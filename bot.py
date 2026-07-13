@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+
+import discord
+from discord.ext import commands
+
+from config import BotConfig
+from database.database import DatabaseManager
+from game_engine import GameEngine
+from game_manager import GameManager
+from lobby_system import LobbyManager
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+class AnimeMafiaBot(commands.Bot):
+    def __init__(self, config: BotConfig) -> None:
+        intents = discord.Intents.default()
+        intents.guilds = True
+        intents.members = True
+        intents.message_content = True
+        super().__init__(command_prefix=config.command_prefix, intents=intents, help_command=None)
+        self.config = config
+        self.db = DatabaseManager()
+        self.game_manager = GameManager()
+        self.game_engine = GameEngine(self.db)
+        self.lobby_manager = LobbyManager(self, self.game_manager, self.game_engine, self.db, self.config)
+
+    async def setup_hook(self) -> None:
+        await self.db.initialize()
+        await self._load_extensions()
+        await self.tree.sync()
+
+    async def close(self) -> None:
+        await super().close()
+        await self.db.close()
+
+    async def on_ready(self) -> None:
+        logger.info("Logged in as %s (%s)", self.user, self.user.id if self.user else "unknown")
+
+    async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
+        logger.exception("App command failed: %s", error)
+        if interaction.response.is_done():
+            await interaction.followup.send("Something went wrong while running that command.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Something went wrong while running that command.", ephemeral=True)
+
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError) -> None:
+        logger.exception("Prefix command failed: %s", error)
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("You do not have permission to use that command.")
+            return
+        if isinstance(error, commands.CommandNotFound):
+            return
+        await ctx.send("Something went wrong while running that command.")
+
+    async def _load_extensions(self) -> None:
+        extensions = (
+            "cogs.help",
+            "cogs.game",
+            "cogs.lobby",
+            "cogs.profile",
+            "cogs.shop",
+            "cogs.leaderboard",
+            "cogs.admin",
+            "cogs.events",
+        )
+        for extension in extensions:
+            try:
+                await self.load_extension(extension)
+            except Exception:
+                logger.exception("Failed to load extension %s", extension)
+
+
+async def main() -> None:
+    config = BotConfig.from_env()
+    if not config.token:
+        raise RuntimeError("DISCORD_TOKEN is not set.")
+
+    bot = AnimeMafiaBot(config)
+    async with bot:
+        await bot.start(config.token)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

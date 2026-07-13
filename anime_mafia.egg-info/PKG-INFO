@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: anime-mafia
+Version: 0.1.0
+Summary: Anime-themed Discord Mafia bot built with discord.py, SQLite, and aiosqlite.
+Requires-Python: >=3.13
+Requires-Dist: aiosqlite>=0.20.0
+Requires-Dist: discord.py>=2.4.0

@@ -1,0 +1,10 @@
+README.md
+bot.py
+config.py
+game_manager.py
+pyproject.toml
+anime_mafia.egg-info/PKG-INFO
+anime_mafia.egg-info/SOURCES.txt
+anime_mafia.egg-info/dependency_links.txt
+anime_mafia.egg-info/requires.txt
+anime_mafia.egg-info/top_level.txt

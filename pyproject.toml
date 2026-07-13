@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anime-mafia"
+version = "0.1.0"
+description = "Anime-themed Discord Mafia bot built with discord.py, SQLite, and aiosqlite."
+requires-python = ">=3.13"
+dependencies = [
+    "aiosqlite>=0.20.0",
+    "discord.py>=2.4.0",
+]
+
+[tool.setuptools]
+py-modules = ["bot", "config", "game_manager"]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
