@@ -44,3 +44,54 @@ def _parse_int_tuple(value: str) -> tuple[int, ...]:
     if not value.strip():
         return ()
     return tuple(int(item.strip()) for item in value.split(",") if item.strip())
+
+
+EMOJIS: dict[str, str] = {
+    # Factions
+    "Hero": "🛡️",
+    "Villain": "🩸",
+    "Neutral": "🎭",
+
+    # Roles
+    "doctor_tenma": "🩺",
+    "ayanokoji_kiyotaka": "🧠",
+    "l": "🕵️",
+    "blackbeard": "🌋",
+    "light_yagami": "📓",
+    "muzan_kibutsuji": "👹",
+    "makima": "👁️",
+    "orochimaru": "🐍",
+    "hisoka": "🃏",
+    "gilgamesh": "🔱",
+    "lelouch_lamperouge": "👑",
+    "eren_jaeger": "🕊️",
+    "mahoraga": "🌀",
+    "villager": "🧑",
+    "demon": "👿",
+    "lower_moon": "🌙",
+    "upper_moon": "💀",
+    "default_villain": "👤",
+
+    # System / UI elements
+    "death": "💀",
+    "alive": "🟢",
+    "night": "🌙",
+    "day": "☀️",
+    "trial": "⚖️",
+    "vote": "🗳️",
+    "verdict": "🔨",
+    "victory": "🏆",
+    "warning": "⚠️",
+    "lobby": "🎮",
+    "clock": "⏰",
+    "check": "✅",
+    "peace": "🕊️",
+    "chat": "💬",
+    "draw": "🤝",
+}
+
+
+def get_emoji(key: str) -> str:
+    """Returns the configured emoji for the given key, falling back to an empty string or default if not found."""
+    return EMOJIS.get(key, "")
+

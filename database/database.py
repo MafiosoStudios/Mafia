@@ -342,6 +342,27 @@ class DatabaseManager:
             upsert=True,
         )
 
+    async def get_guild_settings(self, guild_id: int) -> dict[str, Any]:
+        doc = await self.db.settings.find_one({"guild_id": guild_id})
+        defaults = {
+            "night_duration": 45,
+            "day_duration": 40,
+            "vote_duration": 20,
+            "plea_duration": 30,
+            "verdict_duration": 15,
+            "anonymous_voting": True,
+        }
+        if doc and "settings" in doc:
+            defaults.update(doc["settings"])
+        return defaults
+
+    async def update_guild_setting(self, guild_id: int, key: str, value: Any) -> None:
+        await self.db.settings.update_one(
+            {"guild_id": guild_id},
+            {"$set": {f"settings.{key}": value}},
+            upsert=True,
+        )
+
     # ---- Indexes ---------------------------------------------------------
 
     async def _create_indexes(self) -> None:

@@ -1,0 +1,23 @@
+{
+  "5": { "town": 4, "mafia": 1, "neutral": 0 },
+  "6": { "town": 5, "mafia": 1, "neutral": 0 },
+  "7": { "town": 5, "mafia": 1, "neutral": 1 },
+  "8": { "town": 6, "mafia": 2, "neutral": 0 },
+  "9": { "town": 6, "mafia": 2, "neutral": 1 },
+  "10": { "town": 7, "mafia": 2, "neutral": 1 },
+  "11": { "town": 7, "mafia": 2, "neutral": 2 },
+  "12": { "town": 8, "mafia": 3, "neutral": 1 },
+  "13": { "town": 8, "mafia": 3, "neutral": 2 },
+  "14": { "town": 9, "mafia": 3, "neutral": 2 },
+  "15": { "town": 9, "mafia": 3, "neutral": 3 },
+  "16": { "town": 10, "mafia": 4, "neutral": 2 },
+  "17": { "town": 10, "mafia": 4, "neutral": 3 },
+  "18": { "town": 11, "mafia": 4, "neutral": 3 },
+  "19": { "town": 11, "mafia": 4, "neutral": 4 },
+  "20": { "town": 12, "mafia": 5, "neutral": 3 },
+  "21": { "town": 12, "mafia": 5, "neutral": 4 },
+  "22": { "town": 13, "mafia": 5, "neutral": 4 },
+  "23": { "town": 13, "mafia": 5, "neutral": 5 },
+  "24": { "town": 14, "mafia": 6, "neutral": 4 },
+  "25": { "town": 14, "mafia": 6, "neutral": 5 }
+}

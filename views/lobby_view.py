@@ -63,6 +63,11 @@ class LobbyView(discord.ui.View):
             if member is None:
                 await interaction.response.send_message("This command must be used in a server.", ephemeral=True)
                 return
+            # Strict Host/Admin Check
+            is_admin = member.guild_permissions.administrator
+            if member.id != self.lobby.host_id and not is_admin:
+                await interaction.response.send_message("Only the lobby host (who created it) or an admin can start the match!", ephemeral=True)
+                return
             await lobby_manager.start_lobby(interaction.guild_id or self.lobby.guild_id, member)
         except Exception as exc:  # pragma: no cover - UI feedback path
             await interaction.response.send_message(str(exc), ephemeral=True)

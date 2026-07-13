@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dotenv import load_dotenv
 
 import asyncio
 import logging
@@ -6,9 +7,11 @@ import logging
 import discord
 from discord.ext import commands
 
+load_dotenv()
 from config import BotConfig
 from database.database import DatabaseManager
 from game_engine import GameEngine
+import roles
 from game_manager import GameManager
 from lobby_system import LobbyManager
 
@@ -30,6 +33,7 @@ class AnimeMafiaBot(commands.Bot):
         self.db = DatabaseManager()
         self.game_manager = GameManager()
         self.game_engine = GameEngine(self.db)
+        self.game_engine.bot = self
         self.lobby_manager = LobbyManager(self, self.game_manager, self.game_engine, self.db, self.config)
 
     async def setup_hook(self) -> None:

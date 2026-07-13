@@ -54,6 +54,56 @@ class GameCog(commands.Cog):
         embed.add_field(name="Players", value=str(len(session.players)), inline=True)
         await send_hybrid_response(ctx, embed=embed, view=VoteView(), ephemeral=True)
 
+    @commands.hybrid_group(name="settings", description="Configure game settings for this server")
+    @commands.has_permissions(manage_guild=True)
+    async def settings(self, ctx: commands.Context) -> None:
+        if ctx.invoked_subcommand is None:
+            await send_hybrid_response(ctx, "Try `/settings list` or `/settings set <key> <value>`.", ephemeral=True)
+
+    @settings.command(name="list", description="List current game settings")
+    async def list_settings(self, ctx: commands.Context) -> None:
+        guild_id = ctx.guild.id if ctx.guild else 0
+        db = getattr(self.bot, "db", None)
+        if not db:
+            await send_hybrid_response(ctx, "Database not available.", ephemeral=True)
+            return
+        current = await db.get_guild_settings(guild_id)
+        
+        embed = discord.Embed(title="⚙️ Server Game Settings", color=discord.Color.blue())
+        for key, val in current.items():
+            embed.add_field(name=key, value=f"`{val}`", inline=True)
+        await send_hybrid_response(ctx, embed=embed, ephemeral=True)
+
+    @settings.command(name="set", description="Set a game setting value")
+    @discord.app_commands.choices(key=[
+        discord.app_commands.Choice(name="Night Duration (seconds)", value="night_duration"),
+        discord.app_commands.Choice(name="Day Discussion Duration (seconds)", value="day_duration"),
+        discord.app_commands.Choice(name="Voting Duration (seconds)", value="vote_duration"),
+        discord.app_commands.Choice(name="Defense Plea Duration (seconds)", value="plea_duration"),
+        discord.app_commands.Choice(name="Verdict Duration (seconds)", value="verdict_duration"),
+        discord.app_commands.Choice(name="Anonymous Voting (True/False)", value="anonymous_voting")
+    ])
+    async def set_setting(self, ctx: commands.Context, key: str, value: str) -> None:
+        guild_id = ctx.guild.id if ctx.guild else 0
+        db = getattr(self.bot, "db", None)
+        if not db:
+            await send_hybrid_response(ctx, "Database not available.", ephemeral=True)
+            return
+
+        if key == "anonymous_voting":
+            parsed_value = value.lower() in ("true", "yes", "1", "enable")
+        else:
+            try:
+                parsed_value = int(value)
+                if parsed_value <= 0:
+                    raise ValueError
+            except ValueError:
+                await send_hybrid_response(ctx, "❌ Value for this setting must be a positive integer.", ephemeral=True)
+                return
+
+        await db.update_guild_setting(guild_id, key, parsed_value)
+        await send_hybrid_response(ctx, f"✅ Setting `{key}` successfully updated to `{parsed_value}`.", ephemeral=True)
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(GameCog(bot))

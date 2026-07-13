@@ -54,6 +54,53 @@ class EventsCog(commands.Cog):
         if database is not None:
             await database.delete_guild_data(guild.id)
 
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message) -> None:
+        if message.author.bot:
+            return
+        if message.guild is not None:
+            return
+
+        game_manager = getattr(self.bot, "game_manager", None)
+        game_engine = getattr(self.bot, "game_engine", None)
+        if game_manager is None or game_engine is None:
+            return
+
+        target_session = None
+        player_state = None
+        for session in list(game_engine._sessions.values()):
+            if message.author.id in session.players:
+                pstate = session.players[message.author.id]
+                if pstate.faction == "Villain":
+                    target_session = session
+                    player_state = pstate
+                    break
+
+        if not target_session or not player_state:
+            return
+
+        guild = self.bot.get_guild(target_session.game_handle.guild_id)
+        if not guild:
+            return
+
+        sender_name = message.author.display_name
+        content = message.content
+        if player_state.alive:
+            formatted_msg = f"👥 **[Mafia Chat] {sender_name}**: {content}"
+        else:
+            formatted_msg = f"~~👥 [Mafia Chat] [Dead] {sender_name}: {content}~~"
+
+        for pid, pstate in target_session.players.items():
+            if pid == message.author.id:
+                continue
+            if pstate.faction == "Villain":
+                member = guild.get_member(pid)
+                if member:
+                    try:
+                        await member.send(formatted_msg)
+                    except Exception:
+                        pass
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(EventsCog(bot))

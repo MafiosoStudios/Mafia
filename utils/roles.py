@@ -25,6 +25,7 @@ class BaseRole(ABC):
     description: ClassVar[str]
     passive_ability: ClassVar[str]
     active_ability: ClassVar[str]
+    action_prompt: ClassVar[str] = ""
     priority: ClassVar[int]
     cooldown: ClassVar[int | None] = None
     is_unique: ClassVar[bool] = True

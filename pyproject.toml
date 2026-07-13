@@ -8,8 +8,11 @@ version = "0.1.0"
 description = "Anime-themed Discord Mafia bot built with discord.py, SQLite, and aiosqlite."
 requires-python = ">=3.13"
 dependencies = [
-    "aiosqlite>=0.20.0",
     "discord.py>=2.4.0",
+    "motor>=3.6.0",
+    "pymongo[srv]>=4.9.0",
+    "dnspython>=2.6.0",
+    "python-dotenv>=1.2.2",
 ]
 
 [tool.setuptools]

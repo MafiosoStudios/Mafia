@@ -1,0 +1,164 @@
+{
+  "doctor_tenma": {
+    "name": "Doctor Tenma",
+    "faction": "Hero",
+    "win_condition": "Help the town win. (Wins with Town)",
+    "description": "A brilliant neurosurgeon who believes all lives are equal.",
+    "active_ability": "Hand of Compassion (Heal/protect a player, cannot target same player consecutively). Max Ability: Scalpel of Justice (Revive a dead mafia member as a Default Villager after successfully saving at least 3 players).",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to heal:"
+  },
+  "ayanokoji_kiyotaka": {
+    "name": "Ayanokoji Kiyotaka",
+    "faction": "Hero",
+    "win_condition": "Help the town win. (Wins with Town)",
+    "description": "An elite student who manipulates situations from the shadows.",
+    "active_ability": "Shadow Analysis (Investigate a player's true faction; result is immune to framing/diversion). Max Ability: Final Stand (From Night 9 onwards, passive check reveals the identity of an active mafia player).",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to investigate:"
+  },
+  "l": {
+    "name": "L",
+    "faction": "Hero",
+    "win_condition": "Help the town win. (Wins with Town)",
+    "description": "The world's greatest detective seeking to bring justice.",
+    "active_ability": "Justice's Eye (Investigate a player. 1st scan: Faction. 2nd scan on same player: Role. 3rd scan on same player: Target history, charges, and Max Ability status).",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to scan:"
+  },
+  "blackbeard": {
+    "name": "Blackbeard",
+    "faction": "Villain",
+    "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
+    "description": "A ruthless pirate captain wielding the power of darkness.",
+    "active_ability": "Darkness Logia (Roleblock a player, 1 night cooldown). Max Ability: Tremor Fruit (Earthquake roleblocks all Town and Neutral players for one night).",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to roleblock:"
+  },
+  "light_yagami": {
+    "name": "Light Yagami",
+    "faction": "Villain",
+    "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
+    "description": "A brilliant student with a notebook of death and a god complex.",
+    "active_ability": "Death Note (Guess a player's role; if correct, they are eliminated). Max Ability: The Devil's Pen (Write a player's name; they die unpreventably after 3 nights, 3 night cooldown).",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to target in your Death Note:"
+  },
+  "muzan_kibutsuji": {
+    "name": "Muzan Kibutsuji",
+    "faction": "Villain",
+    "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
+    "description": "The original demon progenitor seeking blue spider lily.",
+    "active_ability": "Blood Demon Art (Every 3rd night, starting Night 3, transform a Town player into a Demon: 85% basic demon, 10% Lower Moon roleblocker, 5% Upper Moon killer).",
+    "passive_ability": "Instant Regeneration (Survive first attack; healed targets give extra charge).",
+    "action_prompt": "Select a town member to infect:"
+  },
+  "makima": {
+    "name": "Makima",
+    "faction": "Villain",
+    "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
+    "description": "The Control Devil who manipulates others' wills.",
+    "active_ability": "Control Order (Every 2nd night, force a player to vote for another target on the next day, 2 uses). Max Ability: Devil's Vendetta (If about to die, redirect death to a random neutral).",
+    "passive_ability": "None",
+    "action_prompt": "Select the player you wish to control:"
+  },
+  "orochimaru": {
+    "name": "Orochimaru",
+    "faction": "Villain",
+    "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
+    "description": "A legendary Sannin obsessed with immortality and forbidden jutsu.",
+    "active_ability": "Reanimation Jutsu (Revive a dead player and use their active ability randomly for the night). Max Ability: Forbidden Rebirth (Self-revive once at the end of the day if lynched/killed).",
+    "passive_ability": "None",
+    "action_prompt": "Select a dead player to reanimate:"
+  },
+  "hisoka": {
+    "name": "Hisoka Morow",
+    "faction": "Neutral",
+    "win_condition": "WinCondition 1: Get voted out before Night 5 (revive for 3 days with roleblock, steal, and kill abilities). WinCondition 2: Correctly predict two players visiting one another 3 times using Bungee Gum.",
+    "description": "A whimsical magician searching for strong opponents.",
+    "active_ability": "Bungee Gum (Link two players. If one visits the other, gain 1 point. Need 3 points).",
+    "passive_ability": "Post-Mortem Nen (Revive if voted out early).",
+    "action_prompt": "Select the first player to link with Bungee Gum:"
+  },
+  "gilgamesh": {
+    "name": "Gilgamesh",
+    "faction": "Neutral",
+    "win_condition": "Find all of your swords (3 or 5 depending on lobby size) to become the Horseman of Apocalypse, then survive for 1 day to trigger the Rumbling apocalypse.",
+    "description": "The King of Heroes who holds all the world's treasures.",
+    "active_ability": "Gate of Babylon (Visit a player to search for your sword. If found, you retrieve it).",
+    "passive_ability": "Apocalypse (Transform once all swords are collected; unleashes wipeout next night if not lynched).",
+    "action_prompt": "Select a player to search for your sword:"
+  },
+  "lelouch_lamperouge": {
+    "name": "Lelouch Lamperouge",
+    "faction": "Neutral",
+    "win_condition": "Geass guess: Declare you will be voted out. If lynched that day, you win. Guessing wrong 3 times kills you. Cannot declare on consecutive days.",
+    "description": "The exiled prince who commands others under the guise of Zero.",
+    "active_ability": "Absolute Command (Declare you will be lynched today).",
+    "passive_ability": "Zero Requiem",
+    "action_prompt": ""
+  },
+  "eren_jaeger": {
+    "name": "Eren Jaeger",
+    "faction": "Neutral",
+    "win_condition": "Survive until Night 8 to trigger The Rumbling, then kill everyone until you are the last one standing.",
+    "description": "A boy who sought freedom, now the Founding Titan.",
+    "active_ability": "Founding Vision (Learn player faction). Max Ability: The Rumbling (From Night 9 onwards, gain un-lynchable status and kill a player every day).",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to look at or attack:"
+  },
+  "mahoraga": {
+    "name": "Eight-Handled Sword Divergent Sila Divine General Mahoraga",
+    "faction": "Neutral",
+    "win_condition": "Survive an attack and eliminate at least 1 player who tried to kill you.",
+    "description": "The ultimate adapted shikigami.",
+    "active_ability": "None",
+    "passive_ability": "Adaptation (75% chance to survive attacks. Upon surviving, gain permanent immunity to the attacker's role and lynch immunity for 1 day).",
+    "action_prompt": ""
+  },
+  "villager": {
+    "name": "Default Villager",
+    "faction": "Hero",
+    "win_condition": "Help the town win. (Wins with Town)",
+    "description": "A normal citizen of the anime town.",
+    "active_ability": "None",
+    "passive_ability": "None",
+    "action_prompt": ""
+  },
+  "default_villain": {
+    "name": "Default Villain",
+    "faction": "Villain",
+    "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
+    "description": "A standard antagonist who works from the shadows.",
+    "active_ability": "Assassinate (Select a target to eliminate every night).",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to assassinate:"
+  },
+  "demon": {
+    "name": "Demon",
+    "faction": "Villain",
+    "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
+    "description": "A human turned demon by Muzan Kibutsuji.",
+    "active_ability": "None",
+    "passive_ability": "None",
+    "action_prompt": ""
+  },
+  "lower_moon": {
+    "name": "Lower Moon Demon",
+    "faction": "Villain",
+    "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
+    "description": "A powerful demon who serves Muzan Kibutsuji.",
+    "active_ability": "Distract (Roleblock a player).",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to roleblock/distract:"
+  },
+  "upper_moon": {
+    "name": "Upper Moon Demon",
+    "faction": "Villain",
+    "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
+    "description": "A lethal demon with supreme power.",
+    "active_ability": "Demon Strike (Kill a player).",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to attack:"
+  }
+}
