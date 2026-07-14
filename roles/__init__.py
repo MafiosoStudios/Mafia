@@ -24,12 +24,25 @@ def get_role_balance(player_count: int) -> dict[str, int]:
     """Returns the count of town, mafia, and neutral roles for the given player count."""
     key = str(player_count)
     if key in BALANCE_METADATA:
-        return BALANCE_METADATA[key]
+        res = dict(BALANCE_METADATA[key])
+    else:
+        # Fallback/extrapolate if outside range
+        if player_count < 5:
+            res = { "town": player_count - 1, "mafia": 1, "neutral": 0 }
+        else:
+            res = { "town": int(player_count * 0.6), "mafia": int(player_count * 0.25), "neutral": player_count - int(player_count * 0.6) - int(player_count * 0.25) }
     
-    # Fallback/extrapolate if outside range
-    if player_count < 5:
-        return { "town": player_count - 1, "mafia": 1, "neutral": 0 }
-    return { "town": int(player_count * 0.6), "mafia": int(player_count * 0.25), "neutral": player_count - int(player_count * 0.6) - int(player_count * 0.25) }
+    # Guarantee at least 1 Mafia role if player count allows it
+    if player_count >= 2 and res.get("mafia", 0) <= 0:
+        town = res.get("town", 0)
+        neutral = res.get("neutral", 0)
+        if neutral > 0:
+            res["neutral"] = neutral - 1
+        elif town > 0:
+            res["town"] = town - 1
+        res["mafia"] = 1
+        
+    return res
 
 
 def bind_metadata_to_roles() -> None:

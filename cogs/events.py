@@ -99,7 +99,7 @@ class EventsCog(commands.Cog):
                 member = guild.get_member(pid)
                 if member:
                     try:
-                        await member.send(formatted_msg)
+                        self.bot.message_queue.send(member, formatted_msg)
                     except Exception:
                         pass
 

@@ -1,22 +1,29 @@
 from __future__ import annotations
 
 from typing import ClassVar, Any
-from utils.roles import BaseRole, RoleContext, RoleCategory, role_registry
+from utils.roles import BaseRole, RoleContext, RoleCategory, role_registry, NightAction, WinCondition
 from utils.constants import RoleFaction
+from config import get_emoji
 
-@role_registry.register
-class DoctorTenma(BaseRole):
-    role_key: ClassVar[str] = "doctor_tenma"
-    priority: ClassVar[int] = 3
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.PROTECTIVE,)
 
-    async def night_action(self, context: RoleContext) -> None:
+class TenmaHeal(NightAction):
+    def __init__(self, role: BaseRole) -> None:
+        super().__init__(
+            name="Hand of Compassion",
+            description="Heal/protect a player, cannot target same player consecutively. Max Ability: Scalpel of Justice (Revive a dead mafia member as a Default Villager after successfully saving at least 3 players).",
+            priority=3
+        )
+        self.role = role
+
+    async def execute(self, context: RoleContext) -> None:
         target_id = context.target_id
         if not target_id:
             return
 
-        # Hand of Compassion
         session = context.payload.get("session")
+        if not session:
+            return
+            
         player_state = session.players[context.user_id]
         
         # Check consecutive heals
@@ -62,22 +69,62 @@ class DoctorTenma(BaseRole):
         heals[target_id + 1000000] = context.user_id  # Keep track of who healed who
         context.payload["log"] = f"Doctor Tenma protected <@{target_id}> tonight."
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.HERO.value in alive_factions
-
 
 @role_registry.register
-class AyanokojiKiyotaka(BaseRole):
-    role_key: ClassVar[str] = "ayanokoji_kiyotaka"
-    priority: ClassVar[int] = 5
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
+class DoctorTenma(BaseRole):
+    role_key: ClassVar[str] = "doctor_tenma"
+    priority: ClassVar[int] = 3
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.PROTECTIVE,)
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "Cannot heal the same player consecutively. Reviving a dead Mafia teammate as a Villager requires saving at least 3 players first."
 
-    async def night_action(self, context: RoleContext) -> None:
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [TenmaHeal(self)]
+
+    async def get_night_feedback(self, context: RoleContext) -> str | None:
+        target_id = context.payload.get("target_id")
+        action_type = context.payload.get("action_type")
+        if not target_id:
+            return None
+            
+        if action_type == "revive":
+            return f"{get_emoji('doctor_tenma')} **You used your Scalpel of Justice to revive <@{target_id}> as a Default Villager!**"
+
+        # Check if heal successfully saved someone
+        session = context.payload.get("session")
+        if session:
+            pending_kills = session.metadata.get("pending_kills", {})
+            healed_players = session.metadata.get("healed_players", {})
+            doc_id = healed_players.get(target_id + 1000000)
+            was_attacked = target_id in pending_kills
+            
+            if was_attacked and doc_id == context.user_id:
+                player_state = session.players[context.user_id]
+                doc_saves = player_state.metadata.get("saves_count", 0)
+                return f"{get_emoji('shield')} **Compassion Successful!** You saved <@{target_id}> from an attack! Saves: **{doc_saves}/3**."
+            
+            return f"{get_emoji('doctor_tenma')} **You decided to heal <@{target_id}> tonight. They were not attacked.**"
+        return None
+
+
+class ShadowAnalysis(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Shadow Analysis",
+            description="Investigate a player's true faction; result is immune to framing/diversion.",
+            priority=5
+        )
+
+    async def execute(self, context: RoleContext) -> None:
         target_id = context.target_id
         if not target_id:
             return
 
         session = context.payload.get("session")
+        if not session:
+            return
+            
         target_player = session.players.get(target_id)
         if not target_player:
             return
@@ -86,22 +133,37 @@ class AyanokojiKiyotaka(BaseRole):
         faction = target_player.faction
         context.payload["result"] = f"Investigation Result: <@{target_id}>'s true faction is **{faction}**."
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.HERO.value in alive_factions
-
 
 @role_registry.register
-class L(BaseRole):
-    role_key: ClassVar[str] = "l"
+class AyanokojiKiyotaka(BaseRole):
+    role_key: ClassVar[str] = "ayanokoji_kiyotaka"
     priority: ClassVar[int] = 5
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "None"
 
-    async def night_action(self, context: RoleContext) -> None:
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [ShadowAnalysis()]
+
+
+class JusticesEye(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Justice's Eye",
+            description="Investigate a player. 1st scan: Faction. 2nd scan: Role. 3rd scan: Target history, charges, and Max Ability status.",
+            priority=5
+        )
+
+    async def execute(self, context: RoleContext) -> None:
         target_id = context.target_id
         if not target_id:
             return
 
         session = context.payload.get("session")
+        if not session:
+            return
+            
         target_player = session.players.get(target_id)
         if not target_player:
             return
@@ -116,7 +178,6 @@ class L(BaseRole):
         elif scan_count == 2:
             context.payload["result"] = f"Investigation (Scan 2): <@{target_id}>'s role is **{target_player.role_key}**."
         else:
-            # Gather details
             max_avail = target_player.metadata.get("max_ability_available", True)
             charges = target_player.metadata.get("charges", "N/A")
             history = target_player.metadata.get("target_history", [])
@@ -129,8 +190,18 @@ class L(BaseRole):
                 f"- Visited Targets History: **{history_str}**"
             )
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.HERO.value in alive_factions
+
+@role_registry.register
+class L(BaseRole):
+    role_key: ClassVar[str] = "l"
+    priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "None"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [JusticesEye()]
 
 
 @role_registry.register
@@ -139,6 +210,5 @@ class DefaultVillager(BaseRole):
     priority: ClassVar[int] = 5
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.COUNCIL,)
     is_unique: ClassVar[bool] = False
-
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.HERO.value in alive_factions
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "None"

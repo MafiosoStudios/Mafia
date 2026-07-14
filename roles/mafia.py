@@ -2,21 +2,28 @@ from __future__ import annotations
 
 import random
 from typing import ClassVar, Any
-from utils.roles import BaseRole, RoleContext, RoleCategory, role_registry
+from utils.roles import BaseRole, RoleContext, RoleCategory, role_registry, NightAction, PassiveEffect
 from utils.constants import RoleFaction
+from config import get_emoji
 
-@role_registry.register
-class Blackbeard(BaseRole):
-    role_key: ClassVar[str] = "blackbeard"
-    priority: ClassVar[int] = 1  # Runs first to apply roleblock
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
 
-    async def night_action(self, context: RoleContext) -> None:
+class BlackbeardBlock(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Darkness Logia / Tremor Fruit",
+            description="Darkness Logia: Roleblock a player. Tremor Fruit: Roleblock all non-mafia players (once per game).",
+            priority=1
+        )
+
+    async def execute(self, context: RoleContext) -> None:
         session = context.payload.get("session")
+        if not session:
+            return
+            
         player_state = session.players[context.user_id]
-        
-        # Check for Tremor Fruit (Max Ability)
         action_type = context.payload.get("action_type")
+
+        # 1. Tremor Fruit (Max Ability)
         if action_type == "tremor":
             if player_state.metadata.get("tremor_used"):
                 context.payload["error"] = "You have already used the Tremor Fruit."
@@ -33,7 +40,7 @@ class Blackbeard(BaseRole):
             context.payload["log"] = f"Blackbeard triggered the Tremor Fruit! An earthquake roleblocked {blocked_count} players."
             return
 
-        # Normal Darkness Logia roleblock
+        # 2. Normal Darkness Logia roleblock
         target_id = context.target_id
         if not target_id:
             return
@@ -51,18 +58,42 @@ class Blackbeard(BaseRole):
             target_player.metadata["roleblocked"] = True
             context.payload["log"] = f"Blackbeard roleblocked <@{target_id}>."
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.VILLAIN.value in alive_factions
-
 
 @role_registry.register
-class LightYagami(BaseRole):
-    role_key: ClassVar[str] = "light_yagami"
-    priority: ClassVar[int] = 4
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
+class Blackbeard(BaseRole):
+    role_key: ClassVar[str] = "blackbeard"
+    priority: ClassVar[int] = 1
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
+    cooldown_text: ClassVar[str] = "1 night cooldown (Darkness Logia)"
+    limitations_text: ClassVar[str] = "Tremor Fruit is once per game."
 
-    async def night_action(self, context: RoleContext) -> None:
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [BlackbeardBlock()]
+
+    async def get_night_feedback(self, context: RoleContext) -> str | None:
+        target_id = context.payload.get("target_id")
+        action_type = context.payload.get("action_type")
+        if action_type == "tremor":
+            return f"{get_emoji('blackbeard')} **You triggered the Tremor Fruit earthquake! All non-mafia players have been roleblocked.**"
+        elif target_id:
+            return f"{get_emoji('blackbeard')} **Your Darkness Logia roleblock successfully distracted <@{target_id}>!**"
+        return None
+
+
+class LightYagamiKill(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Death Note / Devil's Pen",
+            description="Death Note: Guess target's role; if correct, they are eliminated. Devil's Pen: Targeted player dies unpreventably after 3 nights.",
+            priority=4
+        )
+
+    async def execute(self, context: RoleContext) -> None:
         session = context.payload.get("session")
+        if not session:
+            return
+            
         player_state = session.players[context.user_id]
         action_type = context.payload.get("action_type")
 
@@ -87,7 +118,7 @@ class LightYagami(BaseRole):
             context.payload["log"] = f"Light Yagami wrote <@{target_id}>'s name in the Death Note. They will die in 3 nights."
             return
 
-        # 2. Death Note (Ritualist Role Guess)
+        # 2. Death Note Guess
         target_id = context.target_id
         guessed_role = context.payload.get("guessed_role")
         if not target_id or not guessed_role:
@@ -99,34 +130,56 @@ class LightYagami(BaseRole):
             return
 
         if target_player.role_key == guessed_role:
-            # Correct guess: target dies
             kills = session.metadata.setdefault("pending_kills", {})
             kills[target_id] = kills.get(target_id, []) + ["light_guess"]
             context.payload["log"] = f"Light Yagami guessed the role of <@{target_id}> correctly!"
         else:
             context.payload["log"] = f"Light Yagami guessed <@{target_id}>'s role incorrectly as '{guessed_role}'."
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.VILLAIN.value in alive_factions
-
 
 @role_registry.register
-class MuzanKibutsuji(BaseRole):
-    role_key: ClassVar[str] = "muzan_kibutsuji"
+class LightYagami(BaseRole):
+    role_key: ClassVar[str] = "light_yagami"
     priority: ClassVar[int] = 4
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.DECEPTION,)
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
+    cooldown_text: ClassVar[str] = "3 nights cooldown (Devil's Pen)"
+    limitations_text: ClassVar[str] = "Death Note guess only kills on correct guesses."
 
-    async def night_action(self, context: RoleContext) -> None:
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [LightYagamiKill()]
+
+    async def get_night_feedback(self, context: RoleContext) -> str | None:
+        target_id = context.payload.get("target_id")
+        action_type = context.payload.get("action_type")
+        if not target_id:
+            return None
+            
+        if action_type == "devils_pen":
+            return f"{get_emoji('light_yagami')} **You wrote <@{target_id}>'s name in the Death Note with the Devil's Pen. They will die in 3 nights.**"
+        else:
+            guessed_role = context.payload.get("guessed_role")
+            session = context.payload.get("session")
+            if session:
+                target_player = session.players.get(target_id)
+                if target_player and target_player.role_key == guessed_role:
+                    return f"{get_emoji('light_yagami')} **Kira's judgment! Your guess of <@{target_id}> as '{guessed_role}' was correct. They have been eliminated.**"
+                else:
+                    return f"{get_emoji('light_yagami')} **Your guess of <@{target_id}> as '{guessed_role}' was incorrect. No elimination took place.**"
+        return None
+
+
+class MuzanInfect(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Blood Demon Art",
+            description="Every 3rd night (starting Night 3), transform a Town player into a Demon (85% basic, 10% Lower Moon, 5% Upper Moon).",
+            priority=4
+        )
+
+    async def execute(self, context: RoleContext) -> None:
         session = context.payload.get("session")
-        player_state = session.players[context.user_id]
-        
-        # Initialize regeneration passive
-        if "muzan_regen" not in player_state.metadata:
-            player_state.metadata["muzan_regen"] = True
-
-        current_night = session.metadata.get("night_num", 1)
-        if current_night < 3 or current_night % 3 != 0:
-            context.payload["error"] = "Blood Demon Art can only be used starting from Night 3, every 3 nights."
+        if not session:
             return
 
         target_id = context.target_id
@@ -141,7 +194,7 @@ class MuzanKibutsuji(BaseRole):
             context.payload["error"] = "You can only transform town members into demons."
             return
 
-        # 85% basic demon, 10% lower moon, 5% upper moon
+        # Transform logic
         rand = random.random()
         if rand < 0.85:
             target_player.role_key = "demon"
@@ -156,31 +209,93 @@ class MuzanKibutsuji(BaseRole):
         target_player.faction = RoleFaction.VILLAIN.value
         context.payload["log"] = f"Muzan Kibutsuji infected <@{target_id}>, transforming them into a **{new_role_name}**!"
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.VILLAIN.value in alive_factions
+
+class MuzanRegen(PassiveEffect):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Instant Regeneration",
+            description="Survive first night attack."
+        )
+
+    async def resolve_protection(self, context: RoleContext, attack_sources: list[str]) -> bool:
+        session = context.payload.get("session")
+        if not session:
+            return False
+            
+        player_state = session.players.get(context.user_id)
+        if player_state and player_state.metadata.get("muzan_regen", True):
+            player_state.metadata["muzan_regen"] = False
+            
+            # Queue the notification DM
+            guild = context.bot.get_guild(session.game_handle.guild_id) if (context.bot and session.game_handle) else None
+            if guild:
+                muzan_member = guild.get_member(context.user_id)
+                if muzan_member:
+                    context.bot.message_queue.send(
+                        muzan_member,
+                        f"{get_emoji('shield')} **Instant Regeneration Triggered!** You blocked an attack. Your passive is now disabled."
+                    )
+            return True
+        return False
 
 
 @role_registry.register
-class Makima(BaseRole):
-    role_key: ClassVar[str] = "makima"
-    priority: ClassVar[int] = 5
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
+class MuzanKibutsuji(BaseRole):
+    role_key: ClassVar[str] = "muzan_kibutsuji"
+    priority: ClassVar[int] = 4
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.DECEPTION,)
+    cooldown_text: ClassVar[str] = "Usable every 3 nights (Nights 3, 6, 9...)"
+    limitations_text: ClassVar[str] = "Can only infect living Town (Hero) faction players."
 
-    async def night_action(self, context: RoleContext) -> None:
-        session = context.payload.get("session")
-        player_state = session.players[context.user_id]
-        
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [MuzanInfect()]
+        self.passives = [MuzanRegen()]
+
+    def can_act_tonight(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
         current_night = session.metadata.get("night_num", 1)
-        if current_night % 2 != 0:
-            context.payload["error"] = "Control Devil can only be used every 2nd night (Night 2, 4, etc.)."
-            return
+        if current_night < 3 or current_night % 3 != 0:
+            return False, f"Blood Demon Art can only be used starting from Night 3, every 3 nights (Night 3, 6, 9, etc.). It is currently Night {current_night}."
+        return True, None
 
+    async def get_night_feedback(self, context: RoleContext) -> str | None:
+        target_id = context.payload.get("target_id")
+        if not target_id:
+            return None
+        session = context.payload.get("session")
+        if session:
+            target_player = session.players.get(target_id)
+            if target_player and target_player.faction == RoleFaction.VILLAIN.value:
+                from roles import ROLES_METADATA
+                role_meta = ROLES_METADATA.get(target_player.role_key or "", {})
+                role_display = role_meta.get("name", "Demon")
+                return f"{get_emoji('muzan_kibutsuji')} **Your Blood Demon Art successfully infected <@{target_id}>! They are now a {role_display} on your side.**"
+            else:
+                return f"{get_emoji('muzan_kibutsuji')} **Your Blood Demon Art failed to infect <@{target_id}>.**"
+        return None
+
+
+class MakimaControl(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Control Order",
+            description="Force a player to vote for another target on the next day (usable every 2nd night, 2 charges).",
+            priority=5
+        )
+
+    async def execute(self, context: RoleContext) -> None:
+        session = context.payload.get("session")
+        if not session:
+            return
+            
+        player_state = session.players[context.user_id]
+        current_night = session.metadata.get("night_num", 1)
+        
         controls_left = player_state.metadata.setdefault("controls_left", 2)
         if controls_left <= 0:
             context.payload["error"] = "No control charges left."
             return
 
-        # Target 1 (to be controlled) and Target 2 (whom they will vote for)
         target1 = context.target_id
         target2 = context.payload.get("controlled_vote_target")
         if not target1 or not target2:
@@ -189,31 +304,60 @@ class Makima(BaseRole):
 
         player_state.metadata["controls_left"] = controls_left - 1
         
-        # Store vote redirection for the next day
+        # Store redirection
         redirections = session.metadata.setdefault("vote_redirections", {})
         redirections[target1] = target2
         
         context.payload["log"] = f"Makima controlled <@{target1}> to vote for <@{target2}> next day."
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.VILLAIN.value in alive_factions
-
 
 @role_registry.register
-class Orochimaru(BaseRole):
-    role_key: ClassVar[str] = "orochimaru"
-    priority: ClassVar[int] = 2  # Runs early to execute reanimated abilities
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
+class Makima(BaseRole):
+    role_key: ClassVar[str] = "makima"
+    priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
+    cooldown_text: ClassVar[str] = "Usable every 2nd night (Nights 2, 4, 6...)"
+    limitations_text: ClassVar[str] = "2 charges max per game."
 
-    async def night_action(self, context: RoleContext) -> None:
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [MakimaControl()]
+
+    def can_act_tonight(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        current_night = session.metadata.get("night_num", 1)
+        if current_night % 2 != 0:
+            return False, f"Control Devil can only be used every 2nd night (Night 2, 4, etc.). It is currently Night {current_night}."
+        controls_left = player_state.metadata.setdefault("controls_left", 2)
+        if controls_left <= 0:
+            return False, "You have no control charges left."
+        return True, None
+
+    async def get_night_feedback(self, context: RoleContext) -> str | None:
+        target_id = context.payload.get("target_id")
+        controlled_target = context.payload.get("controlled_vote_target")
+        if target_id and controlled_target:
+            return f"{get_emoji('makima')} **Your Control Order succeeded. <@{target_id}> will vote for <@{controlled_target}> next day!**"
+        return None
+
+
+class OrochimaruReanimate(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Reanimation Jutsu",
+            description="Revive a dead player and use their active ability randomly for the night.",
+            priority=2
+        )
+
+    async def execute(self, context: RoleContext) -> None:
         session = context.payload.get("session")
+        if not session:
+            return
+            
         player_state = session.players[context.user_id]
-        
-        target_id = context.target_id  # Dead player to reanimate
+        target_id = context.target_id
         if not target_id:
             return
 
-        # Verify target is dead
         target_player = session.players.get(target_id)
         if not target_player or target_player.alive:
             context.payload["error"] = "Cannot reanimate a living player."
@@ -225,8 +369,6 @@ class Orochimaru(BaseRole):
             return
 
         used_reanimations.append(target_id)
-
-        # Get target's role class
         dead_role_key = target_player.role_key
         if not dead_role_key:
             return
@@ -235,7 +377,7 @@ class Orochimaru(BaseRole):
         if not dead_role_cls:
             return
 
-        # Pick random target from all living players excluding Orochimaru and fellow mafias
+        # Pick random target
         eligible_targets = [
             pid for pid, pstate in session.players.items()
             if pstate.alive and pstate.user_id != context.user_id and pstate.faction != RoleFaction.VILLAIN.value
@@ -246,13 +388,13 @@ class Orochimaru(BaseRole):
 
         random_target = random.choice(eligible_targets)
         
-        # Instantiate dead role context and run its night action
         new_ctx = RoleContext(
             game_id=context.game_id,
             guild_id=context.guild_id,
             user_id=context.user_id,
             target_id=random_target,
-            payload=context.payload
+            payload=context.payload,
+            bot=context.bot
         )
         
         dead_role_inst = dead_role_cls()
@@ -260,75 +402,139 @@ class Orochimaru(BaseRole):
         
         context.payload["log"] = f"Orochimaru reanimated <@{target_id}> to use their ability on <@{random_target}>!"
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.VILLAIN.value in alive_factions
+
+@role_registry.register
+class Orochimaru(BaseRole):
+    role_key: ClassVar[str] = "orochimaru"
+    priority: ClassVar[int] = 2
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "Cannot reanimate the same dead player twice."
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [OrochimaruReanimate()]
+
+    async def get_night_feedback(self, context: RoleContext) -> str | None:
+        target_id = context.payload.get("target_id")
+        if target_id:
+            return f"{get_emoji('orochimaru')} **Your Reanimation Jutsu successfully revived <@{target_id}> for the night!**"
+        return None
 
 
-# Muzan's Demon Minion roles logic:
 @role_registry.register
 class Demon(BaseRole):
     role_key: ClassVar[str] = "demon"
     priority: ClassVar[int] = 5
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "No active night abilities."
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.VILLAIN.value in alive_factions
+    def __init__(self) -> None:
+        super().__init__()
 
 
-@role_registry.register
-class LowerMoon(BaseRole):
-    role_key: ClassVar[str] = "lower_moon"
-    priority: ClassVar[int] = 1  # Roleblock is priority 1
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
+class LowerMoonDistract(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Distract",
+            description="Roleblock a player.",
+            priority=1
+        )
 
-    async def night_action(self, context: RoleContext) -> None:
+    async def execute(self, context: RoleContext) -> None:
         target_id = context.target_id
         if not target_id:
             return
+            
         session = context.payload.get("session")
+        if not session:
+            return
+            
         target_player = session.players.get(target_id)
         if target_player:
             target_player.metadata["roleblocked"] = True
             context.payload["log"] = f"Lower Moon Demon distracted <@{target_id}>."
 
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.VILLAIN.value in alive_factions
+
+@role_registry.register
+class LowerMoon(BaseRole):
+    role_key: ClassVar[str] = "lower_moon"
+    priority: ClassVar[int] = 1
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "Cannot target Mafia teammates."
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [LowerMoonDistract()]
+
+
+class UpperMoonStrike(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Demon Strike",
+            description="Kill a player.",
+            priority=4
+        )
+
+    async def execute(self, context: RoleContext) -> None:
+        target_id = context.target_id
+        if not target_id:
+            return
+            
+        session = context.payload.get("session")
+        if not session:
+            return
+            
+        kills = session.metadata.setdefault("pending_kills", {})
+        kills[target_id] = kills.get(target_id, []) + ["demon_strike"]
+        context.payload["log"] = f"Upper Moon Demon attacked <@{target_id}>."
 
 
 @role_registry.register
 class UpperMoon(BaseRole):
     role_key: ClassVar[str] = "upper_moon"
-    priority: ClassVar[int] = 4  # Kill is priority 4
+    priority: ClassVar[int] = 4
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "Cannot target Mafia teammates."
 
-    async def night_action(self, context: RoleContext) -> None:
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [UpperMoonStrike()]
+
+
+class VillainAssassinate(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Assassinate",
+            description="Select a target to eliminate every night.",
+            priority=4
+        )
+
+    async def execute(self, context: RoleContext) -> None:
         target_id = context.target_id
         if not target_id:
             return
+            
         session = context.payload.get("session")
+        if not session:
+            return
+            
         kills = session.metadata.setdefault("pending_kills", {})
-        kills[target_id] = kills.get(target_id, []) + ["demon_strike"]
-        context.payload["log"] = f"Upper Moon Demon attacked <@{target_id}>."
-
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.VILLAIN.value in alive_factions
+        kills[target_id] = kills.get(target_id, []) + ["mafia_strike"]
+        context.payload["log"] = f"Default Villain attacked <@{target_id}>."
 
 
 @role_registry.register
 class DefaultVillain(BaseRole):
     role_key: ClassVar[str] = "default_villain"
-    priority: ClassVar[int] = 4  # Kill is priority 4
+    priority: ClassVar[int] = 4
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
     is_unique: ClassVar[bool] = False
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "Cannot target Mafia teammates."
 
-    async def night_action(self, context: RoleContext) -> None:
-        target_id = context.target_id
-        if not target_id:
-            return
-        session = context.payload.get("session")
-        kills = session.metadata.setdefault("pending_kills", {})
-        kills[target_id] = kills.get(target_id, []) + ["mafia_strike"]
-        context.payload["log"] = f"Default Villain attacked <@{target_id}>."
-
-    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        return RoleFaction.VILLAIN.value in alive_factions
-
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [VillainAssassinate()]
