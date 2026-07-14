@@ -3,28 +3,73 @@
     "name": "Doctor Tenma",
     "faction": "Hero",
     "win_condition": "Help the town win. (Wins with Town)",
-    "description": "A brilliant neurosurgeon who believes all lives are equal.",
-    "active_ability": "Hand of Compassion (Heal/protect a player, cannot target same player consecutively). Max Ability: Scalpel of Justice (Revive a dead mafia member as a Default Villager after successfully saving at least 3 players).",
+    "description": "A brilliant doctor who believes all lives are equal.",
+    "active_ability": "Emergency Surgery (Protect a player, 1 Night cooldown) / Life Support (Prevent target's death, making them Wounded instead, 1 use).",
     "passive_ability": "None",
-    "action_prompt": "Select a player to heal:"
+    "action_prompt": "Select an action to perform:"
   },
   "ayanokoji_kiyotaka": {
     "name": "Ayanokoji Kiyotaka",
     "faction": "Hero",
     "win_condition": "Help the town win. (Wins with Town)",
-    "description": "An elite student who manipulates situations from the shadows.",
-    "active_ability": "Shadow Analysis (Investigate a player's true faction; result is immune to framing/diversion). Max Ability: Final Stand (From Night 9 onwards, passive check reveals the identity of an active mafia player).",
+    "description": "The \"Hidden Genius\" who manipulates situations from the shadows.",
+    "active_ability": "Observation (Learn whether a player used an ability tonight) / Psychological Analysis (Learn whether a player visited another player or stayed home).",
     "passive_ability": "None",
-    "action_prompt": "Select a player to investigate:"
+    "action_prompt": "Select an action to perform:"
   },
   "l": {
     "name": "L",
     "faction": "Hero",
     "win_condition": "Help the town win. (Wins with Town)",
-    "description": "The world's greatest detective seeking to bring justice.",
-    "active_ability": "Justice's Eye (Investigate a player. 1st scan: Faction. 2nd scan on same player: Role. 3rd scan on same player: Target history, charges, and Max Ability status).",
+    "description": "The World's Greatest Detective.",
+    "active_ability": "Deduction (Investigate target's alignment) / Cross Examination (Compare two players' factions, 2 uses).",
+    "passive_ability": "99% Certain (Scanning the same target on two different nights uncovers their exact role).",
+    "action_prompt": "Select an action to perform:"
+  },
+  "tobirama_senju": {
+    "name": "Tobirama Senju",
+    "faction": "Hero",
+    "win_condition": "Help the town win. (Wins with Town)",
+    "description": "The Master Sensor.",
+    "active_ability": "Sensory Technique (Learn everyone who visited target player tonight) / Water Wall (Protect a player from first basic attack, 2 uses).",
+    "passive_ability": "Master Sensor (Learn which players visited Tobirama tonight).",
+    "action_prompt": "Select an action to perform:"
+  },
+  "hiromi_higuruma": {
+    "name": "Hiromi Higuruma",
+    "faction": "Hero",
+    "win_condition": "Help the town win. (Wins with Town)",
+    "description": "The Prosecutor (Judge + Lawyer).",
+    "active_ability": "Deadly Sentencing (Instantly execute a player during Nomination phase, 2 uses) / Retrial (Acquit defendant during trial, 2 uses).",
     "passive_ability": "None",
-    "action_prompt": "Select a player to scan:"
+    "action_prompt": "Select a day or trial action to perform:"
+  },
+  "levi_ackerman": {
+    "name": "Levi Ackerman",
+    "faction": "Hero",
+    "win_condition": "Help the town win. (Wins with Town)",
+    "description": "Humanity's Strongest Soldier.",
+    "active_ability": "ODM Execution (Attack a player, 3 uses) / Precision Strike (ODM Execution ignores protection tonight, 1 use).",
+    "passive_ability": "Survivor's Guilt (Become exhausted for 1 cycle if you kill a Town player).",
+    "action_prompt": "Select an action to perform:"
+  },
+  "maomao": {
+    "name": "Maomao",
+    "faction": "Hero",
+    "win_condition": "Help the town win. (Wins with Town)",
+    "description": "The Apothecary.",
+    "active_ability": "Postmortem Analysis (Learn all visitors of last night's victim, 1 Night cooldown) / Comparative Analysis (Compare 2 players' factions, 1 Night cooldown).",
+    "passive_ability": "Keen Observation (Learn if examined victim was protected).",
+    "action_prompt": "Select an action to perform:"
+  },
+  "frieren": {
+    "name": "Frieren",
+    "faction": "Hero",
+    "win_condition": "Help the town win. (Wins with Town)",
+    "description": "The Mage.",
+    "active_ability": "Ancient Binding (Bind 2 players; if one dies, survivor is Hidden; 2-Day cooldown) / Magical Barrier (magical protection from opposite faction) / Age of Magic (reduce target cooldown by 1 Night).",
+    "passive_ability": "None",
+    "action_prompt": "Select an action to perform:"
   },
   "blackbeard": {
     "name": "Blackbeard",

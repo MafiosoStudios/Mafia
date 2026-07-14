@@ -78,6 +78,11 @@ EMOJIS: dict[str, str] = {
     "lower_moon": "🌙",
     "upper_moon": "💀",
     "default_villain": "👤",
+    "tobirama_senju": "🌊",
+    "hiromi_higuruma": "⚖️",
+    "levi_ackerman": "⚔️",
+    "maomao": "🧪",
+    "frieren": "✨",
 
     # Role categories (used for role-reveal / role-list UI)
     "category_protective": "🩹",
@@ -213,6 +218,16 @@ DEATH_MESSAGES: dict[str, list[str]] = {
     ],
     "declared_peace": [
         "**{player}** chose to step down peacefully.",
+    ],
+    "levi_kill": [
+        "**{player}** was sliced to pieces by Levi Ackerman's dual blades.",
+        "**{player}** stood no chance against the Humanity's Strongest Soldier's ODM execution.",
+    ],
+    "deadly_sentencing": [
+        "**{player}** was immediately sentenced to execution by Hiromi Higuruma.",
+    ],
+    "wrongful_judgment": [
+        "**{player}** wrongfully prosecuted a town member and was executed by the Hangman for their judgment.",
     ],
 }
 

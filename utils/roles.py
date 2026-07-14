@@ -58,9 +58,22 @@ class NightAction(Ability):
     def __init__(self, name: str, description: str, priority: int = 5, cooldown: int | None = None) -> None:
         super().__init__(name, description, cooldown)
         self.priority = priority
+        self.num_targets = 1
 
     async def execute(self, context: RoleContext) -> None:
         pass
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        return True, None
+
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        targets = []
+        for pid, pstate in session.players.items():
+            if pstate.alive:
+                if pstate.metadata.get("hidden_until_night") == session.night_num:
+                    continue
+                targets.append(pid)
+        return targets
 
 
 class DayAction(Ability):

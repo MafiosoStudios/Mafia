@@ -94,6 +94,16 @@ class NightActionView(discord.ui.View):
             await interaction.response.send_message("Dead players cannot perform night actions.", ephemeral=True)
             return
 
+        # Check Wounded status
+        if player.metadata.get("wounded_until_night") == session.metadata.get("night_num", 1):
+            await interaction.response.send_message("You are Wounded and cannot act tonight!", ephemeral=True)
+            return
+
+        # Check Exhausted status
+        if player.metadata.get("exhausted_until_night") == session.metadata.get("night_num", 1):
+            await interaction.response.send_message("You are Exhausted and cannot act tonight!", ephemeral=True)
+            return
+
         if player.metadata.get("roleblocked"):
             await interaction.response.send_message("You feel disoriented... You have been roleblocked and cannot act tonight!", ephemeral=True)
             return
@@ -103,79 +113,213 @@ class NightActionView(discord.ui.View):
             await interaction.response.send_message("You do not have a role assigned.", ephemeral=True)
             return
 
-        # Special check for roles that can't act or have custom UIs
+        # Special check for roles that can't act
         if role_key in ["villager", "demon", "mahoraga"]:
             await interaction.response.send_message("You do not have an active night ability.", ephemeral=True)
             return
 
-        # Build target select menu
-        # Targets are living players
-        living_targets = [
-            pid for pid, pstate in session.players.items()
-            if pstate.alive
-        ]
-
-        if not living_targets:
-            await interaction.response.send_message("No targets available.", ephemeral=True)
+        # Instantiate role to retrieve abilities
+        from utils.roles import role_registry, NightAction
+        role_cls = role_registry.get(role_key) if role_registry.contains(role_key) else None
+        if not role_cls:
+            await interaction.response.send_message("Your role is not registered.", ephemeral=True)
             return
 
-        # Filter targets based on role rules
-        options = []
-        guild = interaction.guild
-        for pid in living_targets:
-            # Self-targeting check
-            if pid == user_id:
-                # Only Doctor Tenma can heal himself (implied by "heal anyone")
-                if role_key != "doctor_tenma":
-                    continue
-            
-            # Mafia cannot target fellow Mafia for hostile actions
-            if player.faction == "Villain" and role_key in ["blackbeard", "light_yagami", "muzan_kibutsuji", "makima", "upper_moon"]:
-                target_state = session.players[pid]
-                if target_state.faction == "Villain":
-                    continue
-
-            member = guild.get_member(pid) if guild else None
-            name = member.display_name if member else f"User {pid}"
-            options.append(discord.SelectOption(label=name, value=str(pid)))
-
-        if not options:
-            await interaction.response.send_message("No eligible targets for your ability.", ephemeral=True)
+        role_inst = role_cls()
+        active_abilities = [a for a in role_inst.abilities if isinstance(a, NightAction)]
+        if not active_abilities:
+            await interaction.response.send_message("You do not have an active night ability.", ephemeral=True)
             return
 
-        # Handle roles with custom secondary selections
-        view = discord.ui.View(timeout=120)
-        
+        # Handle legacy role-specific custom views (e.g. Light Yagami)
+        # Note: Kenzo Tenma is now fully updated, but Light Yagami uses a special guess panel
         if role_key == "light_yagami":
-            # Guessing role or using Devils Pen
+            living_targets = [pid for pid, pstate in session.players.items() if pstate.alive and pstate.faction != "Villain"]
+            options = []
+            guild = interaction.guild
+            for pid in living_targets:
+                member = guild.get_member(pid) if guild else None
+                name = member.display_name if member else f"User {pid}"
+                options.append(discord.SelectOption(label=name, value=str(pid)))
+
+            view = discord.ui.View(timeout=120)
             select_type = LightYagamiActionSelect(self.game_id, self.engine, options)
             view.add_item(select_type)
             await interaction.response.send_message("Select which ability you wish to use:", view=view, ephemeral=True)
-        elif role_key == "makima":
-            # Needs to select target 1 and target 2
-            select = MakimaSelect(self.game_id, self.engine, options)
-            view.add_item(select)
-            await interaction.response.send_message("Select the first target (whom you will control):", view=view, ephemeral=True)
-        elif role_key == "hisoka" and not player.metadata.get("revived"):
-            # Bungee gum: needs two targets
-            select = HisokaBungeeSelect(self.game_id, self.engine, options)
-            view.add_item(select)
-            await interaction.response.send_message("Select the first target to link with Bungee Gum:", view=view, ephemeral=True)
-        elif role_key == "doctor_tenma" and player.metadata.get("saves_count", 0) >= 3 and not player.metadata.get("revive_used"):
-            # Can choose normal heal or Scalpel of Justice (revive)
-            select = DoctorTenmaActionSelect(self.game_id, self.engine, options)
-            view.add_item(select)
-            await interaction.response.send_message("Select which ability you wish to use:", view=view, ephemeral=True)
-        else:
-            # Standard single target action
-            from utils.roles import role_registry
-            role_cls = role_registry.get(role_key) if role_registry.contains(role_key) else None
-            prompt_text = getattr(role_cls, "action_prompt", "Select your target for tonight:") if role_cls else "Select your target for tonight:"
-            if not prompt_text:
-                prompt_text = "Select your target for tonight:"
-            select = StandardActionSelect(self.game_id, self.engine, options)
-            view.add_item(select)
-            await interaction.response.send_message(prompt_text, view=view, ephemeral=True)
+            return
+
+        # Otherwise, present the dynamic separate buttons view for the role's abilities!
+        view = NightAbilityButtonsView(self.game_id, self.engine, user_id, role_inst, session)
+        await interaction.response.send_message("Select an ability to use tonight:", view=view, ephemeral=True)
+
+
+class NightAbilityButtonsView(discord.ui.View):
+    def __init__(self, game_id: str, engine: GameEngine, player_id: int, role_inst: Any, session: GameSession) -> None:
+        super().__init__(timeout=120)
+        self.game_id = game_id
+        self.engine = engine
+        self.player_id = player_id
+        self.role_inst = role_inst
+        self.session = session
+
+        from utils.roles import NightAction
+        for idx, ability in enumerate(role_inst.abilities):
+            if isinstance(ability, NightAction):
+                btn = discord.ui.Button(
+                    label=ability.name,
+                    style=discord.ButtonStyle.primary,
+                    custom_id=f"mafia_ability_{player_id}_{idx}_{ability.name.lower().replace(' ', '_')}"
+                )
+                btn.callback = self.make_callback(ability, idx)
+                self.add_item(btn)
+
+    def make_callback(self, ability: Any, idx: int):
+        async def callback(interaction: discord.Interaction) -> None:
+            session = await self.engine.get_session(self.game_id)
+            if not session:
+                await interaction.response.send_message("This game is no longer active.", ephemeral=True)
+                return
+
+            player_state = session.players.get(self.player_id)
+            if not player_state or not player_state.alive:
+                await interaction.response.send_message("You cannot perform night actions.", ephemeral=True)
+                return
+
+            if player_state.metadata.get("roleblocked"):
+                await interaction.response.send_message("You are roleblocked and cannot act tonight!", ephemeral=True)
+                return
+
+            # Check if wounded/exhausted
+            night_num = session.metadata.get("night_num", 1)
+            if player_state.metadata.get("wounded_until_night") == night_num or player_state.metadata.get("exhausted_until_night") == night_num:
+                await interaction.response.send_message("You cannot use abilities tonight.", ephemeral=True)
+                return
+
+            # Check if this ability can be used yet
+            can_use, reason = ability.can_use(session, player_state)
+            if not can_use:
+                # If they have someone selected, remove/clear that selection!
+                removed = False
+                async with self.engine._lock:
+                    if self.player_id in session.night_actions:
+                        session.night_actions.pop(self.player_id, None)
+                        player_state.night_actions_used = max(0, player_state.night_actions_used - 1)
+                        removed = True
+                
+                msg = f"❌ **You cannot use {ability.name} yet.**\nReason: {reason or 'Not available.'}"
+                if removed:
+                    msg += "\n⚠️ **Your previously registered night action target has been cleared.**"
+                await interaction.response.send_message(msg, ephemeral=True)
+                return
+
+            # Retrieve eligible targets
+            targets = ability.get_eligible_targets(session, self.player_id)
+            
+            # Teammate validation for Villain faction (Mafia)
+            if player_state.faction == "Villain" and self.role_inst.role_key in ["blackbeard", "light_yagami", "muzan_kibutsuji", "makima", "upper_moon"]:
+                targets = [t for t in targets if session.players[t].faction != "Villain"]
+
+            if ability.num_targets > 0 and not targets:
+                await interaction.response.send_message("No eligible targets for this ability.", ephemeral=True)
+                return
+
+            # If 0 targets (like Levi's Precision Strike)
+            if ability.num_targets == 0:
+                payload = {
+                    "action_index": idx,
+                    "target_id": None
+                }
+                if not await _safe_queue_night_action(interaction, self.engine, self.game_id, self.player_id, payload):
+                    return
+                await interaction.response.edit_message(content=f"Ability **{ability.name}** activated successfully.", view=None)
+                return
+
+            # Build SelectOptions
+            options = []
+            guild = interaction.guild
+            for pid in targets:
+                # Self targeting check (only doctor tenma is allowed to heal himself)
+                if pid == self.player_id and self.role_inst.role_key != "doctor_tenma":
+                    continue
+                member = guild.get_member(pid) if guild else None
+                name = member.display_name if member else f"User {pid}"
+                options.append(discord.SelectOption(label=name, value=str(pid)))
+
+            if not options:
+                await interaction.response.send_message("No eligible targets for this ability.", ephemeral=True)
+                return
+
+            view = discord.ui.View(timeout=120)
+            if ability.num_targets == 2:
+                select = TwoTargetSelectStep1(self.game_id, self.engine, ability, idx, options)
+                view.add_item(select)
+                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the first target:", view=view)
+            else:
+                select = AbilityTargetSelect(self.game_id, self.engine, ability, idx, options)
+                view.add_item(select)
+                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect your target:", view=view)
+
+        return callback
+
+
+class AbilityTargetSelect(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select a target...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        target_id = int(self.values[0])
+        payload = {
+            "action_index": self.action_index,
+            "target_id": target_id
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
+        await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered on <@{target_id}>.", view=None)
+
+
+class TwoTargetSelectStep1(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select first target...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.target_options = options
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        target1 = int(self.values[0])
+        options2 = [opt for opt in self.target_options if opt.value != str(target1)]
+        view = discord.ui.View(timeout=120)
+        select2 = TwoTargetSelectStep2(self.game_id, self.engine, self.ability, self.action_index, target1, options2)
+        view.add_item(select2)
+        await interaction.response.edit_message(content=f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:", view=view)
+
+
+class TwoTargetSelectStep2(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target1: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select second target...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.target1 = target1
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        target2 = int(self.values[0])
+        payload = {
+            "action_index": self.action_index,
+            "target_id": self.target1,
+            "controlled_vote_target": target2,
+            "targets": (self.target1, target2)
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
+        await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered on <@{self.target1}> and <@{target2}>.", view=None)
+
 
 class StandardActionSelect(discord.ui.Select):
     def __init__(self, game_id: str, engine: GameEngine, options: list[discord.SelectOption]) -> None:
@@ -434,8 +578,16 @@ class VoteUISelectView(discord.ui.View):
             await interaction.response.send_message("Dead players cannot vote.", ephemeral=True)
             return
 
-        # Prepare target options: living players and Skip Vote option
-        options = [discord.SelectOption(label="Skip Vote", value="skip")]
+        day_num = session.metadata.get("day_num", 1)
+        if player.metadata.get("wounded_until_day") == day_num:
+            await interaction.response.send_message("You are Wounded and cannot vote today.", ephemeral=True)
+            return
+        if player.metadata.get("exhausted_until_day") == day_num:
+            await interaction.response.send_message("You are Exhausted and cannot vote today.", ephemeral=True)
+            return
+
+        # Build standard target options
+        options = []
         guild = interaction.guild
         for pid, pstate in session.players.items():
             if pstate.alive:
@@ -443,10 +595,94 @@ class VoteUISelectView(discord.ui.View):
                 name = member.display_name if member else f"User {pid}"
                 options.append(discord.SelectOption(label=name, value=str(pid)))
 
+        if player.role_key == "hiromi_higuruma":
+            deadly_uses = player.metadata.setdefault("deadly_sentencing_uses", 2)
+            if deadly_uses > 0:
+                view = discord.ui.View(timeout=30)
+                btn_normal = discord.ui.Button(label="Cast Normal Vote", style=discord.ButtonStyle.secondary)
+                btn_deadly = discord.ui.Button(label=f"Deadly Sentencing ({deadly_uses} left)", style=discord.ButtonStyle.danger)
+
+                async def normal_cb(inter: discord.Interaction) -> None:
+                    normal_options = [discord.SelectOption(label="Skip Vote", value="skip")] + options
+                    v = discord.ui.View(timeout=60)
+                    select = VoteSelector(self.game_id, self.engine, normal_options)
+                    v.add_item(select)
+                    await inter.response.send_message("Select a target to vote for (or Skip):", view=v, ephemeral=True)
+
+                async def deadly_cb(inter: discord.Interaction) -> None:
+                    deadly_targets = [opt for opt in options if opt.value != str(user_id)]
+                    if not deadly_targets:
+                        await inter.response.send_message("No eligible players to execute.", ephemeral=True)
+                        return
+                    v = discord.ui.View(timeout=60)
+                    select = HiromiDeadlySentencingSelect(self.game_id, self.engine, deadly_targets)
+                    v.add_item(select)
+                    await inter.response.send_message("⚖️ **Deadly Sentencing:** Select a player to instantly execute:", view=v, ephemeral=True)
+
+                btn_normal.callback = normal_cb
+                btn_deadly.callback = deadly_cb
+                view.add_item(btn_normal)
+                view.add_item(btn_deadly)
+                await interaction.response.send_message("Hiromi Higuruma, select an action:", view=view, ephemeral=True)
+                return
+
+        normal_options = [discord.SelectOption(label="Skip Vote", value="skip")] + options
         view = discord.ui.View(timeout=60)
-        select = VoteSelector(self.game_id, self.engine, options)
+        select = VoteSelector(self.game_id, self.engine, normal_options)
         view.add_item(select)
         await interaction.response.send_message("Select a target to vote for (or Skip):", view=view, ephemeral=True)
+
+
+class HiromiDeadlySentencingSelect(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select player to sentence...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        target_id = int(self.values[0])
+        session = await self.engine.get_session(self.game_id)
+        if not session:
+            return
+
+        if session.phase != GamePhase.VOTING:
+            await interaction.response.send_message("Voting phase has already ended.", ephemeral=True)
+            return
+
+        player = session.players.get(interaction.user.id)
+        if not player or player.role_key != "hiromi_higuruma":
+            return
+
+        deadly_uses = player.metadata.get("deadly_sentencing_uses", 2)
+        if deadly_uses <= 0:
+            await interaction.response.send_message("You have no uses left.", ephemeral=True)
+            return
+
+        async with self.engine._lock:
+            player.metadata["deadly_sentencing_uses"] = deadly_uses - 1
+            session.metadata["deadly_sentencing_triggered"] = True
+            session.metadata["deadly_sentencing_run"] = True
+
+        target_player = session.players.get(target_id)
+        target_faction = target_player.faction if target_player else None
+
+        await self.engine.eliminate_player(self.game_id, target_id, "deadly_sentencing")
+
+        mafia_channel = interaction.channel
+        await self.engine.bot.message_queue.send(
+            mafia_channel,
+            f"🏛️ **Hiromi Higuruma has declared Deadly Sentencing!**\n"
+            f"Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
+        )
+
+        if target_faction == RoleFaction.HERO.value:
+            await self.engine.eliminate_player(self.game_id, interaction.user.id, "wrongful_judgment")
+            await self.engine.bot.message_queue.send(
+                mafia_channel,
+                f"⚠️ **Wrongful Judgment!** Hiromi Higuruma executed a fellow **Town** member and was executed by the Hangman!"
+            )
+
+        await interaction.response.edit_message(content=f"Deadly Sentencing declared on <@{target_id}>.", view=None)
 
 
 class VoteSelector(discord.ui.Select):
@@ -525,6 +761,44 @@ class VerdictUISelectView(discord.ui.View):
                 ephemeral=True,
             )
             return
+
+        # If forced guilty (e.g. during a Retrial trial), they must vote guilty
+        if session.metadata.get("forced_guilty"):
+            decision = "guilty"
+
+        # Hiromi Higuruma Retrial check
+        if decision == "innocent" and player.role_key == "hiromi_higuruma":
+            retrial_uses = player.metadata.setdefault("retrial_uses", 2)
+            if retrial_uses > 0:
+                view = discord.ui.View(timeout=30)
+                btn_normal = discord.ui.Button(label="Vote Innocent Normally", style=discord.ButtonStyle.secondary)
+                btn_retrial = discord.ui.Button(label=f"Trigger Retrial ({retrial_uses} left)", style=discord.ButtonStyle.danger)
+
+                async def normal_cb(inter: discord.Interaction) -> None:
+                    verdicts = session.metadata.setdefault("verdicts", {})
+                    verdicts[inter.user.id] = "innocent"
+                    await inter.response.edit_message(content="Registered normal Innocent verdict.", view=None)
+
+                async def retrial_cb(inter: discord.Interaction) -> None:
+                    async with self.engine._lock:
+                        player.metadata["retrial_uses"] = retrial_uses - 1
+                        session.metadata["retrial_triggered"] = True
+                        session.metadata["retrial_defendant"] = defendant_id
+                        session.metadata["retrial_by"] = inter.user.id
+                    
+                    mafia_channel = inter.channel
+                    await self.engine.bot.message_queue.send(
+                        mafia_channel,
+                        f"⚖️ <@{inter.user.id}> (Hiromi Higuruma) has activated **Retrial** for this case!"
+                    )
+                    await inter.response.edit_message(content="⚖️ **Retrial Activated!**", view=None)
+
+                btn_normal.callback = normal_cb
+                btn_retrial.callback = retrial_cb
+                view.add_item(btn_normal)
+                view.add_item(btn_retrial)
+                await interaction.response.send_message("Choose whether to trigger Retrial:", view=view, ephemeral=True)
+                return
 
         verdicts = session.metadata.setdefault("verdicts", {})
         verdicts[user_id] = decision
