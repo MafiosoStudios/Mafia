@@ -135,28 +135,23 @@
     "name": "Hisoka Morow",
     "faction": "Neutral",
     "win_condition": "WinCondition 1: Get voted out before Night 5 (revive for 3 days with roleblock, steal, and kill abilities). WinCondition 2: Correctly predict two players visiting one another 3 times using Bungee Gum.",
-    "description": "A whimsical magician searching for strong opponents.",
-    "active_ability": "Bungee Gum (Link two players. If one visits the other, gain 1 point. Need 3 points).",
-    "passive_ability": "Post-Mortem Nen (Revive if voted out early).",
-    "action_prompt": "Select the first player to link with Bungee Gum:"
+    "description": "A thrill-seeking magician whose only true passion is battling powerful opponents. Charismatic, unpredictable, and dangerously cunning, Hisoka follows his own desires without loyalty to anyone but himself.",
+    "active_ability": "Bungee Gum - Link two players. If one visits the other, gain 1 point. Needs 3 points.",
+    "passive_ability": "Post-Mortem Nen - Revive if voted out early. You win the game.",
+    "action_prompt": "Select the first player to link with Bungee Gum:",
+    "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3YxjRq2L8N8jP6rPDY-UlywimP6uXRdt0GVxAJfrS5ykUL3HEnv5BBYVg&s=10",
+    "footer": "The pleasure comes not from victory, but from the fight itself."
   },
   "gilgamesh": {
     "name": "Gilgamesh",
     "faction": "Neutral",
-    "win_condition": "Find all of your swords (3 or 5 depending on lobby size) to become the Horseman of Apocalypse, then survive for 1 day to trigger the Rumbling apocalypse.",
-    "description": "The King of Heroes who holds all the world's treasures.",
-    "active_ability": "Gate of Babylon (Visit a player to search for your sword. If found, you retrieve it).",
-    "passive_ability": "Apocalypse (Transform once all swords are collected; unleashes wipeout next night if not lynched).",
-    "action_prompt": "Select a player to search for your sword:"
-  },
-  "lelouch_lamperouge": {
-    "name": "Lelouch Lamperouge",
-    "faction": "Neutral",
-    "win_condition": "Geass guess: Declare you will be voted out. If lynched that day, you win. Guessing wrong 3 times kills you. Cannot declare on consecutive days.",
-    "description": "The exiled prince who commands others under the guise of Zero.",
-    "active_ability": "Absolute Command (Declare you will be lynched today).",
-    "passive_ability": "Zero Requiem",
-    "action_prompt": ""
+    "win_condition": "Find all of your swords to become the Horseman of Apocalypse, then survive for 1 day to trigger The Gate's of Babylon.",
+    "description": "The King of Heroes, Gilgamesh is a proud and unrivaled monarch who views the world as his rightful domain. Possessing immeasurable power and unwavering confidence, he crushes those he deems unworthy without hesitation.",
+    "active_ability": "Gate of Babylon - Visit a player to search for your sword. If found, you retrieve it. The number of swords needed to be collected depends on the lobby size, 3 for small ones, 5 for larger ones.",
+    "passive_ability": "The Gates of Babylon - Transform once all swords are collected, if Gilgamesh is not lynched that day, wipe the entire mafia and protagonist faction and win the game.",
+    "action_prompt": "Select a player to search for your sword:",
+    "image_url": "https://wallpaperaccess.com/full/7637256.jpg",
+    "footer": "Know your place, mongrel."
   },
   "eren_jaeger": {
     "name": "Eren Jaeger",

@@ -197,34 +197,8 @@ class Gilgamesh(BaseRole):
         session.metadata["gilgamesh_swords"] = swords_list
 
 
-# --- Lelouch Lamperouge ---
-
-class LelouchWinCondition(WinCondition):
-    def __init__(self) -> None:
-        super().__init__("Geass guess: Declare you will be voted out. If lynched that day, you win.")
-
-    def check(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
-        session = context.payload.get("session")
-        if not session:
-            return False
-        player_state = session.players.get(context.user_id)
-        if player_state and player_state.metadata.get("zero_requiem_win"):
-            return True
-        return False
 
 
-@role_registry.register
-class LelouchLamperouge(BaseRole):
-    role_key: ClassVar[str] = "lelouch_lamperouge"
-    priority: ClassVar[int] = 5
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "benign")
-    continues_game_after_win: ClassVar[bool] = True
-    cooldown_text: ClassVar[str] = "Cannot declare on consecutive days."
-    limitations_text: ClassVar[str] = "Max 3 incorrect declarations."
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.win_condition_obj = LelouchWinCondition()
 
 
 # --- Eren Jaeger ---

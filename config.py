@@ -71,7 +71,6 @@ EMOJIS: dict[str, str] = {
     "makima": "👁️",
     "hisoka": "🃏",
     "gilgamesh": "🔱",
-    "lelouch_lamperouge": "👑",
     "eren_jaeger": "🕊️",
     "mahoraga": "🌀",
     "villager": "🧑",

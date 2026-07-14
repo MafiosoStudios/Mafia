@@ -475,8 +475,8 @@ class GameEngine:
                     pass
                 else:
                     # Neutral roles with special win conditions
-                    # For lelouch or hisoka who win but game can continue
-                    if p.role_key in ["hisoka", "lelouch_lamperouge"]:
+                    # For hisoka who wins but game can continue
+                    if p.role_key in ["hisoka"]:
                         p.metadata["has_won"] = True
                     else:
                         # Neutral solo winner (Gilgamesh apocalypse, Eren rumbling, etc.)
@@ -1066,11 +1066,6 @@ class GameEngine:
                                     break_to_voting = False
                                     break
                                 else:
-                                    # Check Lelouch Requiem Guess
-                                    if def_state.role_key == "lelouch_lamperouge" and def_state.metadata.get("declared_this_day"):
-                                        def_state.metadata["zero_requiem_win"] = True
-                                        await self.bot.message_queue.send(mafia_channel, f"{get_emoji('lelouch_lamperouge')} **Zero Requiem: Lelouch has achieved his goal!**")
-
                                     # Check Hisoka Post-Mortem Nen lynch trigger
                                     if def_state.role_key == "hisoka" and night_num <= 5:
                                         def_state.metadata["post_mortem_win"] = True
