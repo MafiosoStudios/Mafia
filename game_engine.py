@@ -568,10 +568,20 @@ class GameEngine:
             faction_emoji = get_emoji(pstate.faction)
             role_emoji = get_emoji(pstate.role_key)
 
+            # Faction-based colors: Green for Town (Hero), Red for Mafia (Villain), White for Neutral
+            color_map = {
+                "Hero": discord.Color.green(),
+                "Town": discord.Color.green(),
+                "Villain": discord.Color.red(),
+                "Mafia": discord.Color.red(),
+                "Neutral": discord.Color.from_rgb(255, 255, 255)
+            }
+            embed_color = color_map.get(pstate.faction, discord.Color.purple())
+
             embed = discord.Embed(
                 title=f"{role_emoji} Your Role: {role_meta.get('name', 'Unknown')}",
                 description=role_meta.get('description', ''),
-                color=discord.Color.purple()
+                color=embed_color
             )
             embed.add_field(name="Faction", value=f"{faction_emoji} **{pstate.faction}**", inline=True)
             embed.add_field(name="Win Condition", value=role_meta.get('win_condition', ''), inline=False)
