@@ -57,6 +57,8 @@ EMOJIS: dict[str, str] = {
     # Factions
     "Hero": "🛡️",
     "Villain": "🩸",
+    "Protagonist": "🛡️",
+    "Antagonist": "🩸",
     "Neutral": "🎭",
 
     # Roles
@@ -67,7 +69,6 @@ EMOJIS: dict[str, str] = {
     "light_yagami": "📓",
     "muzan_kibutsuji": "👹",
     "makima": "👁️",
-    "orochimaru": "🐍",
     "hisoka": "🃏",
     "gilgamesh": "🔱",
     "lelouch_lamperouge": "👑",
@@ -158,9 +159,19 @@ EVENT_IMAGES: dict[str, str] = {
 
 
 def get_role_image(role_key: str) -> str | None:
-    """Returns the configured thumbnail URL for a role, or None if not set."""
+    """Returns the configured thumbnail URL for a role, checking roles.json fallback."""
     url = ROLE_IMAGES.get(role_key or "", "")
-    return url or None
+    if url:
+        return url
+    try:
+        import roles
+        meta = roles.ROLES_METADATA.get(role_key or "", {})
+        url = meta.get("image_url", "")
+        if url:
+            return url
+    except Exception:
+        pass
+    return None
 
 
 def get_event_image(event_key: str) -> str | None:

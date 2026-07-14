@@ -51,17 +51,39 @@ class AnimeMafiaBot(commands.Bot):
 
     async def on_ready(self) -> None:
         logger.info("Logged in as %s (%s)", self.user, self.user.id if self.user else "unknown")
-        for guild in self.guilds:
+
+        # 1. Send restart confirmation message immediately
+        import sys
+        if "--restart-channel" in sys.argv:
             try:
-                self.tree.clear_commands(guild=guild)
-                await self.tree.sync(guild=guild)
+                idx = sys.argv.index("--restart-channel")
+                channel_id = int(sys.argv[idx + 1])
+                channel = self.get_channel(channel_id)
+                if not channel:
+                    channel = await self.fetch_channel(channel_id)
+                if channel:
+                    await channel.send("✅ **Bot has successfully restarted and is now online!**")
+                sys.argv.pop(idx + 1)
+                sys.argv.pop(idx)
             except Exception:
-                pass
-        try:
-            await self.tree.sync()
-            logger.info("Global commands synced successfully.")
-        except Exception:
-            logger.exception("Failed to sync global commands.")
+                logger.exception("Failed to send restart confirmation message.")
+
+        # 2. Sync commands subsequently in the background so it doesn't block interactions
+        import asyncio
+        async def sync_bg():
+            for guild in self.guilds:
+                try:
+                    self.tree.clear_commands(guild=guild)
+                    await self.tree.sync(guild=guild)
+                except Exception:
+                    pass
+            try:
+                await self.tree.sync()
+                logger.info("Global commands synced successfully.")
+            except Exception:
+                logger.exception("Failed to sync global commands.")
+
+        asyncio.create_task(sync_bg())
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
         logger.exception("App command failed: %s", error)

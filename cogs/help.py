@@ -36,6 +36,7 @@ class HelpCog(commands.Cog):
     @commands.hybrid_command(name="roleinfo", description="View detailed information about a specific role")
     @discord.app_commands.describe(character="Name of the character")
     async def roleinfo(self, ctx: commands.Context, character: str) -> None:
+        await ctx.defer()
         import roles
         from config import get_emoji
 
@@ -72,27 +73,56 @@ class HelpCog(commands.Cog):
 
         # Color mapping based on faction
         color_map = {
-            "Hero": discord.Color.blue(),
-            "Town": discord.Color.blue(),
+            "Hero": discord.Color.green(),
+            "Town": discord.Color.green(),
+            "Protagonist": discord.Color.green(),
             "Villain": discord.Color.red(),
             "Mafia": discord.Color.red(),
-            "Neutral": discord.Color.gold()
+            "Antagonist": discord.Color.red(),
+            "Neutral": discord.Color.from_rgb(255, 255, 255)
         }
-        embed_color = color_map.get(faction, discord.Color.blurple())
+        embed_color = color_map.get(faction, discord.Color.purple())
 
         emoji = get_emoji(character_matched_key)
         emoji_prefix = f"{emoji} " if emoji else ""
 
         embed = discord.Embed(
-            title=f"{emoji_prefix}{name}",
+            title=name,
             description=description,
             color=embed_color
         )
+        from config import get_role_image
+        role_image = get_role_image(character_matched_key)
+        if role_image:
+            embed.set_image(url=role_image)
         embed.add_field(name="Faction", value=faction, inline=True)
         embed.add_field(name="Win Condition", value=win_condition, inline=False)
-        embed.add_field(name="Active Ability", value=active_ability, inline=False)
-        embed.add_field(name="Passive Ability", value=passive_ability, inline=False)
-        embed.set_footer(text="Anime Mafia Roles")
+        
+        # Split active abilities
+        if "Max Ability:" in active_ability:
+            parts = active_ability.split("Max Ability:")
+            abilities = [parts[0].strip(), "Max Ability: " + parts[1].strip()]
+        elif "Max Ability. " in active_ability:
+            parts = active_ability.split("Max Ability. ")
+            abilities = [parts[0].strip(), "Max Ability: " + parts[1].strip()]
+        else:
+            abilities = [a.strip() for a in active_ability.split(" / ") if a.strip()]
+
+        if not abilities or (len(abilities) == 1 and not abilities[0]):
+            embed.add_field(name="Active Ability", value="None", inline=False)
+        elif len(abilities) == 1:
+            embed.add_field(name="Active Ability", value=abilities[0], inline=False)
+        else:
+            for idx, ability in enumerate(abilities, 1):
+                embed.add_field(name=f"Active Ability {idx}", value=ability, inline=False)
+
+        passive_val = passive_ability.strip()
+        if passive_val and passive_val.lower() != "none":
+            embed.add_field(name="Passive Ability", value=passive_val, inline=False)
+
+        footer_text = character_matched_meta.get("footer", "")
+        if footer_text:
+            embed.set_footer(text=footer_text)
 
         await send_hybrid_response(ctx, embed=embed)
 

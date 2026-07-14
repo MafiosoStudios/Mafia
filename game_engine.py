@@ -565,7 +565,9 @@ class GameEngine:
                 continue
 
             role_meta = roles.ROLES_METADATA.get(pstate.role_key, {})
-            faction_emoji = get_emoji(pstate.faction)
+            # Map faction to Protagonist/Antagonist for user display
+            display_faction = "Protagonist" if pstate.faction == "Hero" else ("Antagonist" if pstate.faction == "Villain" else pstate.faction)
+            faction_emoji = get_emoji(display_faction)
             role_emoji = get_emoji(pstate.role_key)
 
             # Faction-based colors: Green for Town (Hero), Red for Mafia (Villain), White for Neutral
@@ -579,23 +581,45 @@ class GameEngine:
             embed_color = color_map.get(pstate.faction, discord.Color.purple())
 
             embed = discord.Embed(
-                title=f"{role_emoji} Your Role: {role_meta.get('name', 'Unknown')}",
+                title=f"Your Role: {role_meta.get('name', 'Unknown')}",
                 description=role_meta.get('description', ''),
                 color=embed_color
             )
-            embed.add_field(name="Faction", value=f"{faction_emoji} **{pstate.faction}**", inline=True)
+            embed.add_field(name="Faction", value=f"{faction_emoji} **{display_faction}**", inline=True)
             embed.add_field(name="Win Condition", value=role_meta.get('win_condition', ''), inline=False)
-            embed.add_field(name="Active Ability", value=role_meta.get('active_ability', 'None'), inline=False)
-            embed.add_field(name="Passive Ability", value=role_meta.get('passive_ability', 'None'), inline=False)
-            embed.set_footer(text="Keep your role secret!")
+            
+            # Split active abilities
+            active_ability = role_meta.get('active_ability', 'None')
+            if "Max Ability:" in active_ability:
+                parts = active_ability.split("Max Ability:")
+                abilities = [parts[0].strip(), "Max Ability: " + parts[1].strip()]
+            elif "Max Ability. " in active_ability:
+                parts = active_ability.split("Max Ability. ")
+                abilities = [parts[0].strip(), "Max Ability: " + parts[1].strip()]
+            else:
+                abilities = [a.strip() for a in active_ability.split(" / ") if a.strip()]
+
+            if not abilities or (len(abilities) == 1 and not abilities[0]):
+                embed.add_field(name="Active Ability", value="None", inline=False)
+            elif len(abilities) == 1:
+                embed.add_field(name="Active Ability", value=abilities[0], inline=False)
+            else:
+                for idx, ability in enumerate(abilities, 1):
+                    embed.add_field(name=f"Active Ability {idx}", value=ability, inline=False)
+
+            passive_ability = role_meta.get('passive_ability', 'None').strip()
+            if passive_ability and passive_ability.lower() != "none":
+                embed.add_field(name="Passive Ability", value=passive_ability, inline=False)
+            footer_text = role_meta.get("footer", "Keep your role secret!")
+            embed.set_footer(text=footer_text)
             role_image = get_role_image(pstate.role_key)
             if role_image:
-                embed.set_thumbnail(url=role_image)
+                embed.set_image(url=role_image)
 
             try:
                 self.bot.message_queue.send(member, embed=embed)
                 if pstate.faction == RoleFaction.VILLAIN.value and len(mafia_members) > 1:
-                    self.bot.message_queue.send(member, f"{get_emoji('group')} **Your Fellow Mafia Members:** {mafia_list_str}")
+                    self.bot.message_queue.send(member, f"{get_emoji('group')} **Your Fellow Antagonists:** {mafia_list_str}")
             except Exception:
                 logger.exception("Failed to send DM to player %s", pid)
 
@@ -973,7 +997,7 @@ class GameEngine:
                                     await self.bot.message_queue.send(
                                         mafia_channel,
                                         f"⚖️ **WE ARE HAVING A RE TRIAL!!**\n"
-                                        f"Defendant <@{retrial_defendant}> is confirmed to be **Town (Hero)**! Their execution is cancelled.\n"
+                                        f"Defendant <@{retrial_defendant}> is confirmed to be a **Protagonist**! Their execution is cancelled.\n"
                                         f"Returning to the Nomination/Voting phase to choose a new target."
                                     )
                                     # Reset defendant metadata
@@ -991,7 +1015,7 @@ class GameEngine:
                                     await self.bot.message_queue.send(
                                         mafia_channel,
                                         f"⚖️ **Retrial Failed!**\n"
-                                        f"An attempt to acquit <@{retrial_defendant}> failed because they are **not Town**!\n"
+                                        f"An attempt to acquit <@{retrial_defendant}> failed because they are **not a Protagonist**!\n"
                                         f"• The defendant's true role is revealed as **{def_role_display}**.\n"
                                         f"Returning to the Verdict phase for the defendant."
                                     )
@@ -1141,8 +1165,8 @@ class GameEngine:
         """Sends a detailed victory embed with Winners and Losers lists."""
         # Determine the display title for the winner
         faction_display_map = {
-            RoleFaction.HERO.value: f"{get_emoji('victory')} Town (Hero) Wins!",
-            RoleFaction.VILLAIN.value: f"{get_emoji('victory')} Mafia (Villain) Wins!",
+            RoleFaction.HERO.value: f"{get_emoji('victory')} Protagonists Win!",
+            RoleFaction.VILLAIN.value: f"{get_emoji('victory')} Antagonists Win!",
             "Draw": f"{get_emoji('peace')} It's a Draw!",
         }
         # If it's a neutral solo winner, show their name

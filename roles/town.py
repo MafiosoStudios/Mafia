@@ -201,7 +201,7 @@ class LDeduction(NightAction):
             role_display = target_player.role_key.replace('_', ' ').title()
             context.payload["result"] = f"🕵️ **Deduction (Scan {scan_count}):** <@{target_id}>'s exact role is **{role_display}**."
         else:
-            align_emoji = "🍏 Town" if faction == RoleFaction.HERO.value else ("🍎 Mafia" if faction == RoleFaction.VILLAIN.value else "🟡 Neutral")
+            align_emoji = "🍏 Protagonist" if faction == RoleFaction.HERO.value else ("🍎 Antagonist" if faction == RoleFaction.VILLAIN.value else "🟡 Neutral")
             context.payload["result"] = f"🕵️ **Deduction (Scan 1):** <@{target_id}>'s alignment is **{align_emoji}**."
 
 

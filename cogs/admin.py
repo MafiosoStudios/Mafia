@@ -86,6 +86,40 @@ class AdminCog(commands.Cog):
             ephemeral=True
         )
 
+    @commands.hybrid_command(name="dev_restart", description="Restart the bot process (Developer only)")
+    async def dev_restart(self, ctx: commands.Context) -> None:
+        authorized_ids = {744831273406824449, 839182501091344444}
+        if ctx.author.id not in authorized_ids:
+            await send_hybrid_response(ctx, "❌ **Unauthorized:** Only bot developers can run this command.", ephemeral=True)
+            return
+
+        import os
+        import sys
+
+        await send_hybrid_response(ctx, "🔄 **Restarting bot process...** Please wait.", ephemeral=True)
+        
+        # Clean up database and message queue
+        try:
+            if hasattr(self.bot, "db"):
+                await self.bot.db.close()
+            if hasattr(self.bot, "message_queue"):
+                await self.bot.message_queue.stop()
+        except Exception:
+            pass
+
+        # Clean existing restart-channel arguments from sys.argv if present
+        clean_argv = list(sys.argv)
+        while "--restart-channel" in clean_argv:
+            try:
+                idx = clean_argv.index("--restart-channel")
+                clean_argv.pop(idx + 1)
+                clean_argv.pop(idx)
+            except ValueError:
+                break
+
+        # Restart process and pass the restart channel ID
+        os.execv(sys.executable, [sys.executable] + clean_argv + ["--restart-channel", str(ctx.channel.id)])
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(AdminCog(bot))

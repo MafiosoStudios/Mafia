@@ -54,9 +54,9 @@ def bind_metadata_to_roles() -> None:
             
             # Map faction string to RoleFaction enum
             faction_str = meta.get("faction", "Hero")
-            if faction_str == "Hero":
+            if faction_str in ("Hero", "Protagonist"):
                 role_cls.faction = RoleFaction.HERO
-            elif faction_str == "Villain":
+            elif faction_str in ("Villain", "Antagonist"):
                 role_cls.faction = RoleFaction.VILLAIN
             else:
                 role_cls.faction = RoleFaction.NEUTRAL
