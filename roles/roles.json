@@ -150,26 +150,30 @@
     "active_ability": "Gate of Babylon - Visit a player to search for your sword. If found, you retrieve it. The number of swords needed to be collected depends on the lobby size, 3 for small ones, 5 for larger ones.",
     "passive_ability": "The Gates of Babylon - Transform once all swords are collected, if Gilgamesh is not lynched that day, wipe the entire mafia and protagonist faction and win the game.",
     "action_prompt": "Select a player to search for your sword:",
-    "image_url": "https://wallpaperaccess.com/full/7637256.jpg",
+    "image_url": "https://images4.alphacoders.com/702/thumb-1920-702886.png",
     "footer": "Know your place, mongrel."
   },
   "eren_jaeger": {
     "name": "Eren Jaeger",
     "faction": "Neutral",
     "win_condition": "Survive until Night 8 to trigger The Rumbling, then kill everyone until you are the last one standing.",
-    "description": "A boy who sought freedom, now the Founding Titan.",
-    "active_ability": "Founding Vision (Learn player faction). Max Ability: The Rumbling (From Night 9 onwards, gain un-lynchable status and kill a player every day).",
+    "description": "A determined soldier whose unyielding desire for freedom drives him to challenge the fate of the world itself. Fiercely passionate and willing to sacrifice everything for his convictions, Eren's choices forever reshape history.",
+    "active_ability": "Founding Vision - Select a player every night and learn their faction / The Rumbling - From Night 8 onwards, Eren transforms and gains the ability to kill a player every day. Eren cannot be lynched after the Rumbling begins.",
     "passive_ability": "None",
-    "action_prompt": "Select a player to look at or attack:"
+    "action_prompt": "Select a player to look at or attack:",
+    "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRVVq9KyxX88t_0aepOHjeEUNTptvkO574E4ZGjBj0B9jTNlpeZ3z2OQo0H&s=10",
+    "footer": "If someone tries to take my freedom, I won't hesitate to take theirs."
   },
   "mahoraga": {
     "name": "Eight-Handled Sword Divergent Sila Divine General Mahoraga",
     "faction": "Neutral",
     "win_condition": "Survive an attack and eliminate at least 1 player who tried to kill you.",
-    "description": "The ultimate adapted shikigami.",
-    "active_ability": "None",
-    "passive_ability": "Adaptation (75% chance to survive attacks. Upon surviving, gain permanent immunity to the attacker's role and lynch immunity for 1 day).",
-    "action_prompt": ""
+    "description": "The ultimate adapted shikigami.The ultimate shikigami of the Ten Shadows Technique, Mahoraga is an unstoppable force that continuously adapts to any attack or ability it endures. Once summoned, its relentless evolution makes it one of the most terrifying entities to face in battle.",
+    "active_ability": "The Eight-Handled Wheel - Kill the player who attacked you.",
+    "passive_ability": "Adaptation - 75% chance to survive attacks. Upon surviving, gain permanent immunity to the attacker's role and lynch immunity for 1 day).",
+    "action_prompt": "",
+    "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR940rQIjSgvfUpSSguneVPC6r054WdgzG2xjUbKJVvWvgVzd4wrG4SPF4&s=10",
+    "footer": "Nah I'd Adapt."
   },
   "villager": {
     "name": "Default Villager",
