@@ -19,8 +19,72 @@ class AdminCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     @discord.app_commands.checks.has_permissions(administrator=True)
     async def sync_commands(self, ctx: commands.Context) -> None:
+        # Clear guild commands to remove duplicates
+        self.bot.tree.clear_commands(guild=ctx.guild)
+        await self.bot.tree.sync(guild=ctx.guild)
+        # Sync globally
         synced = await self.bot.tree.sync()
-        await send_hybrid_response(ctx, f"Synced {len(synced)} commands.", ephemeral=True)
+        await send_hybrid_response(ctx, f"Cleaned duplicates and synced {len(synced)} global commands successfully!", ephemeral=True)
+
+    @commands.hybrid_command(name="reset", description="Reset the bot in the server, cleaning up game channels and status")
+    @commands.has_permissions(manage_guild=True)
+    async def reset(self, ctx: commands.Context) -> None:
+        if ctx.guild is None:
+            await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
+            return
+
+        # Defer to avoid interaction timeout
+        await ctx.defer(ephemeral=True)
+
+        # 1. Remove active game from manager
+        game_manager = getattr(self.bot, "game_manager", None)
+        removed_game = False
+        if game_manager:
+            session = await game_manager.get_game(ctx.guild.id)
+            if session:
+                try:
+                    await game_manager.remove_game(ctx.guild.id)
+                    removed_game = True
+                except Exception:
+                    pass
+
+        # 2. Find and delete mafia channels/categories
+        deleted_categories = 0
+        deleted_channels = 0
+        for category in list(ctx.guild.categories):
+            if "mafia match" in category.name.lower():
+                try:
+                    for ch in list(category.channels):
+                        await ch.delete(reason="Mafia bot reset command.")
+                        deleted_channels += 1
+                    await category.delete(reason="Mafia bot reset command.")
+                    deleted_categories += 1
+                except Exception:
+                    pass
+
+        for channel in list(ctx.guild.text_channels):
+            if channel.name.lower().startswith("mafia-"):
+                try:
+                    await channel.delete(reason="Mafia bot reset command.")
+                    deleted_channels += 1
+                except Exception:
+                    pass
+
+        # 3. Refresh presence/status
+        try:
+            await self.bot.change_presence(activity=discord.Game(name="Anime Mafia"), status=discord.Status.online)
+        except Exception:
+            pass
+
+        await send_hybrid_response(
+            ctx,
+            f"✅ **Server Reset Completed!**\n"
+            f"• Removed active session: {'Yes' if removed_game else 'None found'}\n"
+            f"• Deleted categories: **{deleted_categories}**\n"
+            f"• Deleted channels: **{deleted_channels}**\n"
+            f"• Bot status refreshed.",
+            ephemeral=True
+        )
 
 
 async def setup(bot: commands.Bot) -> None:

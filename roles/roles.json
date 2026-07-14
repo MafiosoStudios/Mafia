@@ -102,9 +102,9 @@
     "name": "Makima",
     "faction": "Villain",
     "win_condition": "Eliminate all threats to the Mafia. (Wins with Mafia)",
-    "description": "The Control Devil who manipulates others' wills.",
-    "active_ability": "Control Order (Every 2nd night, force a player to vote for another target on the next day, 2 uses). Max Ability: Devil's Vendetta (If about to die, redirect death to a random neutral).",
-    "passive_ability": "None",
+    "description": "The Control Devil who manipulates others' actions.",
+    "active_ability": "Control (Redirect target's night action to any player of choosing). Max Ability: Bang. (Deals unstoppable attack once per game after contract is activated and 2 unique controls succeed).",
+    "passive_ability": "Prime Minister's Contract (Once per game, survive execution, Day immediately ends, role hidden).",
     "action_prompt": "Select the player you wish to control:"
   },
   "orochimaru": {

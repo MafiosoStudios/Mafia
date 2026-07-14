@@ -164,10 +164,17 @@ class BaseRole(ABC):
         pass
 
     async def night_action(self, context: RoleContext) -> None:
-        # Execute any active NightAction component
-        for ability in self.abilities:
-            if isinstance(ability, NightAction):
-                await ability.execute(context)
+        # Execute only the active NightAction component corresponding to the action_index
+        action_index = context.payload.get("action_index")
+        if action_index is not None:
+            if 0 <= action_index < len(self.abilities):
+                ability = self.abilities[action_index]
+                if isinstance(ability, NightAction):
+                    await ability.execute(context)
+        else:
+            for ability in self.abilities:
+                if isinstance(ability, NightAction):
+                    await ability.execute(context)
 
     async def day_action(self, context: RoleContext) -> None:
         # Execute any active DayAction component

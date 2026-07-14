@@ -13,7 +13,7 @@ from database.models import GamePlayerRecord, GameRecord, MatchHistoryRecord
 from game_manager import ActiveGameHandle
 from utils.constants import GamePhase, GameState, RoleFaction
 from utils.helpers import utcnow
-from utils.roles import BaseRole, RoleContext, role_registry
+from utils.roles import BaseRole, RoleContext, role_registry, NightAction
 import roles
 from config import (
     get_emoji, get_death_message, get_inaction_message, get_event_image, get_role_image,
@@ -76,6 +76,22 @@ class GameSession:
     draw_reason: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def night_num(self) -> int:
+        return self.metadata.get("night_num", 0)
+
+    @night_num.setter
+    def night_num(self, value: int) -> None:
+        self.metadata["night_num"] = value
+
+    @property
+    def day_num(self) -> int:
+        return self.metadata.get("day_num", 0)
+
+    @day_num.setter
+    def day_num(self, value: int) -> None:
+        self.metadata["day_num"] = value
+
 
 class GameEngine:
     """Owns gameplay state and resolves roles and votes."""
@@ -116,8 +132,45 @@ class GameEngine:
             if len(role_keys) < len(player_ids):
                 raise ValueError("Not enough roles for all players.")
 
-            for index, user_id in enumerate(player_ids):
-                role_key = role_keys[index]
+            available_roles = list(role_keys)
+            assignments = {}
+
+            # 1. Fetch favorite characters for all players
+            fav_characters = {}
+            import roles
+            for user_id in player_ids:
+                prof = await self._database.get_player_profile(user_id, session.game_handle.guild_id)
+                if prof and prof.favorite_character:
+                    cleaned_fav = prof.favorite_character.lower().strip().replace(" ", "_")
+                    for rkey in roles.ROLES_METADATA:
+                        if rkey == cleaned_fav or roles.ROLES_METADATA[rkey].get("name", "").lower() == prof.favorite_character.lower():
+                            fav_characters[user_id] = rkey
+                            break
+
+            # 2. Process players in a random order to apply the 2% bonus chance fairly
+            import random
+            shuffled_players = list(player_ids)
+            random.shuffle(shuffled_players)
+
+            assigned_players = set()
+            for user_id in shuffled_players:
+                fav_role = fav_characters.get(user_id)
+                if fav_role and fav_role in available_roles:
+                    if random.random() < 0.02:
+                        assignments[user_id] = fav_role
+                        available_roles.remove(fav_role)
+                        assigned_players.add(user_id)
+                        logger.info("Player %s won the 2%% bonus chance to get their favorite role: %s", user_id, fav_role)
+
+            # 3. Assign remaining roles randomly to players who didn't win the bonus
+            remaining_players = [pid for pid in player_ids if pid not in assigned_players]
+            random.shuffle(available_roles)
+            for index, user_id in enumerate(remaining_players):
+                role_key = available_roles[index]
+                assignments[user_id] = role_key
+
+            # 4. Save assignments to session and database
+            for user_id, role_key in assignments.items():
                 role_cls = role_registry.get(role_key)
                 session.players[user_id].role_key = role_key
                 session.players[user_id].faction = role_cls.faction.value
@@ -131,6 +184,7 @@ class GameEngine:
                         faction=role_cls.faction.value,
                     )
                 )
+
             session.state = GameState.NIGHT
             session.phase = GamePhase.NIGHT_ACTIONS
             return dict(session.role_history)
@@ -772,44 +826,48 @@ class GameEngine:
                 day_time = settings.get("day_duration", 40)
                 await asyncio.sleep(day_time)
 
-                # Day Voting
-                session.phase = GamePhase.VOTING
-                session.votes.clear()
-                session.metadata.pop("skip_votes", None)
+                # Day Voting Loop (supports returning to voting phase on successful retrial)
+                break_to_voting = False
+                while True:
+                    # Day Voting
+                    session.phase = GamePhase.VOTING
+                    session.votes.clear()
+                    session.metadata.pop("skip_votes", None)
 
-                # Send Vote Button
-                from views.game_ui import VoteUISelectView
-                vote_view = VoteUISelectView(game_id, self)
-                vote_msg = await self.bot.message_queue.send(
-                    mafia_channel,
-                    f"{get_emoji('vote')} **Voting Phase**\nClick below to select a target to vote onto the stand. You can also vote to skip.",
-                    view=vote_view
-                )
+                    # Send Vote Button
+                    from views.game_ui import VoteUISelectView
+                    vote_view = VoteUISelectView(game_id, self)
+                    vote_msg = await self.bot.message_queue.send(
+                        mafia_channel,
+                        f"{get_emoji('vote')} **Voting Phase**\nClick below to select a target to vote onto the stand. You can also vote to skip.",
+                        view=vote_view
+                    )
 
-                vote_time = settings.get("vote_duration", 20)
-                for _ in range(0, vote_time, 2):
-                    if session.metadata.get("deadly_sentencing_triggered"):
+                    vote_time = settings.get("vote_duration", 20)
+                    for _ in range(0, vote_time, 2):
+                        if session.metadata.get("deadly_sentencing_triggered"):
+                            break
+                        alive_count_check = sum(1 for p in session.players.values() if p.alive)
+                        total_votes = len(session.votes) + len(session.metadata.get("skip_votes", set()))
+                        if total_votes >= alive_count_check:
+                            break
+                        await asyncio.sleep(2)
+
+                    # Remove vote view
+                    try:
+                        await vote_msg.edit(content=f"{get_emoji('vote')} **Voting Phase Ended**", view=None)
+                    except Exception:
+                        pass
+
+                    # Check if Deadly Sentencing was run
+                    if session.metadata.get("deadly_sentencing_run"):
+                        session.metadata.pop("deadly_sentencing_run", None)
+                        session.metadata.pop("deadly_sentencing_triggered", None)
+                        session.metadata.pop("defendant_id", None)
+                        session.metadata.pop("verdicts", None)
+                        await self.bot.message_queue.send(mafia_channel, f"🏛️ **Deadly Sentencing completed. Skipping normal trial.**")
                         break
-                    alive_count_check = sum(1 for p in session.players.values() if p.alive)
-                    total_votes = len(session.votes) + len(session.metadata.get("skip_votes", set()))
-                    if total_votes >= alive_count_check:
-                        break
-                    await asyncio.sleep(2)
 
-                # Remove vote view
-                try:
-                    await vote_msg.edit(content=f"{get_emoji('vote')} **Voting Phase Ended**", view=None)
-                except Exception:
-                    pass
-
-                # Check if Deadly Sentencing was run
-                if session.metadata.get("deadly_sentencing_run"):
-                    session.metadata.pop("deadly_sentencing_run", None)
-                    session.metadata.pop("deadly_sentencing_triggered", None)
-                    session.metadata.pop("defendant_id", None)
-                    session.metadata.pop("verdicts", None)
-                    await self.bot.message_queue.send(mafia_channel, f"🏛️ **Deadly Sentencing completed. Skipping normal trial.**")
-                else:
                     # Calculate Vote Results
                     tally: dict[int, int] = {}
                     for target_id in session.votes.values():
@@ -860,111 +918,76 @@ class GameEngine:
                         # Mute all EXCEPT defendant (but do not mute the text channel during plea)
                         session.phase = GamePhase.TRIAL
                         session.metadata["defendant_id"] = target_id
+                        await self._update_channel_mute_trial(mafia_channel, session, target_id)
 
                         # Plea Timer
                         plea_time = settings.get("plea_duration", 30)
                         await asyncio.sleep(plea_time)
 
-                        # Verdict Phase
-                        session.phase = GamePhase.EXECUTION
-                        session.metadata["verdicts"] = {}
+                        # Verdict Loop (supports retrial failure redirecting back to guilty/inno selection)
+                        break_to_voting = False
+                        while True:
+                            # Verdict Phase
+                            session.phase = GamePhase.EXECUTION
+                            session.metadata["verdicts"] = {}
 
-                        # Unmute everyone for verdict buttons
-                        await self._update_channel_mute(mafia_channel, session, mute=False)
+                            # Unmute everyone for verdict buttons
+                            await self._update_channel_mute(mafia_channel, session, mute=False)
 
-                        from views.game_ui import VerdictUISelectView
-                        verdict_view = VerdictUISelectView(game_id, self)
-                        verdict_msg = await self.bot.message_queue.send(
-                            mafia_channel,
-                            f"{get_emoji('trial')} **Verdict Phase**\nCast your verdict on the defendant: Guilty or Innocent.",
-                            view=verdict_view
-                        )
+                            from views.game_ui import VerdictUISelectView
+                            verdict_view = VerdictUISelectView(game_id, self)
+                            verdict_msg = await self.bot.message_queue.send(
+                                mafia_channel,
+                                f"{get_emoji('trial')} **Verdict Phase**\nCast your verdict on the defendant: Guilty or Innocent.",
+                                view=verdict_view
+                            )
 
-                        verdict_time = settings.get("verdict_duration", 15)
-                        # Sleep loop supporting instant Retrial interruption
-                        for _ in range(int(verdict_time)):
+                            verdict_time = settings.get("verdict_duration", 15)
+                            await asyncio.sleep(verdict_time)
+
+                            # Remove verdict view
+                            try:
+                                await verdict_msg.edit(content=f"{get_emoji('trial')} **Verdict Phase Closed**", view=None)
+                            except Exception:
+                                pass
+
+                            # Check if Retrial was triggered during this verdict phase
                             if session.metadata.get("retrial_triggered"):
-                                break
-                            await asyncio.sleep(1)
+                                session.metadata.pop("retrial_triggered", None)
+                                retrial_defendant = session.metadata.get("retrial_defendant")
+                                retrial_by = session.metadata.get("retrial_by")
 
-                        # Remove verdict view
-                        try:
-                            await verdict_msg.edit(content=f"{get_emoji('trial')} **Verdict Phase Closed**", view=None)
-                        except Exception:
-                            pass
-
-                        retrial_success = False
-                        if session.metadata.get("retrial_triggered"):
-                            session.metadata.pop("retrial_triggered", None)
-                            retrial_defendant = session.metadata.get("retrial_defendant")
-                            retrial_by = session.metadata.get("retrial_by")
-
-                            # Determine if defendant is Town (Hero)
-                            def_player = session.players.get(retrial_defendant)
-                            if def_player and def_player.faction == RoleFaction.HERO.value:
-                                await self.bot.message_queue.send(
-                                    mafia_channel,
-                                    f"⚖️ **Hiromi Higuruma activated Retrial!**\n"
-                                    f"Defendant <@{retrial_defendant}> is confirmed to be **Town**! Their execution is cancelled.\n"
-                                    f"A new trial begins immediately. This time, **every player is forced to vote Guilty**!"
-                                )
-                                # Start second trial for the same defendant
-                                session.phase = GamePhase.TRIAL
-                                session.metadata["defendant_id"] = retrial_defendant
-                                await asyncio.sleep(5)
-                                
-                                session.phase = GamePhase.EXECUTION
-                                session.metadata["verdicts"] = {}
-                                session.metadata["forced_guilty"] = True
-                                
-                                verdict_view = VerdictUISelectView(game_id, self)
-                                verdict_msg = await self.bot.message_queue.send(
-                                    mafia_channel,
-                                    f"{get_emoji('trial')} **Verdict Phase: RETRIAL FORCED GUILTY**\nCast your verdict on the defendant (Forced to vote Guilty):",
-                                    view=verdict_view
-                                )
-                                
-                                for _ in range(10):
-                                    await asyncio.sleep(1)
-                                
-                                try:
-                                    await verdict_msg.edit(content=f"{get_emoji('trial')} **Verdict Phase Closed**", view=None)
-                                except Exception:
-                                    pass
-                                    
-                                session.metadata.pop("forced_guilty", None)
-                                
-                                defendant_name = guild.get_member(retrial_defendant).display_name if guild.get_member(retrial_defendant) else f"User {retrial_defendant}"
-                                role_meta = roles.ROLES_METADATA.get(def_player.role_key, {})
-                                role_display = role_meta.get("name", def_player.role_key or "Unknown")
-                                await self.eliminate_player(game_id, retrial_defendant, "execution")
-                                await self.bot.message_queue.send(
-                                    mafia_channel,
-                                    embed=discord.Embed(
-                                        title=f"{get_emoji('death')} Execution under Retrial",
-                                        description=f"**{defendant_name}** was executed by the town! Their role was **{role_display}**.",
-                                        color=discord.Color.red()
+                                def_player = session.players.get(retrial_defendant)
+                                if def_player and def_player.faction == RoleFaction.HERO.value:
+                                    # Successful Retrial (Saved Town player)
+                                    await self.bot.message_queue.send(
+                                        mafia_channel,
+                                        f"⚖️ **WE ARE HAVING A RE TRIAL!!**\n"
+                                        f"Defendant <@{retrial_defendant}> is confirmed to be **Town (Hero)**! Their execution is cancelled.\n"
+                                        f"Returning to the Nomination/Voting phase to choose a new target."
                                     )
-                                )
-                                retrial_success = True
-                            else:
-                                higuruma_p = session.players.get(retrial_by)
-                                if higuruma_p:
-                                    higuruma_p.metadata["retrial_uses"] = 0
-                                
-                                def_role_display = def_player.role_key.replace('_', ' ').title() if def_player else "Unknown"
-                                await self.bot.message_queue.send(
-                                    mafia_channel,
-                                    f"⚖️ **Retrial Failed!**\n"
-                                    f"Hiromi Higuruma (<@{retrial_by}>) attempted to acquit <@{retrial_defendant}>, but they are **not Town**!\n"
-                                    f"• Hiromi Higuruma's role is publicly revealed.\n"
-                                    f"• The defendant's true role is revealed as **{def_role_display}**.\n"
-                                    f"The trial will resume now with normal verdict tallying."
-                                )
-                                retrial_success = False
+                                    # Reset defendant metadata
+                                    session.metadata.pop("defendant_id", None)
+                                    session.metadata.pop("verdicts", None)
+                                    break_to_voting = True
+                                    break
+                                else:
+                                    # Failed Retrial (Target is not Town)
+                                    higuruma_p = session.players.get(retrial_by)
+                                    if higuruma_p:
+                                        higuruma_p.metadata["retrial_uses"] = 0
+                                        
+                                    def_role_display = def_player.role_key.replace('_', ' ').title() if def_player else "Unknown"
+                                    await self.bot.message_queue.send(
+                                        mafia_channel,
+                                        f"⚖️ **Retrial Failed!**\n"
+                                        f"An attempt to acquit <@{retrial_defendant}> failed because they are **not Town**!\n"
+                                        f"• The defendant's true role is revealed as **{def_role_display}**.\n"
+                                        f"Returning to the Verdict phase for the defendant."
+                                    )
+                                    continue
 
-                        if not retrial_success:
-                            # Tally verdicts
+                            # No retrial triggered, process the verdict normally
                             verdict_data = session.metadata.get("verdicts", {})
                             guilty_count = sum(1 for v in verdict_data.values() if v == "guilty")
                             inno_count = sum(1 for v in verdict_data.values() if v == "innocent")
@@ -981,7 +1004,7 @@ class GameEngine:
                                     mafia_channel,
                                     embed=discord.Embed(
                                         title=f"{get_emoji('trial')} Verdict Logs",
-                                        description="\n".join(vote_detail_lines),
+                                        description="\n".join(verdict_report_lines),
                                         color=discord.Color.blue()
                                     )
                                 )
@@ -991,12 +1014,23 @@ class GameEngine:
                                 f"{get_emoji('trial')} Verdict Totals: **{guilty_count} Guilty** vs **{inno_count} Innocent**."
                             )
 
-                            # If majority guilty, lynch them
                             if guilty_count > inno_count:
-                                # Check Mahoraga adaptation (lynch immunity)
+                                # Perform lynch
                                 def_state = session.players[target_id]
                                 if def_state.metadata.get("lynch_immune_day") == day_num:
                                     await self.bot.message_queue.send(mafia_channel, f"{get_emoji('mahoraga')} **Mahoraga is immune to being lynched today!** The trial is dismissed.")
+                                elif def_state.role_key == "makima" and not def_state.metadata.get("pm_contract_activated"):
+                                    def_state.metadata["pm_contract_activated"] = True
+                                    await self.bot.message_queue.send(
+                                        mafia_channel,
+                                        f"⚖️ **Prime Minister's Contract Triggered!**\n"
+                                        f"An invisible force has prevented the execution! The defendant survives.\n"
+                                        f"The Day ends immediately with no execution."
+                                    )
+                                    session.metadata.pop("defendant_id", None)
+                                    session.metadata.pop("verdicts", None)
+                                    break_to_voting = False
+                                    break
                                 else:
                                     # Check Lelouch Requiem Guess
                                     if def_state.role_key == "lelouch_lamperouge" and def_state.metadata.get("declared_this_day"):
@@ -1025,12 +1059,18 @@ class GameEngine:
                             else:
                                 await self.bot.message_queue.send(mafia_channel, f"{get_emoji('peace')} The town has voted to release the defendant.")
 
-                        # Reset defendant metadata
-                        session.metadata.pop("defendant_id", None)
-                        session.metadata.pop("verdicts", None)
-
+                            # Reset defendant metadata and break the verdict loop
+                            session.metadata.pop("defendant_id", None)
+                            session.metadata.pop("verdicts", None)
+                            break
+                        
+                        if break_to_voting:
+                            continue
+                        else:
+                            break
                     else:
                         await self.bot.message_queue.send(mafia_channel, f"{get_emoji('peace')} Voting skipped. No one is on trial today.")
+                        break
 
                 # Check Victory after day phase
                 winner = self._evaluate_victory(session)
@@ -1264,6 +1304,67 @@ class GameEngine:
         session.metadata["magical_barriers"] = {}
         session.metadata["life_supports"] = {}
 
+        # 0. Check Makima controls before processing actions and visits
+        makima_id = None
+        for pid, pstate in session.players.items():
+            if pstate.role_key == "makima" and pstate.alive:
+                makima_id = pid
+                break
+
+        if makima_id and makima_id in session.night_actions:
+            makima_payload = session.night_actions[makima_id]
+            action_idx = makima_payload.get("action_index", 0)
+            if action_idx == 0:  # Control
+                controlled_pid = makima_payload.get("target_id")
+                redirect_pid = makima_payload.get("redirect_target")
+                
+                controlled_state = session.players.get(controlled_pid) if controlled_pid else None
+                makima_state = session.players.get(makima_id)
+                
+                if controlled_state and controlled_state.alive and controlled_state.faction != RoleFaction.VILLAIN.value:
+                    last_controlled = makima_state.metadata.get("last_controlled_player")
+                    if last_controlled != controlled_pid:
+                        makima_state.metadata["last_controlled_player"] = controlled_pid
+                        
+                        # Target must perform an active visit (be in night_actions and have target_id or targets)
+                        if controlled_pid in session.night_actions:
+                            controlled_payload = session.night_actions[controlled_pid]
+                            has_active_target = False
+                            if controlled_payload.get("target_id") is not None:
+                                has_active_target = True
+                            elif controlled_payload.get("targets"):
+                                has_active_target = True
+                                
+                            if has_active_target:
+                                # Successful redirection!
+                                if "target_id" in controlled_payload and controlled_payload["target_id"] is not None:
+                                    controlled_payload["target_id"] = redirect_pid
+                                if "targets" in controlled_payload and controlled_payload["targets"]:
+                                    controlled_payload["targets"] = (redirect_pid,) * len(controlled_payload["targets"])
+                                    
+                                # Track unique controlled targets
+                                controlled_history = makima_state.metadata.setdefault("controlled_targets_history", [])
+                                if controlled_pid not in controlled_history:
+                                    controlled_history.append(controlled_pid)
+                                makima_state.metadata["controlled_count"] = len(controlled_history)
+                                
+                                makima_payload["control_success"] = True
+                                makima_payload["target_id"] = controlled_pid
+                                makima_payload["redirect_target"] = redirect_pid
+                                makima_payload["log"] = f"Makima controlled <@{controlled_pid}> and redirected their action to <@{redirect_pid}>."
+                            else:
+                                makima_payload["control_success"] = False
+                                makima_payload["error"] = "Target player did not perform an active visit."
+                        else:
+                            makima_payload["control_success"] = False
+                            makima_payload["error"] = "Target player did not perform an active visit."
+                    else:
+                        makima_payload["control_success"] = False
+                        makima_payload["error"] = "Cannot control the same player on consecutive nights."
+                else:
+                    makima_payload["control_success"] = False
+                    makima_payload["error"] = "Invalid target."
+
         # Collect visits for history (to support Maomao)
         history = session.metadata.setdefault("night_visits_history", {})
         night_visits = history.setdefault(night_num, {})
@@ -1316,6 +1417,7 @@ class GameEngine:
                 guild_id=session.game_handle.guild_id,
                 user_id=actor_id,
                 target_id=payload.get("target_id"),
+                targets=payload.get("targets", ()),
                 payload={**payload, "session": session}
             )
             try:
@@ -1365,6 +1467,22 @@ class GameEngine:
                 kills = session.metadata.setdefault("pending_kills", {})
                 kills[pid] = kills.get(pid, []) + ["devils_pen_kill"]
                 death_queue.pop(pid_str, None)
+                
+                # Notify Light Yagami that the target was hit
+                for ly_id, ly_state in session.players.items():
+                    if ly_state.role_key == "light_yagami" and ly_state.alive:
+                        guild_id = session.game_handle.guild_id
+                        g = self.bot.get_guild(guild_id)
+                        if g:
+                            ly_member = g.get_member(ly_id)
+                            if ly_member:
+                                try:
+                                    self.bot.message_queue.send(
+                                        ly_member,
+                                        f"🍎 **Devil's Pen:** The 3 nights have passed. Your target <@{pid}> has been written out of existence!"
+                                    )
+                                except Exception:
+                                    pass
 
         # 3. Check Gilgamesh transformed apocalypse
         for pid, pstate in session.players.items():
@@ -1438,13 +1556,16 @@ class GameEngine:
             if not target_state or not target_state.alive:
                 continue
 
-            # Check unpreventable kills (Devils Pen/Apocalypse)
-            unpreventable_sources = ("devils_pen_kill", "gates_of_babylon")
+            # Check unpreventable kills (Devils Pen/Apocalypse/Bang)
+            unpreventable_sources = ("devils_pen_kill", "gates_of_babylon", "bang_kill")
             if any(src in unpreventable_sources for src in sources):
                 target_mem = guild.get_member(target_id) if guild else None
                 target_name = target_mem.display_name if target_mem else f"User {target_id}"
                 cause_key = next(src for src in unpreventable_sources if src in sources)
-                death_msg = get_death_message(cause_key, target_name)
+                if cause_key == "bang_kill":
+                    death_msg = f"{get_emoji('makima')} **{target_name} was blown to pieces by an invisible force.**"
+                else:
+                    death_msg = get_death_message(cause_key, target_name)
                 await self.eliminate_player(session.game_handle.game_id, target_id, "darkness", death_message=death_msg)
                 continue
 
@@ -1567,27 +1688,11 @@ class GameEngine:
                 frieren_state = session.players.get(frieren_id)
                 if frieren_state:
                     frieren_state.metadata["frieren_binding_cooldown_until_day"] = session.metadata.get("day_num", 1) + 2
-                mafia_ch_id = session.metadata.get("mafia_channel_id")
-                if mafia_ch_id:
-                    ch = self.bot.get_channel(mafia_ch_id)
-                    if ch:
-                        self.bot.message_queue.send(
-                            ch,
-                            f"✨ **Ancient Binding Triggered!** One of the bound players died. The survivor (<@{p2}>) is now **Hidden** and cannot be targeted next cycle."
-                        )
             elif p2_died and not p1_died and p1_state and p1_state.alive:
                 p1_state.metadata["hidden_until_night"] = night_num + 1
                 frieren_state = session.players.get(frieren_id)
                 if frieren_state:
                     frieren_state.metadata["frieren_binding_cooldown_until_day"] = session.metadata.get("day_num", 1) + 2
-                mafia_ch_id = session.metadata.get("mafia_channel_id")
-                if mafia_ch_id:
-                    ch = self.bot.get_channel(mafia_ch_id)
-                    if ch:
-                        self.bot.message_queue.send(
-                            ch,
-                            f"✨ **Ancient Binding Triggered!** One of the bound players died. The survivor (<@{p1}>) is now **Hidden** and cannot be targeted next cycle."
-                        )
 
         # Check Levi's Survivor's Guilt
         for pid, pstate in session.players.items():
@@ -1662,10 +1767,14 @@ class GameEngine:
                 guild_id=session.game_handle.guild_id,
                 user_id=actor_id,
                 target_id=payload.get("target_id"),
+                targets=payload.get("targets", ()),
                 payload={**payload, "session": session},
                 bot=self.bot
             )
             try:
+                # If the feedback was already sent as an embed in the resolution phase, skip it here
+                if "result" in payload:
+                    continue
                 feedback = await role_inst.get_night_feedback(context)
                 if feedback:
                     self.bot.message_queue.send(member, feedback)
@@ -1749,21 +1858,24 @@ class GameEngine:
     async def _update_channel_mute(self, channel: discord.TextChannel, session: GameSession, mute: bool) -> None:
         """Sets message-sending overrides on `#mafia` text channel using default_role."""
         try:
-            await channel.set_permissions(channel.guild.default_role, read_messages=False, send_messages=not mute)
+            await channel.set_permissions(channel.guild.default_role, read_messages=False, send_messages=False)
             
-            if not mute:
-                guild = channel.guild
-                day_num = session.metadata.get("day_num", 1)
-                for pid, pstate in session.players.items():
-                    if pstate.alive:
+            guild = channel.guild
+            day_num = session.metadata.get("day_num", 1)
+            for pid, pstate in session.players.items():
+                if pstate.alive:
+                    member = guild.get_member(pid)
+                    if not member:
+                        try:
+                            member = await guild.fetch_member(pid)
+                        except discord.NotFound:
+                            continue
+                    
+                    if mute:
+                        await channel.set_permissions(member, read_messages=True, send_messages=False)
+                    else:
                         is_wounded = pstate.metadata.get("wounded_until_day") == day_num
                         is_exhausted = pstate.metadata.get("exhausted_until_day") == day_num
-                        member = guild.get_member(pid)
-                        if not member:
-                            try:
-                                member = await guild.fetch_member(pid)
-                            except discord.NotFound:
-                                continue
                         if is_wounded or is_exhausted:
                             await channel.set_permissions(member, read_messages=True, send_messages=False)
                         else:

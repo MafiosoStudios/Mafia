@@ -34,7 +34,7 @@ def build_status_embed(title: str, description: str | None = None) -> discord.Em
 
 
 def build_profile_embed(title: str, description: str | None = None) -> discord.Embed:
-    return build_embed(title, description, color=ANIME_PRIMARY)
+    return build_embed(title, description, color=discord.Color.from_rgb(0, 0, 0))
 
 
 def build_victory_embed(title: str, description: str | None = None) -> discord.Embed:

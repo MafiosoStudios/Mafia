@@ -7,56 +7,70 @@ from utils.constants import RoleFaction
 from config import get_emoji
 
 
-class BlackbeardBlock(NightAction):
+class BlackbeardDarknessLogia(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Darkness Logia / Tremor Fruit",
-            description="Darkness Logia: Roleblock a player. Tremor Fruit: Roleblock all non-mafia players (once per game).",
+            name="Darkness Logia",
+            description="Roleblock a player. Cooldown: 1 Night.",
             priority=1
         )
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        last_used_night = player_state.metadata.get("last_block_night", -1)
+        current_night = session.metadata.get("night_num", 1)
+        if last_used_night == current_night - 1:
+            return False, "Darkness Logia is on cooldown tonight."
+        return True, None
+
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        return [pid for pid in super().get_eligible_targets(session, actor_id) if pid != actor_id]
+
+    async def execute(self, context: RoleContext) -> None:
+        target_id = context.target_id
+        session = context.payload.get("session")
+        if not target_id or not session:
+            return
+
+        player_state = session.players[context.user_id]
+        current_night = session.metadata.get("night_num", 1)
+        player_state.metadata["last_block_night"] = current_night
+
+        target_player = session.players.get(target_id)
+        if target_player:
+            target_player.metadata["roleblocked"] = True
+            context.payload["log"] = f"Blackbeard roleblocked <@{target_id}> using Darkness Logia."
+
+
+class BlackbeardTremorFruit(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Tremor Fruit",
+            description="Roleblock all non-mafia players for one night. (Once per game)",
+            priority=1
+        )
+        self.num_targets = 0
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        if player_state.metadata.get("tremor_used"):
+            return False, "Tremor Fruit has already been used this game."
+        return True, None
 
     async def execute(self, context: RoleContext) -> None:
         session = context.payload.get("session")
         if not session:
             return
-            
+
         player_state = session.players[context.user_id]
-        action_type = context.payload.get("action_type")
+        player_state.metadata["tremor_used"] = True
 
-        # 1. Tremor Fruit (Max Ability)
-        if action_type == "tremor":
-            if player_state.metadata.get("tremor_used"):
-                context.payload["error"] = "You have already used the Tremor Fruit."
-                return
-            player_state.metadata["tremor_used"] = True
-            
-            # Roleblock all non-mafia (town and neutral)
-            blocked_count = 0
-            for pid, pstate in session.players.items():
-                if pstate.alive and pstate.faction != RoleFaction.VILLAIN.value:
-                    pstate.metadata["roleblocked"] = True
-                    blocked_count += 1
-            
-            context.payload["log"] = f"Blackbeard triggered the Tremor Fruit! An earthquake roleblocked {blocked_count} players."
-            return
+        blocked_count = 0
+        for pid, pstate in session.players.items():
+            if pstate.alive and pstate.faction != RoleFaction.VILLAIN.value:
+                pstate.metadata["roleblocked"] = True
+                blocked_count += 1
 
-        # 2. Normal Darkness Logia roleblock
-        target_id = context.target_id
-        if not target_id:
-            return
-
-        # Cooldown check
-        last_used_night = player_state.metadata.get("last_block_night", -1)
-        current_night = session.metadata.get("night_num", 1)
-        if last_used_night == current_night - 1:
-            context.payload["error"] = "Darkness Logia is on cooldown."
-            return
-
-        player_state.metadata["last_block_night"] = current_night
-        target_player = session.players.get(target_id)
-        if target_player:
-            target_player.metadata["roleblocked"] = True
-            context.payload["log"] = f"Blackbeard roleblocked <@{target_id}>."
+        context.payload["action_type"] = "tremor"
+        context.payload["log"] = f"Blackbeard triggered the Tremor Fruit! An earthquake roleblocked {blocked_count} players."
 
 
 @role_registry.register
@@ -69,7 +83,7 @@ class Blackbeard(BaseRole):
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [BlackbeardBlock()]
+        self.abilities = [BlackbeardDarknessLogia(), BlackbeardTremorFruit()]
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
         target_id = context.payload.get("target_id")
@@ -278,37 +292,64 @@ class MuzanKibutsuji(BaseRole):
 class MakimaControl(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Control Order",
-            description="Force a player to vote for another target on the next day (usable every 2nd night, 2 charges).",
+            name="Control",
+            description="Control a player, redirecting their night action to a target of your choice. You cannot target friendly mafia, or the same player on consecutive nights.",
             priority=5
         )
+        self.num_targets = 1
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        return True, None
+
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        return [pid for pid in super().get_eligible_targets(session, actor_id) if pid != actor_id]
 
     async def execute(self, context: RoleContext) -> None:
-        session = context.payload.get("session")
-        if not session:
-            return
+        # Resolves before priority list in game_engine.py _resolve_night_logic.
+        # This execute method acts as a backup logger.
+        pass
+
+
+class MakimaBang(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Bang.",
+            description="Fire an invisible force that deals an Unstoppable Attack to a player. Once per game.",
+            priority=4
+        )
+        self.num_targets = 1
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        if player_state.metadata.get("bang_used"):
+            return False, "Bang has already been used this game."
             
+        contract_activated = player_state.metadata.get("pm_contract_activated", False)
+        controlled_count = player_state.metadata.get("controlled_count", 0)
+        
+        if not contract_activated or controlled_count < 2:
+            reasons = []
+            if not contract_activated:
+                reasons.append("Prime Minister's Contract has not activated")
+            if controlled_count < 2:
+                reasons.append(f"Successfully controlled only {controlled_count}/2 different players")
+            return False, f"Bang is sealed. Conditions not met: {', '.join(reasons)}."
+            
+        return True, None
+
+    async def execute(self, context: RoleContext) -> None:
+        target_id = context.target_id
+        session = context.payload.get("session")
+        if not target_id or not session:
+            return
+
         player_state = session.players[context.user_id]
-        current_night = session.metadata.get("night_num", 1)
-        
-        controls_left = player_state.metadata.setdefault("controls_left", 2)
-        if controls_left <= 0:
-            context.payload["error"] = "No control charges left."
-            return
+        player_state.metadata["bang_used"] = True
 
-        target1 = context.target_id
-        target2 = context.payload.get("controlled_vote_target")
-        if not target1 or not target2:
-            context.payload["error"] = "Must select two players."
-            return
-
-        player_state.metadata["controls_left"] = controls_left - 1
-        
-        # Store redirection
-        redirections = session.metadata.setdefault("vote_redirections", {})
-        redirections[target1] = target2
-        
-        context.payload["log"] = f"Makima controlled <@{target1}> to vote for <@{target2}> next day."
+        # Queue unstoppable attack
+        kills = session.metadata.setdefault("pending_kills", {})
+        kills[target_id] = kills.get(target_id, []) + ["bang_kill"]
+        context.payload["action_type"] = "bang"
+        context.payload["log"] = f"Makima used Bang. on <@{target_id}>!"
 
 
 @role_registry.register
@@ -316,27 +357,30 @@ class Makima(BaseRole):
     role_key: ClassVar[str] = "makima"
     priority: ClassVar[int] = 5
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
-    cooldown_text: ClassVar[str] = "Usable every 2nd night (Nights 2, 4, 6...)"
-    limitations_text: ClassVar[str] = "2 charges max per game."
+    cooldown_text: ClassVar[str] = "Control: None. Bang: Once per game (requires conditions)."
+    limitations_text: ClassVar[str] = "Control fails if target doesn't actively visit. Cannot control consecutive nights."
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [MakimaControl()]
-
-    def can_act_tonight(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
-        current_night = session.metadata.get("night_num", 1)
-        if current_night % 2 != 0:
-            return False, f"Control Devil can only be used every 2nd night (Night 2, 4, etc.). It is currently Night {current_night}."
-        controls_left = player_state.metadata.setdefault("controls_left", 2)
-        if controls_left <= 0:
-            return False, "You have no control charges left."
-        return True, None
+        self.abilities = [MakimaControl(), MakimaBang()]
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
+        # Check if Bang was used
+        action_type = context.payload.get("action_type")
+        if action_type == "bang" or context.payload.get("action_index") == 1:
+            target_id = context.payload.get("target_id")
+            return f"{get_emoji('makima')} **Bang. dealt an Unstoppable Attack to <@{target_id}>.**"
+            
+        # Control feedback
         target_id = context.payload.get("target_id")
-        controlled_target = context.payload.get("controlled_vote_target")
-        if target_id and controlled_target:
-            return f"{get_emoji('makima')} **Your Control Order succeeded. <@{target_id}> will vote for <@{controlled_target}> next day!**"
+        redirect_target = context.payload.get("redirect_target")
+        success = context.payload.get("control_success", False)
+        error = context.payload.get("error")
+        
+        if success and target_id and redirect_target:
+            return f"{get_emoji('makima')} **Your Control succeeded! <@{target_id}> was redirected to <@{redirect_target}>.**"
+        elif error:
+            return f"{get_emoji('makima')} **Your Control failed.** Reason: {error}"
         return None
 
 

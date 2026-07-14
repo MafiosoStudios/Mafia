@@ -7,8 +7,11 @@ if TYPE_CHECKING:
     from game_engine import GameSession, GameEngine
 
 import asyncio
+import logging
 from config import get_emoji
 from utils.constants import GamePhase, RoleFaction
+
+logger = logging.getLogger(__name__)
 
 
 async def _safe_queue_night_action(
@@ -19,14 +22,26 @@ async def _safe_queue_night_action(
     payload: dict[str, Any],
 ) -> bool:
     """Submits a night action, gracefully handling the case where the night
-    phase already ended (e.g. the player waited too long to pick a target
-    in the ephemeral dropdown). Returns True on success."""
+    phase already ended or parameters are invalid. Returns True on success."""
     try:
         await engine.queue_night_action(game_id, user_id, payload)
         return True
     except RuntimeError:
         await interaction.response.edit_message(
             content=f"{get_emoji('cross')} Night actions have already locked in — your action wasn't submitted.",
+            view=None,
+        )
+        return False
+    except ValueError as val_err:
+        await interaction.response.edit_message(
+            content=f"{get_emoji('cross')} **Invalid Action:** {val_err}",
+            view=None,
+        )
+        return False
+    except Exception as exc:
+        logger.exception("Unexpected error in night action queue")
+        await interaction.response.edit_message(
+            content=f"{get_emoji('cross')} An unexpected error occurred: {exc}",
             view=None,
         )
         return False
@@ -434,17 +449,14 @@ class LightYagamiTargetSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction) -> None:
         target_id = int(self.values[0])
         # Now prompt for role guess
+        import roles
+        role_options = []
+        for rkey, rmeta in roles.ROLES_METADATA.items():
+            name = rmeta.get("name", rkey.replace("_", " ").title())
+            role_options.append(discord.SelectOption(label=name, value=rkey))
+        role_options = sorted(role_options, key=lambda opt: opt.label)[:25]
+        
         view = discord.ui.View(timeout=120)
-        role_options = [
-            discord.SelectOption(label="Doctor Tenma", value="doctor_tenma"),
-            discord.SelectOption(label="Ayanokoji Kiyotaka", value="ayanokoji_kiyotaka"),
-            discord.SelectOption(label="L", value="l"),
-            discord.SelectOption(label="Hisoka", value="hisoka"),
-            discord.SelectOption(label="Gilgamesh", value="gilgamesh"),
-            discord.SelectOption(label="Lelouch Lamperouge", value="lelouch_lamperouge"),
-            discord.SelectOption(label="Eren Jaeger", value="eren_jaeger"),
-            discord.SelectOption(label="Mahoraga", value="mahoraga")
-        ]
         select = LightYagamiRoleGuessSelect(self.game_id, self.engine, target_id, role_options)
         view.add_item(select)
         await interaction.response.edit_message(content=f"Select the guessed role for <@{target_id}>:", view=view)
@@ -488,24 +500,35 @@ class LightYagamiPenSelect(discord.ui.Select):
 
 class MakimaSelect(discord.ui.Select):
     def __init__(self, game_id: str, engine: GameEngine, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select first target...", options=options[:25])
+        super().__init__(placeholder="Select player to control...", options=options[:25])
         self.game_id = game_id
         self.engine = engine
         self.target_options = options
 
     async def callback(self, interaction: discord.Interaction) -> None:
         target1 = int(self.values[0])
-        # Select second target (can be anyone)
-        options2 = [opt for opt in self.target_options if opt.value != str(target1)]
+        session = await self.engine.get_session(self.game_id)
+        if not session:
+            return
+
+        # Target 2 can be any living player except the controlled player
+        options2 = []
+        guild = interaction.guild
+        for pid, pstate in session.players.items():
+            if pstate.alive and pid != target1:
+                member = guild.get_member(pid) if guild else None
+                name = member.display_name if member else f"User {pid}"
+                options2.append(discord.SelectOption(label=name, value=str(pid)))
+
         view = discord.ui.View(timeout=120)
-        select2 = MakimaVoteTargetSelect(self.game_id, self.engine, target1, options2)
+        select2 = MakimaRedirectTargetSelect(self.game_id, self.engine, target1, options2)
         view.add_item(select2)
-        await interaction.response.edit_message(content=f"Select the target <@{target1}> will be forced to vote for:", view=view)
+        await interaction.response.edit_message(content=f"Select the target <@{target1}>'s action will be redirected to:", view=view)
 
 
-class MakimaVoteTargetSelect(discord.ui.Select):
+class MakimaRedirectTargetSelect(discord.ui.Select):
     def __init__(self, game_id: str, engine: GameEngine, target1: int, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select vote target...", options=options[:25])
+        super().__init__(placeholder="Select redirection target...", options=options[:25])
         self.game_id = game_id
         self.engine = engine
         self.target1 = target1
@@ -514,11 +537,12 @@ class MakimaVoteTargetSelect(discord.ui.Select):
         target2 = int(self.values[0])
         payload = {
             "target_id": self.target1,
-            "controlled_vote_target": target2
+            "redirect_target": target2,
+            "action_index": 0
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(content=f"Control Devil registered: Redirection of <@{self.target1}> to vote for <@{target2}>.", view=None)
+        await interaction.response.edit_message(content=f"Control Devil registered: Redirecting <@{self.target1}> to target <@{target2}>.", view=None)
 
 
 class HisokaBungeeSelect(discord.ui.Select):
@@ -640,13 +664,16 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         self.engine = engine
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        # Defer response immediately to avoid 3-second timeout
+        await interaction.response.defer(ephemeral=True)
+        
         target_id = int(self.values[0])
         session = await self.engine.get_session(self.game_id)
         if not session:
             return
 
         if session.phase != GamePhase.VOTING:
-            await interaction.response.send_message("Voting phase has already ended.", ephemeral=True)
+            await interaction.followup.send("Voting phase has already ended.", ephemeral=True)
             return
 
         player = session.players.get(interaction.user.id)
@@ -655,7 +682,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
 
         deadly_uses = player.metadata.get("deadly_sentencing_uses", 2)
         if deadly_uses <= 0:
-            await interaction.response.send_message("You have no uses left.", ephemeral=True)
+            await interaction.followup.send("You have no uses left.", ephemeral=True)
             return
 
         async with self.engine._lock:
@@ -665,24 +692,44 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
 
         target_player = session.players.get(target_id)
         target_faction = target_player.faction if target_player else None
-
-        await self.engine.eliminate_player(self.game_id, target_id, "deadly_sentencing")
-
+        
         mafia_channel = interaction.channel
         await self.engine.bot.message_queue.send(
             mafia_channel,
             f"🏛️ **Hiromi Higuruma has declared Deadly Sentencing!**\n"
-            f"Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
+            f"Hiromi Higuruma decided to put <@{target_id}> on the stand!"
+        )
+
+        await asyncio.sleep(3)
+
+        faction_display = "Town (Hero)"
+        if target_faction == RoleFaction.VILLAIN.value:
+            faction_display = "Mafia (Villain)"
+        elif target_faction == "Neutral":
+            faction_display = "Neutral"
+
+        await self.engine.bot.message_queue.send(
+            mafia_channel,
+            f"⚖️ The defendant <@{target_id}> was aligned with the **{faction_display}** faction!"
+        )
+
+        await asyncio.sleep(3)
+
+        await self.engine.eliminate_player(self.game_id, target_id, "deadly_sentencing")
+        await self.engine.bot.message_queue.send(
+            mafia_channel,
+            f"⚡ Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
         )
 
         if target_faction == RoleFaction.HERO.value:
+            await asyncio.sleep(3)
             await self.engine.eliminate_player(self.game_id, interaction.user.id, "wrongful_judgment")
             await self.engine.bot.message_queue.send(
                 mafia_channel,
                 f"⚠️ **Wrongful Judgment!** Hiromi Higuruma executed a fellow **Town** member and was executed by the Hangman!"
             )
 
-        await interaction.response.edit_message(content=f"Deadly Sentencing declared on <@{target_id}>.", view=None)
+        await interaction.edit_original_response(content=f"Deadly Sentencing declared on <@{target_id}>.", view=None)
 
 
 class VoteSelector(discord.ui.Select):

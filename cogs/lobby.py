@@ -13,14 +13,44 @@ class LobbyCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.hybrid_group(name="lobby", description="Manage anime mafia lobbies")
+    @commands.hybrid_group(name="lobby", description="Manage anime mafia lobbies", invoke_without_command=True)
     async def lobby(self, ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
-            await send_hybrid_response(
-                ctx,
-                "Try `lobby create`, `lobby join`, `lobby leave`, or `lobby start`.",
-                ephemeral=True,
+            lobby_manager = getattr(self.bot, "lobby_manager", None)
+            if lobby_manager is None:
+                await send_hybrid_response(ctx, "Lobby system is not ready yet.", ephemeral=True)
+                return
+            
+            guild_id = ctx.guild.id if ctx.guild is not None else 0
+            lobby = await lobby_manager.get_lobby(guild_id)
+            if lobby is None:
+                await send_hybrid_response(
+                    ctx,
+                    "No active lobby found. Try `lobby create` to create one.",
+                    ephemeral=True,
+                )
+                return
+
+            from utils.embeds import build_lobby_embed
+            guild_name = lobby_manager._guild_name(guild_id)
+            roster_lines = lobby_manager._render_roster(lobby)
+
+            embed = build_lobby_embed(
+                guild_name=guild_name,
+                leader_text=f"<@{lobby.leader_id}>",
+                roster_lines=roster_lines,
+                current_players=len(lobby.players),
+                min_players=lobby.min_players,
+                max_players=lobby.max_players,
             )
+            view = LobbyView(self.bot, lobby)
+            message = await send_hybrid_response(
+                ctx,
+                embed=embed,
+                view=view,
+            )
+            if message is not None:
+                await lobby_manager.bind_lobby_message(guild_id, message)
 
     @lobby.command(name="create")
     async def create_lobby(self, ctx: commands.Context) -> None:

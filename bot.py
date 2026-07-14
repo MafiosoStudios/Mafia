@@ -51,6 +51,17 @@ class AnimeMafiaBot(commands.Bot):
 
     async def on_ready(self) -> None:
         logger.info("Logged in as %s (%s)", self.user, self.user.id if self.user else "unknown")
+        for guild in self.guilds:
+            try:
+                self.tree.clear_commands(guild=guild)
+                await self.tree.sync(guild=guild)
+            except Exception:
+                pass
+        try:
+            await self.tree.sync()
+            logger.info("Global commands synced successfully.")
+        except Exception:
+            logger.exception("Failed to sync global commands.")
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
         logger.exception("App command failed: %s", error)

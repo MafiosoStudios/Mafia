@@ -396,11 +396,7 @@ class LeviODMExecution(NightAction):
             player_state.metadata["levi_precision_active"] = False
 
         pending_kills = session.metadata.setdefault("pending_kills", {})
-        pending_kills[target_id] = {
-            "attacker_id": context.user_id,
-            "cause": "levi_kill",
-            "ignore_protection": precision
-        }
+        pending_kills[target_id] = pending_kills.get(target_id, []) + ["levi_kill"]
         context.payload["result"] = f"⚔️ **ODM Execution:** You launched a strike against <@{target_id}> (Precision strike active: **{precision}**)."
 
 
