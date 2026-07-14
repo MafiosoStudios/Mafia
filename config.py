@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import os
+import random
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -46,6 +47,12 @@ def _parse_int_tuple(value: str) -> tuple[int, ...]:
     return tuple(int(item.strip()) for item in value.split(",") if item.strip())
 
 
+# =============================================================================
+# EMOJIS — every emoji used anywhere in the bot is defined here. Nothing is
+# hardcoded in game logic or UI files; everything calls get_emoji("key").
+# Swap any value for a custom Discord emoji string (e.g. "<:name:id>" or
+# "<a:name:id>" for animated) once you have your own emoji assets uploaded.
+# =============================================================================
 EMOJIS: dict[str, str] = {
     # Factions
     "Hero": "🛡️",
@@ -72,6 +79,16 @@ EMOJIS: dict[str, str] = {
     "upper_moon": "💀",
     "default_villain": "👤",
 
+    # Role categories (used for role-reveal / role-list UI)
+    "category_protective": "🩹",
+    "category_investigative": "🔍",
+    "category_council": "🏛️",
+    "category_utility": "🧰",
+    "category_killing": "🗡️",
+    "category_deception": "🎭",
+    "category_control": "🕹️",
+    "category_neutral": "🎲",
+
     # System / UI elements
     "death": "💀",
     "alive": "🟢",
@@ -85,13 +102,150 @@ EMOJIS: dict[str, str] = {
     "lobby": "🎮",
     "clock": "⏰",
     "check": "✅",
+    "cross": "❌",
     "peace": "🕊️",
     "chat": "💬",
     "draw": "🤝",
+    "target": "🎯",
+    "zap": "⚡",
+    "group": "👥",
+    "settings": "⚙️",
+    "search": "🔎",
+    "shield": "🛡️",
+    "sword": "⚔️",
+    "join": "➕",
+    "leave": "➖",
+    "crown": "👑",
+    "skull": "☠️",
+    "inactive": "💤",
 }
 
 
 def get_emoji(key: str) -> str:
-    """Returns the configured emoji for the given key, falling back to an empty string or default if not found."""
+    """Returns the configured emoji for the given key, falling back to an empty string if not found."""
     return EMOJIS.get(key, "")
 
+
+# =============================================================================
+# MEDIA — thumbnails / banners / gifs used across embeds. All fully optional:
+# leave a value as "" to skip it. Point these at your own CDN/Discord CDN
+# links once you have art assets; nothing else in the codebase needs to change.
+# =============================================================================
+ROLE_IMAGES: dict[str, str] = {
+    # role_key -> thumbnail image URL shown on role-reveal DMs / role info embeds
+}
+
+EVENT_IMAGES: dict[str, str] = {
+    # event key -> banner image/gif URL shown in the big phase-transition embeds
+    "lobby": "",
+    "rules": "",
+    "match_start": "",
+    "night": "",
+    "day": "",
+    "trial": "",
+    "verdict": "",
+    "death": "",
+    "victory_hero": "",
+    "victory_villain": "",
+    "victory_neutral": "",
+    "draw": "",
+}
+
+
+def get_role_image(role_key: str) -> str | None:
+    """Returns the configured thumbnail URL for a role, or None if not set."""
+    url = ROLE_IMAGES.get(role_key or "", "")
+    return url or None
+
+
+def get_event_image(event_key: str) -> str | None:
+    """Returns the configured banner/gif URL for an event, or None if not set."""
+    url = EVENT_IMAGES.get(event_key, "")
+    return url or None
+
+
+# =============================================================================
+# DEATH MESSAGES — flavor text shown when a player dies. Fully data-driven so
+# adding a new role's kill only means adding an entry here, never touching
+# game_engine.py. Each key is a "kill source" tag set by a role's night_action
+# (e.g. roles/mafia.py sets "mafia_strike"); each value is a list of possible
+# lines and one is picked at random for variety. Use {player} as a placeholder.
+# Any source tag without an entry here automatically falls back to
+# GENERIC_DEATH_MESSAGES, so new roles never "break" and always show *some*
+# flavor text instead of silently reusing one hardcoded fallback line.
+# =============================================================================
+DEATH_MESSAGES: dict[str, list[str]] = {
+    "mafia_strike": [
+        "**{player}** was cornered in the dark and struck down by the Mafia.",
+        "**{player}** never saw the blade coming. The Mafia claimed another life.",
+        "**{player}** was found lifeless — the Mafia's mark left behind.",
+    ],
+    "demon_strike": [
+        "**{player}** was torn apart by a demon's claws in the night.",
+        "**{player}** let out a scream before a demon silenced them forever.",
+        "**{player}** was hunted down and devoured under the moonlight.",
+    ],
+    "light_guess": [
+        "**{player}**'s true identity was written in the Death Note — their heart gave out instantly.",
+        "**{player}** clutched their chest and collapsed. Kira's judgment was absolute.",
+    ],
+    "devils_pen_kill": [
+        "**{player}**'s name had been written three nights ago. Right on schedule, their heart stopped.",
+        "**{player}** succumbed to a curse written in ink days ago — the Devil's Pen never misses.",
+    ],
+    "gates_of_babylon": [
+        "**{player}** was obliterated in a hailstorm of a thousand golden blades.",
+        "**{player}** stood no chance against the King of Heroes' treasury unleashed.",
+    ],
+    "hisoka_nen_kill": [
+        "**{player}** felt Bungee Gum snap tight around their throat — Hisoka's Post-Mortem Nen struck true.",
+        "**{player}** was ambushed by a magician who should have already been dead.",
+    ],
+    "rumbling": [
+        "**{player}** was crushed beneath the unstoppable march of the Rumbling.",
+        "**{player}** had nowhere to run as the Titans closed in.",
+    ],
+    "darkness": [
+        "**{player}** vanished into an inescapable darkness, never to be seen again.",
+    ],
+    "execution": [
+        "**{player}** was lynched by the town's judgment.",
+    ],
+    "declared_peace": [
+        "**{player}** chose to step down peacefully.",
+    ],
+}
+
+# Generic fallback lines used when a death has no specific source tag mapped above.
+GENERIC_DEATH_MESSAGES: list[str] = [
+    "**{player}** was found dead.",
+    "**{player}** did not survive the night.",
+    "**{player}** was eliminated during the night.",
+]
+
+# Sent (via DM) to alive players who took no night action at all — e.g. no
+# ability, roleblocked with nothing to report, or simply chose not to act.
+NIGHT_INACTION_MESSAGES: list[str] = [
+    "The night passed quietly for you. Nothing to report.",
+    "You kept a low profile through the night. No action was taken.",
+    "Nothing happened on your end tonight — stay alert for tomorrow.",
+]
+
+
+def get_death_message(cause_key: str | None, player_name: str) -> str:
+    """Looks up a flavored death line for the given cause tag, falling back to a generic one."""
+    pool = DEATH_MESSAGES.get(cause_key or "", None) or GENERIC_DEATH_MESSAGES
+    template = random.choice(pool)
+    return template.format(player=player_name)
+
+
+def get_inaction_message() -> str:
+    return random.choice(NIGHT_INACTION_MESSAGES)
+
+
+# =============================================================================
+# CHANNEL / CATEGORY NAMING — used when the bot spins up a temporary category
+# + text channel for each match. Both are deleted together when the game ends.
+# =============================================================================
+GAME_CATEGORY_NAME_TEMPLATE = "🎭 Mafia Match {game_id}"
+GAME_CHANNEL_NAME_TEMPLATE = "mafia-{game_id}"

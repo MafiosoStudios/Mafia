@@ -5,6 +5,8 @@ import logging
 import discord
 from discord.ext import commands
 
+from config import get_emoji
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,9 +88,9 @@ class EventsCog(commands.Cog):
         sender_name = message.author.display_name
         content = message.content
         if player_state.alive:
-            formatted_msg = f"👥 **[Mafia Chat] {sender_name}**: {content}"
+            formatted_msg = f"{get_emoji('group')} **[Mafia Chat] {sender_name}**: {content}"
         else:
-            formatted_msg = f"~~👥 [Mafia Chat] [Dead] {sender_name}: {content}~~"
+            formatted_msg = f"~~{get_emoji('group')} [Mafia Chat] [Dead] {sender_name}: {content}~~"
 
         for pid, pstate in target_session.players.items():
             if pid == message.author.id:

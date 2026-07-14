@@ -7,6 +7,27 @@ from typing import ClassVar
 from utils.constants import RoleFaction
 
 
+class RoleCategory:
+    """Category tags used by the balanced role-selection algorithm (see roles/balance.py).
+
+    Town categories: PROTECTIVE, INVESTIGATIVE, COUNCIL, UTILITY.
+    Mafia categories: KILLING (exactly one per game), and the "support" trio
+    DECEPTION / CONTROL / UTILITY (exactly one of these per game).
+    Neutral roles use NEUTRAL plus whatever descriptive tag they like.
+    """
+
+    PROTECTIVE = "protective"
+    INVESTIGATIVE = "investigative"
+    COUNCIL = "council"
+    UTILITY = "utility"
+    KILLING = "killing"
+    DECEPTION = "deception"
+    CONTROL = "control"
+    NEUTRAL = "neutral"
+
+    MAFIA_SUPPORT = (DECEPTION, CONTROL, UTILITY)
+
+
 @dataclass(slots=True)
 class RoleContext:
     game_id: str

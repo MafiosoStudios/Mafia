@@ -15,16 +15,13 @@ from utils.constants import GamePhase, GameState, RoleFaction
 from utils.helpers import utcnow
 from utils.roles import BaseRole, RoleContext, role_registry
 import roles
-from config import get_emoji
+from config import (
+    get_emoji, get_death_message, get_inaction_message, get_event_image, get_role_image,
+    GAME_CATEGORY_NAME_TEMPLATE, GAME_CHANNEL_NAME_TEMPLATE,
+)
 
 logger = logging.getLogger(__name__)
 
-# Generic fallback descriptions when players die
-DEATH_MEMES = [
-    "**{player}** was found dead.",
-    "**{player}** did not survive the night.",
-    "**{player}** was eliminated during the night.",
-]
 
 def get_rules_text() -> str:
     return (
@@ -143,6 +140,8 @@ class GameEngine:
             session = self._require_session(game_id)
             if voter_id not in session.players:
                 raise KeyError("Voter is not part of the session.")
+            if session.phase != GamePhase.VOTING:
+                raise RuntimeError("Voting has ended for this round.")
             if target_id is None:
                 session.votes.pop(voter_id, None)
             else:
@@ -159,6 +158,8 @@ class GameEngine:
             session = self._require_session(game_id)
             if user_id not in session.players:
                 raise KeyError("Actor is not part of the session.")
+            if session.phase != GamePhase.NIGHT_ACTIONS:
+                raise RuntimeError("Night actions have already been locked in for this round.")
             session.night_actions[user_id] = payload
             session.players[user_id].night_actions_used += 1
 
@@ -195,8 +196,14 @@ class GameEngine:
             player = session.players[user_id]
             player.alive = False
             player.metadata["death_cause"] = cause
-            if death_message:
-                player.metadata["death_message"] = death_message
+
+            if not death_message:
+                guild = self.bot.get_guild(session.game_handle.guild_id) if self.bot else None
+                member = guild.get_member(user_id) if guild else None
+                mname = member.display_name if member else f"User {user_id}"
+                death_message = get_death_message(cause, mname)
+
+            player.metadata["death_message"] = death_message
 
             # Track this death so the day report picks it up (Only for night deaths)
             if session.state == GameState.NIGHT and cause != "declared_peace":
@@ -226,18 +233,7 @@ class GameEngine:
                 if mafia_ch_id and self.bot:
                     ch = self.bot.get_channel(mafia_ch_id)
                     if ch:
-                        guild = self.bot.get_guild(session.game_handle.guild_id)
-                        mname = f"User {user_id}"
-                        if guild:
-                            member = guild.get_member(user_id)
-                            if member:
-                                mname = member.display_name
-                        
-                        if death_message:
-                            announcement = f"{get_emoji('death')} {death_message}"
-                        else:
-                            announcement = f"{get_emoji('death')} **{mname}** died."
-                        
+                        announcement = f"{get_emoji('death')} {death_message}"
                         try:
                             await ch.send(announcement)
                         except Exception:
@@ -427,48 +423,11 @@ class GameEngine:
         if not guild:
             return
 
-        # 1. Roles Distribution
-        balance = roles.get_role_balance(len(session.player_ids))
-
-        # Build pools of roles
-        town_pool = [k for k, v in roles.ROLES_METADATA.items() if v["faction"] == "Hero" and k not in ["villager"]]
-        mafia_pool = [k for k, v in roles.ROLES_METADATA.items() if v["faction"] == "Villain" and k not in ["demon", "lower_moon", "upper_moon"]]
-        neutral_pool = [k for k, v in roles.ROLES_METADATA.items() if v["faction"] == "Neutral"]
-
-        random.shuffle(town_pool)
-        random.shuffle(mafia_pool)
-        random.shuffle(neutral_pool)
-
-        assigned_keys = []
-        # Draw roles according to counts
-        for _ in range(balance.get("town", 0)):
-            if town_pool:
-                assigned_keys.append(town_pool.pop())
-            else:
-                assigned_keys.append("villager")
-
-        mafia_count = balance.get("mafia", 0)
-        mafia_assigned = []
-        if mafia_count > 0:
-            # First mafia role is always default_villain (confirmed killer)
-            mafia_assigned.append("default_villain")
-            # For the remaining, shuffle the other mafia roles (excluding default_villain) and pop them
-            other_mafia = [k for k in mafia_pool if k != "default_villain"]
-            random.shuffle(other_mafia)
-            for _ in range(mafia_count - 1):
-                if other_mafia:
-                    mafia_assigned.append(other_mafia.pop())
-                else:
-                    mafia_assigned.append("default_villain")
-        assigned_keys.extend(mafia_assigned)
-
-        for _ in range(balance.get("neutral", 0)):
-            if neutral_pool:
-                assigned_keys.append(neutral_pool.pop())
-            else:
-                assigned_keys.append("mahoraga")  # default neutral
-
-        random.shuffle(assigned_keys)
+        # 1. Roles Distribution — category-balanced (see roles/balance.py):
+        # guarantees Protective/Investigative/Council-Utility coverage for town
+        # and exactly one Killing + one support role for mafia, instead of a
+        # purely random draw.
+        assigned_keys = roles.build_role_pool(len(session.player_ids))
 
         # Apply role assignments
         await self.assign_roles(game_id, tuple(assigned_keys))
@@ -508,11 +467,14 @@ class GameEngine:
             embed.add_field(name="Active Ability", value=role_meta.get('active_ability', 'None'), inline=False)
             embed.add_field(name="Passive Ability", value=role_meta.get('passive_ability', 'None'), inline=False)
             embed.set_footer(text="Keep your role secret!")
+            role_image = get_role_image(pstate.role_key)
+            if role_image:
+                embed.set_thumbnail(url=role_image)
 
             try:
                 await member.send(embed=embed)
                 if pstate.faction == RoleFaction.VILLAIN.value and len(mafia_members) > 1:
-                    await member.send(f"👥 **Your Fellow Mafia Members:** {mafia_list_str}")
+                    await member.send(f"{get_emoji('group')} **Your Fellow Mafia Members:** {mafia_list_str}")
             except Exception:
                 logger.exception("Failed to send DM to player %s", pid)
 
@@ -555,16 +517,18 @@ class GameEngine:
         # Fetch settings for this guild
         settings = await self._database.get_guild_settings(guild_id)
 
-        # 1. Setup #mafia channel and category
-        category = discord.utils.get(guild.categories, name="Mafia Games")
-        if not category:
-            try:
-                category = await guild.create_category("Mafia Games")
-            except Exception:
-                logger.exception("Failed to create Mafia Games category.")
+        # 1. Setup a temporary per-game category + #mafia channel. Both are
+        # torn down together in end_game() once the match finishes.
+        category_name = GAME_CATEGORY_NAME_TEMPLATE.format(game_id=game_id[:6])
+        category = None
+        try:
+            category = await guild.create_category(category_name)
+            session.metadata["mafia_category_id"] = category.id
+        except Exception:
+            logger.exception("Failed to create temporary Mafia match category.")
 
         # Create #mafia channel with proper permissions
-        channel_name = f"mafia-{game_id[:6]}"
+        channel_name = GAME_CHANNEL_NAME_TEMPLATE.format(game_id=game_id[:6])
         mafia_channel = None
         try:
             overwrites = {
@@ -590,6 +554,12 @@ class GameEngine:
             if isinstance(lobby_chan, discord.TextChannel):
                 mafia_channel = lobby_chan
                 session.metadata["mafia_channel_id"] = mafia_channel.id
+            if category is not None:
+                try:
+                    await category.delete(reason="Mafia channel creation failed; cleaning up empty category.")
+                except Exception:
+                    pass
+                session.metadata.pop("mafia_category_id", None)
 
         if not mafia_channel:
             return
@@ -606,18 +576,23 @@ class GameEngine:
             color=discord.Color.purple()
         )
         rules_embed.set_footer(text="Roles have been sent to your DMs. Good luck!")
+        rules_image = get_event_image("rules")
+        if rules_image:
+            rules_embed.set_image(url=rules_image)
         await mafia_channel.send(embed=rules_embed)
 
         # Wait a few seconds for players to read rules
         await asyncio.sleep(8)
 
-        await mafia_channel.send(
-            embed=discord.Embed(
-                title=f"{get_emoji('lobby')} Match Starting!",
-                description="The game begins now. Prepare yourselves!",
-                color=discord.Color.dark_purple()
-            )
+        match_start_embed = discord.Embed(
+            title=f"{get_emoji('lobby')} Match Starting!",
+            description="The game begins now. Prepare yourselves!",
+            color=discord.Color.dark_purple()
         )
+        match_start_image = get_event_image("match_start")
+        if match_start_image:
+            match_start_embed.set_image(url=match_start_image)
+        await mafia_channel.send(embed=match_start_embed)
         await asyncio.sleep(3)
 
         # 4. Game Cycles
@@ -642,16 +617,18 @@ class GameEngine:
                 await self._update_channel_mute(mafia_channel, session, mute=True)
 
                 # Announce Night
-                await mafia_channel.send(
-                    embed=discord.Embed(
-                        title=f"{get_emoji('night')} Night {night_num}",
-                        description=(
-                            "Night has fallen. The town sleeps.\n"
-                            "Players, check your action buttons below to make your moves."
-                        ),
-                        color=discord.Color.dark_blue()
-                    )
+                night_embed = discord.Embed(
+                    title=f"{get_emoji('night')} Night {night_num}",
+                    description=(
+                        "Night has fallen. The town sleeps.\n"
+                        "Players, check your action buttons below to make your moves."
+                    ),
+                    color=discord.Color.dark_blue()
                 )
+                night_image = get_event_image("night")
+                if night_image:
+                    night_embed.set_image(url=night_image)
+                await mafia_channel.send(embed=night_embed)
 
                 # Send action interface (button that opens ephemeral select menu)
                 from views.game_ui import NightActionView
@@ -683,46 +660,12 @@ class GameEngine:
                     session.metadata["day_num"] += 1
                     day_num = session.metadata["day_num"]
 
-                    # Compile deaths
-                    dead_this_round = session.metadata.pop("dead_this_round", [])
-                    death_report = ""
-                    if dead_this_round:
-                        for dpid in dead_this_round:
-                            member = guild.get_member(dpid)
-                            mname = member.display_name if member else f"User {dpid}"
-                            pstate = session.players.get(dpid)
-
-                            custom_msg = pstate.metadata.get("death_message") if pstate else None
-                            if custom_msg:
-                                death_report += f"{get_emoji('death')} {custom_msg}\n"
-                            else:
-                                meme = random.choice(DEATH_MEMES).format(player=mname)
-                                death_report += f"{get_emoji('death')} {meme}\n"
-                    else:
-                        death_report = f"{get_emoji('day')} No one died tonight. It was a quiet night."
-
-                    # Generate alive and dead player list
-                    alive_list = []
-                    dead_list = []
-                    for pid, pstate in session.players.items():
-                        member = guild.get_member(pid)
-                        mname = member.display_name if member else f"User {pid}"
-                        if pstate.alive:
-                            alive_list.append(f"• {mname}")
-                        else:
-                            role_meta = roles.ROLES_METADATA.get(pstate.role_key or "", {})
-                            role_display = role_meta.get("name", pstate.role_key or "Unknown")
-                            dead_list.append(f"• ~~{mname}~~ ({role_display})")
-
-                    # Post deaths in #mafia
-                    embed = discord.Embed(
-                        title=f"{get_emoji('day')} Day {day_num} (Match Point)",
-                        description=death_report,
-                        color=discord.Color.gold()
+                    # Post the death report and the alive/dead roster as two
+                    # separate embeds (they used to be one combined embed).
+                    await self._send_death_and_status_embeds(
+                        mafia_channel, guild, session,
+                        title=f"Day {day_num} (Match Point)",
                     )
-                    embed.add_field(name=f"{get_emoji('chat')} Alive Players", value="\n".join(alive_list) if alive_list else "None", inline=True)
-                    embed.add_field(name=f"{get_emoji('death')} Dead Players", value="\n".join(dead_list) if dead_list else "None", inline=True)
-                    await mafia_channel.send(embed=embed)
 
                     session.state = GameState.ENDED
                     session.winner_faction = winner
@@ -734,47 +677,12 @@ class GameEngine:
                 session.state = GameState.DAY
                 session.phase = GamePhase.DISCUSSION
 
-                # Compile deaths
-                dead_this_round = session.metadata.pop("dead_this_round", [])
-                death_report = ""
-                if dead_this_round:
-                    for dpid in dead_this_round:
-                        member = guild.get_member(dpid)
-                        mname = member.display_name if member else f"User {dpid}"
-                        pstate = session.players.get(dpid)
-
-                        # Use the custom death_message if the role/action set one
-                        custom_msg = pstate.metadata.get("death_message") if pstate else None
-                        if custom_msg:
-                            death_report += f"{get_emoji('death')} {custom_msg}\n"
-                        else:
-                            meme = random.choice(DEATH_MEMES).format(player=mname)
-                            death_report += f"{get_emoji('death')} {meme}\n"
-                else:
-                    death_report = f"{get_emoji('day')} No one died tonight. It was a quiet night."
-
-                # Generate alive and dead player list
-                alive_list = []
-                dead_list = []
-                for pid, pstate in session.players.items():
-                    member = guild.get_member(pid)
-                    mname = member.display_name if member else f"User {pid}"
-                    if pstate.alive:
-                        alive_list.append(f"• {mname}")
-                    else:
-                        role_meta = roles.ROLES_METADATA.get(pstate.role_key or "", {})
-                        role_display = role_meta.get("name", pstate.role_key or "Unknown")
-                        dead_list.append(f"• ~~{mname}~~ ({role_display})")
-
-                # Post deaths in #mafia
-                embed = discord.Embed(
-                    title=f"{get_emoji('day')} Day {day_num}",
-                    description=death_report,
-                    color=discord.Color.gold()
+                # Post the death report and the alive/dead roster as two
+                # separate embeds (they used to be one combined embed).
+                await self._send_death_and_status_embeds(
+                    mafia_channel, guild, session,
+                    title=f"Day {day_num}",
                 )
-                embed.add_field(name=f"{get_emoji('chat')} Alive Players", value="\n".join(alive_list) if alive_list else "None", inline=True)
-                embed.add_field(name=f"{get_emoji('death')} Dead Players", value="\n".join(dead_list) if dead_list else "None", inline=True)
-                await mafia_channel.send(embed=embed)
 
                 # Check if Gilgamesh has transformed and is preparing apocalypse
                 for pid, pstate in list(session.players.items()):
@@ -783,7 +691,7 @@ class GameEngine:
                             embed=discord.Embed(
                                 title=f"{get_emoji('warning')} Warning!",
                                 description=(
-                                    f"⚡ **Gilgamesh has retrieved all of his swords and "
+                                    f"{get_emoji('zap')} **Gilgamesh has retrieved all of his swords and "
                                     f"transformed into the Horseman of Apocalypse!**\n"
                                     f"You have until the end of today to find and lynch him, "
                                     f"or he will unleash the Gates of Babylon and wipe everyone out!"
@@ -998,6 +906,17 @@ class GameEngine:
             except Exception:
                 logger.exception("Failed to delete mafia channel %s", mafia_channel.id)
 
+        # Delete the temporary per-game category that was created alongside
+        # the channel — it's match-specific and should never be left orphaned.
+        category_id = session.metadata.get("mafia_category_id")
+        if category_id:
+            category = guild.get_channel(category_id)
+            if category is not None:
+                try:
+                    await category.delete(reason="Game ended.")
+                except Exception:
+                    logger.exception("Failed to delete temporary Mafia match category %s", category_id)
+
         # Remove active game from manager
         try:
             await self.bot.game_manager.remove_game(game_id)
@@ -1091,7 +1010,72 @@ class GameEngine:
         seconds = history.duration_seconds % 60
         victory_embed.set_footer(text=f"Match Duration: {minutes}m {seconds}s")
 
+        image_key = {
+            RoleFaction.HERO.value: "victory_hero",
+            RoleFaction.VILLAIN.value: "victory_villain",
+            "Draw": "draw",
+        }.get(winner_faction, "victory_neutral")
+        image_url = get_event_image(image_key)
+        if image_url:
+            victory_embed.set_image(url=image_url)
+
         await channel.send(embed=victory_embed)
+
+    async def _send_death_and_status_embeds(
+        self,
+        channel: discord.TextChannel,
+        guild: discord.Guild,
+        session: GameSession,
+        *,
+        title: str,
+    ) -> None:
+        """Sends the night's death report and the alive/dead roster as two
+        separate embeds (kept apart so each is easy to read on its own)."""
+        dead_this_round = session.metadata.pop("dead_this_round", [])
+
+        if dead_this_round:
+            death_lines = []
+            for dpid in dead_this_round:
+                pstate = session.players.get(dpid)
+                msg = pstate.metadata.get("death_message") if pstate else None
+                if not msg:
+                    member = guild.get_member(dpid)
+                    mname = member.display_name if member else f"User {dpid}"
+                    msg = get_death_message(pstate.metadata.get("death_cause") if pstate else None, mname)
+                death_lines.append(f"{get_emoji('death')} {msg}")
+            death_description = "\n".join(death_lines)
+        else:
+            death_description = f"{get_emoji('day')} No one died tonight. It was a quiet night."
+
+        death_embed = discord.Embed(
+            title=f"{get_emoji('death')} {title} — Death Report",
+            description=death_description,
+            color=discord.Color.dark_red() if dead_this_round else discord.Color.gold(),
+        )
+        death_image = get_event_image("death" if dead_this_round else "day")
+        if death_image:
+            death_embed.set_image(url=death_image)
+        await channel.send(embed=death_embed)
+
+        alive_list = []
+        dead_list = []
+        for pid, pstate in session.players.items():
+            member = guild.get_member(pid)
+            mname = member.display_name if member else f"User {pid}"
+            if pstate.alive:
+                alive_list.append(f"• {mname}")
+            else:
+                role_meta = roles.ROLES_METADATA.get(pstate.role_key or "", {})
+                role_display = role_meta.get("name", pstate.role_key or "Unknown")
+                dead_list.append(f"• ~~{mname}~~ ({role_display})")
+
+        status_embed = discord.Embed(
+            title=f"{get_emoji('group')} {title} — Player Status",
+            color=discord.Color.blurple(),
+        )
+        status_embed.add_field(name=f"{get_emoji('alive')} Alive Players", value="\n".join(alive_list) if alive_list else "None", inline=True)
+        status_embed.add_field(name=f"{get_emoji('death')} Dead Players", value="\n".join(dead_list) if dead_list else "None", inline=True)
+        await channel.send(embed=status_embed)
 
     async def _all_active_submitted(self, session: GameSession) -> bool:
         """Checks if all alive players who have active night actions have submitted."""
@@ -1158,6 +1142,10 @@ class GameEngine:
             try:
                 await role_inst.night_action(context)
 
+                # Persist whatever the role wrote (log/result/error) back onto
+                # the stored action payload so later feedback code can read it.
+                session.night_actions[actor_id] = {k: v for k, v in context.payload.items() if k != "session"}
+
                 # Check L / Ayanokoji scan results and deliver to their DMs
                 if "result" in context.payload:
                     mafia_ch_id = session.metadata.get("mafia_channel_id")
@@ -1169,7 +1157,7 @@ class GameEngine:
                                 try:
                                     role_meta = roles.ROLES_METADATA.get(actor_state.role_key or "", {})
                                     role_display = role_meta.get("name", "Investigator")
-                                    emoji = get_emoji(actor_state.role_key) or "🔍"
+                                    emoji = get_emoji(actor_state.role_key) or get_emoji("search")
                                     embed = discord.Embed(
                                         title=f"{emoji} {role_display} Intel",
                                         description=context.payload["result"],
@@ -1236,7 +1224,7 @@ class GameEngine:
                             if hisoka_mem:
                                 try:
                                     await hisoka_mem.send(
-                                        f"🎯 **Bungee Gum Success!** You correctly linked <@{t1}> and <@{t2}> "
+                                        f"{get_emoji('target')} **Bungee Gum Success!** You correctly linked <@{t1}> and <@{t2}> "
                                         f"who visited one another! Points: **{points}/3**."
                                     )
                                 except Exception:
@@ -1252,13 +1240,12 @@ class GameEngine:
                 continue
 
             # Check unpreventable kills (Devils Pen/Apocalypse)
-            if any(src in ["devils_pen_kill", "gates_of_babylon"] for src in sources):
+            unpreventable_sources = ("devils_pen_kill", "gates_of_babylon")
+            if any(src in unpreventable_sources for src in sources):
                 target_mem = guild.get_member(target_id) if guild else None
                 target_name = target_mem.display_name if target_mem else f"User {target_id}"
-                if "devils_pen_kill" in sources:
-                    death_msg = f"**{target_name}**'s name was written in the Death Note... and they suffered a sudden heart attack!"
-                else:
-                    death_msg = f"**{target_name}** was obliterated by Gilgamesh's Gates of Babylon apocalypse!"
+                cause_key = next(src for src in unpreventable_sources if src in sources)
+                death_msg = get_death_message(cause_key, target_name)
                 await self.eliminate_player(session.game_handle.game_id, target_id, "darkness", death_message=death_msg)
                 continue
 
@@ -1279,7 +1266,7 @@ class GameEngine:
                                 if doc_member:
                                     try:
                                         await doc_member.send(
-                                            f"🛡️ **Compassion Successful!** You saved <@{target_id}> from an attack! "
+                                            f"{get_emoji('shield')} **Compassion Successful!** You saved <@{target_id}> from an attack! "
                                             f"Saves: **{doc_saves}/3**."
                                         )
                                     except Exception:
@@ -1297,7 +1284,7 @@ class GameEngine:
                         if muzan_member:
                             try:
                                 await muzan_member.send(
-                                    "🛡️ **Instant Regeneration Triggered!** You blocked an attack. Your passive is now disabled."
+                                    f"{get_emoji('shield')} **Instant Regeneration Triggered!** You blocked an attack. Your passive is now disabled."
                                 )
                             except Exception:
                                 pass
@@ -1327,41 +1314,48 @@ class GameEngine:
                             if mahoraga_mem:
                                 try:
                                     await mahoraga_mem.send(
-                                        "🛡️ **Adaptation triggered!** You survived the attack, adapted to their roles, "
+                                        f"{get_emoji('shield')} **Adaptation triggered!** You survived the attack, adapted to their roles, "
                                         "and gained lynch immunity for tomorrow!"
                                     )
                                 except Exception:
                                     pass
                     continue
 
-            # Eliminate player
+            # Eliminate player — pick the flavor line for whichever kill source landed
+            # (config.DEATH_MESSAGES), so every role's kill gets real variety instead
+            # of only the first few hardcoded sources.
             target_mem = guild.get_member(target_id) if guild else None
             target_name = target_mem.display_name if target_mem else f"User {target_id}"
-            if "mafia_strike" in sources:
-                death_msg = f"**{target_name}** was targeted and assassinated by the Mafia."
-            elif "demon_strike" in sources:
-                death_msg = f"**{target_name}** was attacked and slain by a Demon."
-            elif "light_guess" in sources:
-                death_msg = f"**{target_name}**'s secret identity was discovered by Kira and they were eliminated."
-            else:
-                death_msg = f"**{target_name}** was attacked and died in the night."
+            cause_key = sources[-1] if sources else None
+            death_msg = get_death_message(cause_key, target_name)
             await self.eliminate_player(session.game_handle.game_id, target_id, "attack", death_message=death_msg)
 
-        # Send outcome feedback DMs to players who acted tonight
+        # Send outcome feedback DMs to EVERY alive player — not just ones who
+        # submitted an action. Players with no action (or nothing eventful)
+        # still get a short "quiet night" DM instead of silence.
         dead_tonight = session.metadata.get("dead_this_round", [])
-        for actor_id, payload in session.night_actions.items():
-            actor_state = session.players.get(actor_id)
-            if not actor_state or not actor_state.alive:
+        for actor_id, actor_state in session.players.items():
+            if not actor_state.alive:
                 continue
 
             member = guild.get_member(actor_id) if guild else None
             if not member:
                 continue
 
+            payload = session.night_actions.get(actor_id)
+
+            # No action submitted at all tonight (no ability, chose not to act, etc.)
+            if payload is None:
+                try:
+                    await member.send(f"{get_emoji('night')} {get_inaction_message()}")
+                except Exception:
+                    pass
+                continue
+
             # Roleblocked feedback
             if actor_state.metadata.get("roleblocked"):
                 try:
-                    await member.send("❌ **Your action failed because you were roleblocked tonight!**")
+                    await member.send(f"{get_emoji('cross')} **Your action failed because you were roleblocked tonight!**")
                 except Exception:
                     pass
                 continue
@@ -1374,7 +1368,7 @@ class GameEngine:
                 action_type = payload.get("action_type")
                 if action_type == "revive":
                     try:
-                        await member.send(f"🩺 **You used your Scalpel of Justice to revive <@{target_id}> as a Default Villager!**")
+                        await member.send(f"{get_emoji('doctor_tenma')} **You used your Scalpel of Justice to revive <@{target_id}> as a Default Villager!**")
                     except Exception:
                         pass
                 else:
@@ -1382,7 +1376,7 @@ class GameEngine:
                     was_attacked = target_id in pending_kills
                     if not was_attacked:
                         try:
-                            await member.send(f"🩺 **You decided to heal <@{target_id}> tonight. They were not attacked.**")
+                            await member.send(f"{get_emoji('doctor_tenma')} **You decided to heal <@{target_id}> tonight. They were not attacked.**")
                         except Exception:
                             pass
 
@@ -1391,12 +1385,12 @@ class GameEngine:
                 action_type = payload.get("action_type")
                 if action_type == "tremor":
                     try:
-                        await member.send("🌋 **You triggered the Tremor Fruit earthquake! All non-mafia players have been roleblocked.**")
+                        await member.send(f"{get_emoji('blackbeard')} **You triggered the Tremor Fruit earthquake! All non-mafia players have been roleblocked.**")
                     except Exception:
                         pass
                 else:
                     try:
-                        await member.send(f"🌋 **Your Darkness Logia roleblock successfully distracted <@{target_id}>!**")
+                        await member.send(f"{get_emoji('blackbeard')} **Your Darkness Logia roleblock successfully distracted <@{target_id}>!**")
                     except Exception:
                         pass
 
@@ -1405,7 +1399,7 @@ class GameEngine:
                 action_type = payload.get("action_type")
                 if action_type == "devils_pen":
                     try:
-                        await member.send(f"📓 **You wrote <@{target_id}>'s name in the Death Note with the Devil's Pen. They will die in 3 nights.**")
+                        await member.send(f"{get_emoji('light_yagami')} **You wrote <@{target_id}>'s name in the Death Note with the Devil's Pen. They will die in 3 nights.**")
                     except Exception:
                         pass
                 else:
@@ -1413,12 +1407,12 @@ class GameEngine:
                     target_player = session.players.get(target_id)
                     if target_player and target_player.role_key == guessed_role:
                         try:
-                            await member.send(f"📓 **Kira's judgment! Your guess of <@{target_id}> as '{guessed_role}' was correct. They have been eliminated.**")
+                            await member.send(f"{get_emoji('light_yagami')} **Kira's judgment! Your guess of <@{target_id}> as '{guessed_role}' was correct. They have been eliminated.**")
                         except Exception:
                             pass
                     else:
                         try:
-                            await member.send(f"📓 **Your guess of <@{target_id}> as '{guessed_role}' was incorrect. No elimination took place.**")
+                            await member.send(f"{get_emoji('light_yagami')} **Your guess of <@{target_id}> as '{guessed_role}' was incorrect. No elimination took place.**")
                         except Exception:
                             pass
 
@@ -1430,12 +1424,12 @@ class GameEngine:
                     role_meta = roles.ROLES_METADATA.get(target_player.role_key or "", {})
                     role_display = role_meta.get("name", "Demon")
                     try:
-                        await member.send(f"👹 **Your Blood Demon Art successfully infected <@{target_id}>! They are now a {role_display} on your side.**")
+                        await member.send(f"{get_emoji('muzan_kibutsuji')} **Your Blood Demon Art successfully infected <@{target_id}>! They are now a {role_display} on your side.**")
                     except Exception:
                         pass
                 else:
                     try:
-                        await member.send(f"👹 **Your Blood Demon Art failed to infect <@{target_id}>.**")
+                        await member.send(f"{get_emoji('muzan_kibutsuji')} **Your Blood Demon Art failed to infect <@{target_id}>.**")
                     except Exception:
                         pass
 
@@ -1443,14 +1437,14 @@ class GameEngine:
             elif role_key == "makima":
                 controlled_target = payload.get("controlled_vote_target")
                 try:
-                    await member.send(f"👁️ **Your Control Order succeeded. <@{target_id}> will vote for <@{controlled_target}> next day!**")
+                    await member.send(f"{get_emoji('makima')} **Your Control Order succeeded. <@{target_id}> will vote for <@{controlled_target}> next day!**")
                 except Exception:
                     pass
 
             # Orochimaru feedback
             elif role_key == "orochimaru":
                 try:
-                    await member.send(f"🐍 **Your Reanimation Jutsu successfully revived <@{target_id}> for the night!**")
+                    await member.send(f"{get_emoji('orochimaru')} **Your Reanimation Jutsu successfully revived <@{target_id}> for the night!**")
                 except Exception:
                     pass
 
@@ -1497,19 +1491,19 @@ class GameEngine:
                 if current_night >= 9:
                     if target_id in dead_tonight:
                         try:
-                            await member.send(f"🕊️ **Rumbling: You successfully crushed <@{target_id}>!**")
+                            await member.send(f"{get_emoji('eren_jaeger')} **Rumbling: You successfully crushed <@{target_id}>!**")
                         except Exception:
                             pass
                     else:
                         try:
-                            await member.send(f"🕊️ **Rumbling: You attempted to crush <@{target_id}>, but they survived.**")
+                            await member.send(f"{get_emoji('eren_jaeger')} **Rumbling: You attempted to crush <@{target_id}>, but they survived.**")
                         except Exception:
                             pass
 
             # Lower Moon Demon feedback
             elif role_key == "lower_moon":
                 try:
-                    await member.send(f"👿 **Lower Moon: Your distraction successfully roleblocked <@{target_id}>!**")
+                    await member.send(f"{get_emoji('lower_moon')} **Lower Moon: Your distraction successfully roleblocked <@{target_id}>!**")
                 except Exception:
                     pass
 
@@ -1517,12 +1511,12 @@ class GameEngine:
             elif role_key == "upper_moon":
                 if target_id in dead_tonight:
                     try:
-                        await member.send(f"👿 **Upper Moon: Your demon strike successfully assassinated <@{target_id}>!**")
+                        await member.send(f"{get_emoji('upper_moon')} **Upper Moon: Your demon strike successfully assassinated <@{target_id}>!**")
                     except Exception:
                         pass
                 else:
                     try:
-                        await member.send(f"👿 **Upper Moon: You attempted to attack <@{target_id}>, but they survived or were healed.**")
+                        await member.send(f"{get_emoji('upper_moon')} **Upper Moon: You attempted to attack <@{target_id}>, but they survived or were healed.**")
                     except Exception:
                         pass
 
@@ -1530,12 +1524,25 @@ class GameEngine:
             elif role_key == "default_villain":
                 if target_id in dead_tonight:
                     try:
-                        await member.send(f"🩸 **Default Villain: Your assassination successfully eliminated <@{target_id}>!**")
+                        await member.send(f"{get_emoji('default_villain')} **Default Villain: Your assassination successfully eliminated <@{target_id}>!**")
                     except Exception:
                         pass
                 else:
                     try:
-                        await member.send(f"🩸 **Default Villain: You decided to assassinate <@{target_id}> tonight, but they were healed or survived.**")
+                        await member.send(f"{get_emoji('default_villain')} **Default Villain: You decided to assassinate <@{target_id}> tonight, but they were healed or survived.**")
+                    except Exception:
+                        pass
+
+            # Fallback for any role without a dedicated feedback branch above
+            # (e.g. new roles) — always uses the "result"/"log" the role's own
+            # night_action already wrote to context.payload, or a generic line.
+            else:
+                fallback_msg = payload.get("result") or payload.get("log")
+                if not fallback_msg and target_id:
+                    fallback_msg = f"Your action targeting <@{target_id}> was carried out."
+                if fallback_msg:
+                    try:
+                        await member.send(f"{get_emoji('night')} **{fallback_msg}**")
                     except Exception:
                         pass
 
@@ -1573,7 +1580,7 @@ class GameEngine:
         if converted_member:
             try:
                 convert_embed = discord.Embed(
-                    title="🩸 You Have Been Transformed!",
+                    title=f"{get_emoji('muzan_kibutsuji')} You Have Been Transformed!",
                     description=(
                         f"**Muzan Kibutsuji** has infected you with his blood!\n\n"
                         f"**Your New Role:** {role_display}\n"
@@ -1592,7 +1599,7 @@ class GameEngine:
                         name="Passive Ability", value=role_meta["passive_ability"], inline=False
                     )
                 await converted_member.send(embed=convert_embed)
-                await converted_member.send(f"👥 **Your Fellow Mafia Members:** {mafia_list_str}")
+                await converted_member.send(f"{get_emoji('group')} **Your Fellow Mafia Members:** {mafia_list_str}")
             except Exception:
                 logger.exception("Failed to DM converted player %s", converted_id)
 
@@ -1606,7 +1613,7 @@ class GameEngine:
             if member:
                 try:
                     await member.send(
-                        f"🩸 **New Mafia Member!** <@{converted_id}> has been transformed into "
+                        f"{get_emoji('muzan_kibutsuji')} **New Mafia Member!** <@{converted_id}> has been transformed into "
                         f"a **{role_display}** by Muzan Kibutsuji and is now on your side!"
                     )
                 except Exception:

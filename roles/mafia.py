@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import random
 from typing import ClassVar, Any
-from utils.roles import BaseRole, RoleContext, role_registry
+from utils.roles import BaseRole, RoleContext, RoleCategory, role_registry
 from utils.constants import RoleFaction
 
 @role_registry.register
 class Blackbeard(BaseRole):
     role_key: ClassVar[str] = "blackbeard"
     priority: ClassVar[int] = 1  # Runs first to apply roleblock
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
 
     async def night_action(self, context: RoleContext) -> None:
         session = context.payload.get("session")
@@ -58,6 +59,7 @@ class Blackbeard(BaseRole):
 class LightYagami(BaseRole):
     role_key: ClassVar[str] = "light_yagami"
     priority: ClassVar[int] = 4
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
 
     async def night_action(self, context: RoleContext) -> None:
         session = context.payload.get("session")
@@ -112,6 +114,7 @@ class LightYagami(BaseRole):
 class MuzanKibutsuji(BaseRole):
     role_key: ClassVar[str] = "muzan_kibutsuji"
     priority: ClassVar[int] = 4
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.DECEPTION,)
 
     async def night_action(self, context: RoleContext) -> None:
         session = context.payload.get("session")
@@ -161,6 +164,7 @@ class MuzanKibutsuji(BaseRole):
 class Makima(BaseRole):
     role_key: ClassVar[str] = "makima"
     priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
 
     async def night_action(self, context: RoleContext) -> None:
         session = context.payload.get("session")
@@ -199,6 +203,7 @@ class Makima(BaseRole):
 class Orochimaru(BaseRole):
     role_key: ClassVar[str] = "orochimaru"
     priority: ClassVar[int] = 2  # Runs early to execute reanimated abilities
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
 
     async def night_action(self, context: RoleContext) -> None:
         session = context.payload.get("session")
@@ -273,6 +278,7 @@ class Demon(BaseRole):
 class LowerMoon(BaseRole):
     role_key: ClassVar[str] = "lower_moon"
     priority: ClassVar[int] = 1  # Roleblock is priority 1
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
 
     async def night_action(self, context: RoleContext) -> None:
         target_id = context.target_id
@@ -292,6 +298,7 @@ class LowerMoon(BaseRole):
 class UpperMoon(BaseRole):
     role_key: ClassVar[str] = "upper_moon"
     priority: ClassVar[int] = 4  # Kill is priority 4
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
 
     async def night_action(self, context: RoleContext) -> None:
         target_id = context.target_id
@@ -310,6 +317,8 @@ class UpperMoon(BaseRole):
 class DefaultVillain(BaseRole):
     role_key: ClassVar[str] = "default_villain"
     priority: ClassVar[int] = 4  # Kill is priority 4
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
+    is_unique: ClassVar[bool] = False
 
     async def night_action(self, context: RoleContext) -> None:
         target_id = context.target_id

@@ -12,7 +12,7 @@ from database.database import DatabaseManager
 from database.models import GamePlayerRecord, GameRecord
 from game_engine import GameEngine
 from game_manager import ActiveGameHandle, GameManager
-from config import BotConfig
+from config import BotConfig, get_emoji
 from utils.embeds import build_lobby_embed
 from utils.helpers import utcnow
 
@@ -295,6 +295,6 @@ class LobbyManager:
         for index, user_id in enumerate(lobby.players, start=1):
             member = guild.get_member(user_id) if guild is not None else None
             display_name = member.display_name if member is not None else f"<@{user_id}>"
-            crown = "👑 " if user_id == lobby.leader_id else ""
+            crown = f"{get_emoji('crown')} " if user_id == lobby.leader_id else ""
             roster_lines.append(f"{crown}`{index}.` {display_name}")
         return roster_lines

@@ -8,6 +8,28 @@ if TYPE_CHECKING:
 
 import asyncio
 from config import get_emoji
+from utils.constants import GamePhase
+
+
+async def _safe_queue_night_action(
+    interaction: discord.Interaction,
+    engine: "GameEngine",
+    game_id: str,
+    user_id: int,
+    payload: dict[str, Any],
+) -> bool:
+    """Submits a night action, gracefully handling the case where the night
+    phase already ended (e.g. the player waited too long to pick a target
+    in the ephemeral dropdown). Returns True on success."""
+    try:
+        await engine.queue_night_action(game_id, user_id, payload)
+        return True
+    except RuntimeError:
+        await interaction.response.edit_message(
+            content=f"{get_emoji('cross')} Night actions have already locked in — your action wasn't submitted.",
+            view=None,
+        )
+        return False
 
 
 class StartGameView(discord.ui.View):
@@ -163,7 +185,8 @@ class StandardActionSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         target_id = int(self.values[0])
-        await self.engine.queue_night_action(self.game_id, interaction.user.id, {"target_id": target_id})
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id}):
+            return
         await interaction.response.edit_message(content=f"Night action registered on <@{target_id}>.", view=None)
 
 
@@ -215,7 +238,8 @@ class TenmaHealSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         target_id = int(self.values[0])
-        await self.engine.queue_night_action(self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "heal"})
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "heal"}):
+            return
         await interaction.response.edit_message(content=f"Night action registered: Healing <@{target_id}>.", view=None)
 
 
@@ -227,7 +251,8 @@ class TenmaReviveSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         target_id = int(self.values[0])
-        await self.engine.queue_night_action(self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "revive"})
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "revive"}):
+            return
         await interaction.response.edit_message(content=f"Night action registered: Reviving <@{target_id}>.", view=None)
 
 
@@ -290,11 +315,13 @@ class LightYagamiRoleGuessSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         guessed_role = self.values[0]
-        await self.engine.queue_night_action(self.game_id, interaction.user.id, {
+        payload = {
             "target_id": self.target_id,
             "action_type": "guess",
             "guessed_role": guessed_role
-        })
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
         await interaction.response.edit_message(content=f"Death Note guess registered on <@{self.target_id}> for role '{guessed_role}'.", view=None)
 
 
@@ -306,10 +333,12 @@ class LightYagamiPenSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         target_id = int(self.values[0])
-        await self.engine.queue_night_action(self.game_id, interaction.user.id, {
+        payload = {
             "target_id": target_id,
             "action_type": "devils_pen"
-        })
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
         await interaction.response.edit_message(content=f"Devil's Pen registered on <@{target_id}>.", view=None)
 
 
@@ -339,10 +368,12 @@ class MakimaVoteTargetSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         target2 = int(self.values[0])
-        await self.engine.queue_night_action(self.game_id, interaction.user.id, {
+        payload = {
             "target_id": self.target1,
             "controlled_vote_target": target2
-        })
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
         await interaction.response.edit_message(content=f"Control Devil registered: Redirection of <@{self.target1}> to vote for <@{target2}>.", view=None)
 
 
@@ -371,10 +402,12 @@ class HisokaBungeeLinkSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         target2 = int(self.values[0])
-        await self.engine.queue_night_action(self.game_id, interaction.user.id, {
+        payload = {
             "target_id": self.target1,
             "controlled_vote_target": target2
-        })
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
         await interaction.response.edit_message(content=f"Bungee Gum registered: linking <@{self.target1}> with <@{target2}>.", view=None)
 
 
@@ -425,24 +458,30 @@ class VoteSelector(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction) -> None:
         value = self.values[0]
         voter_id = interaction.user.id
-        
+
         session = await self.engine.get_session(self.game_id)
         if not session:
             return
 
-        if value == "skip":
-            await self.engine.register_vote(self.game_id, voter_id, None)
-            # Store skip in session metadata
-            skips = session.metadata.setdefault("skip_votes", set())
-            skips.add(voter_id)
-            await interaction.response.edit_message(content="You voted to Skip.", view=None)
-        else:
-            target_id = int(value)
-            await self.engine.register_vote(self.game_id, voter_id, target_id)
-            # Remove from skips
-            skips = session.metadata.setdefault("skip_votes", set())
-            skips.discard(voter_id)
-            await interaction.response.edit_message(content=f"You voted for <@{target_id}>.", view=None)
+        try:
+            if value == "skip":
+                await self.engine.register_vote(self.game_id, voter_id, None)
+                # Store skip in session metadata
+                skips = session.metadata.setdefault("skip_votes", set())
+                skips.add(voter_id)
+                await interaction.response.edit_message(content="You voted to Skip.", view=None)
+            else:
+                target_id = int(value)
+                await self.engine.register_vote(self.game_id, voter_id, target_id)
+                # Remove from skips
+                skips = session.metadata.setdefault("skip_votes", set())
+                skips.discard(voter_id)
+                await interaction.response.edit_message(content=f"You voted for <@{target_id}>.", view=None)
+        except RuntimeError:
+            await interaction.response.edit_message(
+                content=f"{get_emoji('cross')} Voting has already ended for this round — your vote wasn't counted.",
+                view=None,
+            )
 
 
 class VerdictUISelectView(discord.ui.View):
@@ -478,6 +517,13 @@ class VerdictUISelectView(discord.ui.View):
         defendant_id = session.metadata.get("defendant_id")
         if user_id == defendant_id:
             await interaction.response.send_message("You cannot vote on your own trial!", ephemeral=True)
+            return
+
+        if session.phase != GamePhase.EXECUTION:
+            await interaction.response.send_message(
+                f"{get_emoji('cross')} The trial has already ended — your verdict wasn't counted.",
+                ephemeral=True,
+            )
             return
 
         verdicts = session.metadata.setdefault("verdicts", {})

@@ -4,6 +4,7 @@ import discord
 from discord import Interaction
 
 from lobby_system import LobbySession
+from config import get_emoji
 
 
 class LobbyView(discord.ui.View):
@@ -11,8 +12,13 @@ class LobbyView(discord.ui.View):
         super().__init__(timeout=None)
         self.bot = bot
         self.lobby = lobby
+        # Emojis are set here (rather than in the decorator) so they stay
+        # fully configurable from config.EMOJIS without touching this file.
+        self.join_button.emoji = get_emoji("join")
+        self.leave_button.emoji = get_emoji("leave")
+        self.start_button.emoji = get_emoji("sword")
 
-    @discord.ui.button(label="Join Lobby", emoji="➕", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="Join Lobby", style=discord.ButtonStyle.success)
     async def join_button(
         self,
         interaction: Interaction,
@@ -32,7 +38,7 @@ class LobbyView(discord.ui.View):
             return
         await interaction.response.send_message("You joined the lobby.", ephemeral=True)
 
-    @discord.ui.button(label="Leave Lobby", emoji="➖", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Leave Lobby", style=discord.ButtonStyle.secondary)
     async def leave_button(
         self,
         interaction: Interaction,
@@ -48,7 +54,7 @@ class LobbyView(discord.ui.View):
         )
         await interaction.response.send_message("You left the lobby.", ephemeral=True)
 
-    @discord.ui.button(label="Begin Match", emoji="⚔️", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Begin Match", style=discord.ButtonStyle.danger)
     async def start_button(
         self,
         interaction: Interaction,

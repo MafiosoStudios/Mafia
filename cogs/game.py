@@ -7,6 +7,7 @@ from views.vote_view import VoteView
 from utils.constants import GameState
 from utils.embeds import build_status_embed
 from utils.helpers import send_hybrid_response
+from config import get_emoji
 
 
 class GameCog(commands.Cog):
@@ -69,7 +70,7 @@ class GameCog(commands.Cog):
             return
         current = await db.get_guild_settings(guild_id)
         
-        embed = discord.Embed(title="⚙️ Server Game Settings", color=discord.Color.blue())
+        embed = discord.Embed(title=f"{get_emoji('settings')} Server Game Settings", color=discord.Color.blue())
         for key, val in current.items():
             embed.add_field(name=key, value=f"`{val}`", inline=True)
         await send_hybrid_response(ctx, embed=embed, ephemeral=True)
@@ -98,11 +99,11 @@ class GameCog(commands.Cog):
                 if parsed_value <= 0:
                     raise ValueError
             except ValueError:
-                await send_hybrid_response(ctx, "❌ Value for this setting must be a positive integer.", ephemeral=True)
+                await send_hybrid_response(ctx, f"{get_emoji('cross')} Value for this setting must be a positive integer.", ephemeral=True)
                 return
 
         await db.update_guild_setting(guild_id, key, parsed_value)
-        await send_hybrid_response(ctx, f"✅ Setting `{key}` successfully updated to `{parsed_value}`.", ephemeral=True)
+        await send_hybrid_response(ctx, f"{get_emoji('check')} Setting `{key}` successfully updated to `{parsed_value}`.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

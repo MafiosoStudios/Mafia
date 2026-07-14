@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import random
 from typing import ClassVar, Any
-from utils.roles import BaseRole, RoleContext, role_registry
+from utils.roles import BaseRole, RoleContext, RoleCategory, role_registry
 from utils.constants import RoleFaction
 
 @role_registry.register
 class Hisoka(BaseRole):
     role_key: ClassVar[str] = "hisoka"
     priority: ClassVar[int] = 4
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "chaos")
 
     async def night_action(self, context: RoleContext) -> None:
         session = context.payload.get("session")
@@ -72,6 +73,7 @@ class Hisoka(BaseRole):
 class Gilgamesh(BaseRole):
     role_key: ClassVar[str] = "gilgamesh"
     priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "apocalypse")
 
     async def night_action(self, context: RoleContext) -> None:
         session = context.payload.get("session")
@@ -119,6 +121,7 @@ class Gilgamesh(BaseRole):
 class LelouchLamperouge(BaseRole):
     role_key: ClassVar[str] = "lelouch_lamperouge"
     priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "benign")
 
     def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
         session = context.payload.get("session")
@@ -134,6 +137,7 @@ class LelouchLamperouge(BaseRole):
 class ErenJaeger(BaseRole):
     role_key: ClassVar[str] = "eren_jaeger"
     priority: ClassVar[int] = 4
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "apocalypse")
 
     async def night_action(self, context: RoleContext) -> None:
         session = context.payload.get("session")
@@ -174,6 +178,8 @@ class ErenJaeger(BaseRole):
 class Mahoraga(BaseRole):
     role_key: ClassVar[str] = "mahoraga"
     priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "survival")
+    is_unique: ClassVar[bool] = False
 
     def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
         session = context.payload.get("session")

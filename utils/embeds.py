@@ -12,9 +12,20 @@ ANIME_TEAL = discord.Color.from_rgb(53, 169, 166)
 ANIME_RED = discord.Color.from_rgb(201, 72, 72)
 
 
-def build_embed(title: str, description: str | None = None, *, color: discord.Color = ANIME_PRIMARY) -> discord.Embed:
+def build_embed(
+    title: str,
+    description: str | None = None,
+    *,
+    color: discord.Color = ANIME_PRIMARY,
+    image_url: str | None = None,
+    thumbnail_url: str | None = None,
+) -> discord.Embed:
     embed = discord.Embed(title=title, description=description, color=color)
     embed.set_footer(text="Anime Mafia")
+    if image_url:
+        embed.set_image(url=image_url)
+    if thumbnail_url:
+        embed.set_thumbnail(url=thumbnail_url)
     return embed
 
 
@@ -44,9 +55,12 @@ def build_lobby_embed(
     max_players: int,
     started: bool = False,
 ) -> discord.Embed:
+    from config import get_event_image
+
     status_label = "Match in progress" if started else "Lobby waiting for players"
     color = ANIME_GOLD if started else ANIME_PRIMARY
-    embed = build_embed(f"{guild_name} Lobby", status_label, color=color)
+    lobby_image = get_event_image("lobby")
+    embed = build_embed(f"{guild_name} Lobby", status_label, color=color, image_url=lobby_image)
     embed.add_field(name="Lobby Leader", value=leader_text, inline=True)
     embed.add_field(name="Players", value=f"{current_players}/{max_players}", inline=True)
     embed.add_field(name="Minimum to Start", value=str(min_players), inline=True)

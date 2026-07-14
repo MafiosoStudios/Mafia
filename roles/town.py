@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from typing import ClassVar, Any
-from utils.roles import BaseRole, RoleContext, role_registry
+from utils.roles import BaseRole, RoleContext, RoleCategory, role_registry
 from utils.constants import RoleFaction
 
 @role_registry.register
 class DoctorTenma(BaseRole):
     role_key: ClassVar[str] = "doctor_tenma"
     priority: ClassVar[int] = 3
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.PROTECTIVE,)
 
     async def night_action(self, context: RoleContext) -> None:
         target_id = context.target_id
@@ -69,6 +70,7 @@ class DoctorTenma(BaseRole):
 class AyanokojiKiyotaka(BaseRole):
     role_key: ClassVar[str] = "ayanokoji_kiyotaka"
     priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
 
     async def night_action(self, context: RoleContext) -> None:
         target_id = context.target_id
@@ -92,6 +94,7 @@ class AyanokojiKiyotaka(BaseRole):
 class L(BaseRole):
     role_key: ClassVar[str] = "l"
     priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
 
     async def night_action(self, context: RoleContext) -> None:
         target_id = context.target_id
@@ -134,6 +137,8 @@ class L(BaseRole):
 class DefaultVillager(BaseRole):
     role_key: ClassVar[str] = "villager"
     priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.COUNCIL,)
+    is_unique: ClassVar[bool] = False
 
     def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
         return RoleFaction.HERO.value in alive_factions
