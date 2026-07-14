@@ -596,8 +596,13 @@ class GameEngine:
             # Add overwrites for each player to read but not send initially
             for pid in session.player_ids:
                 member = guild.get_member(pid)
-                if member:
-                    overwrites[member] = discord.PermissionOverwrite(read_messages=True, send_messages=None)
+                if not member:
+                    try:
+                        member = await guild.fetch_member(pid)
+                    except discord.NotFound:
+                        logger.warning("Player %s not found in guild %s, skipping channel overwrite.", pid, guild_id)
+                        continue
+                overwrites[member] = discord.PermissionOverwrite(read_messages=True, send_messages=None)
 
             mafia_channel = await guild.create_text_channel(
                 name=channel_name,
@@ -1754,11 +1759,15 @@ class GameEngine:
                         is_wounded = pstate.metadata.get("wounded_until_day") == day_num
                         is_exhausted = pstate.metadata.get("exhausted_until_day") == day_num
                         member = guild.get_member(pid)
-                        if member:
-                            if is_wounded or is_exhausted:
-                                await channel.set_permissions(member, send_messages=False)
-                            else:
-                                await channel.set_permissions(member, overwrite=None)
+                        if not member:
+                            try:
+                                member = await guild.fetch_member(pid)
+                            except discord.NotFound:
+                                continue
+                        if is_wounded or is_exhausted:
+                            await channel.set_permissions(member, read_messages=True, send_messages=False)
+                        else:
+                            await channel.set_permissions(member, read_messages=True, send_messages=True)
         except Exception:
             logger.exception("Failed to update channel mute overrides.")
 
@@ -1773,10 +1782,19 @@ class GameEngine:
                 if pid == defendant_id:
                     continue
                 member = guild.get_member(pid)
-                if member:
-                    await channel.set_permissions(member, overwrite=None)
+                if not member:
+                    try:
+                        member = await guild.fetch_member(pid)
+                    except discord.NotFound:
+                        continue
+                await channel.set_permissions(member, read_messages=True, send_messages=False)
             
             defendant = guild.get_member(defendant_id)
+            if not defendant:
+                try:
+                    defendant = await guild.fetch_member(defendant_id)
+                except discord.NotFound:
+                    defendant = None
             if defendant:
                 def_state = session.players.get(defendant_id)
                 is_wounded = def_state.metadata.get("wounded_until_day") == day_num if def_state else False

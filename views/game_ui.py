@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 import asyncio
 from config import get_emoji
-from utils.constants import GamePhase
+from utils.constants import GamePhase, RoleFaction
 
 
 async def _safe_queue_night_action(

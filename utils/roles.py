@@ -70,7 +70,7 @@ class NightAction(Ability):
         targets = []
         for pid, pstate in session.players.items():
             if pstate.alive:
-                if pstate.metadata.get("hidden_until_night") == session.night_num:
+                if pstate.metadata.get("hidden_until_night") == session.metadata.get("night_num"):
                     continue
                 targets.append(pid)
         return targets
