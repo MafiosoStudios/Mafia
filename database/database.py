@@ -345,11 +345,11 @@ class DatabaseManager:
     async def get_guild_settings(self, guild_id: int) -> dict[str, Any]:
         doc = await self.db.settings.find_one({"guild_id": guild_id})
         defaults = {
-            "night_duration": 45,
-            "day_duration": 40,
-            "vote_duration": 20,
-            "plea_duration": 30,
-            "verdict_duration": 15,
+            "night_duration": 90,
+            "day_duration": 120,
+            "vote_duration": 60,
+            "plea_duration": 60,
+            "verdict_duration": 30,
             "anonymous_voting": True,
         }
         if doc and "settings" in doc:

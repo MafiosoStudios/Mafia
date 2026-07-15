@@ -16,9 +16,12 @@ class AdminCog(commands.Cog):
             await send_hybrid_response(ctx, "Try `admin sync`.", ephemeral=True)
 
     @admin.command(name="sync")
-    @commands.has_permissions(administrator=True)
-    @discord.app_commands.checks.has_permissions(administrator=True)
     async def sync_commands(self, ctx: commands.Context) -> None:
+        import config
+        has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.administrator)
+        if not has_perm:
+            await send_hybrid_response(ctx, "❌ **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            return
         # Clear guild commands to remove duplicates
         self.bot.tree.clear_commands(guild=ctx.guild)
         await self.bot.tree.sync(guild=ctx.guild)
@@ -27,8 +30,13 @@ class AdminCog(commands.Cog):
         await send_hybrid_response(ctx, f"Cleaned duplicates and synced {len(synced)} global commands successfully!", ephemeral=True)
 
     @commands.hybrid_command(name="reset", description="Reset the bot in the server, cleaning up game channels and status")
-    @commands.has_permissions(manage_guild=True)
     async def reset(self, ctx: commands.Context) -> None:
+        import config
+        has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
+        if not has_perm:
+            await send_hybrid_response(ctx, "❌ **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            return
+
         if ctx.guild is None:
             await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
             return
@@ -88,8 +96,8 @@ class AdminCog(commands.Cog):
 
     @commands.hybrid_command(name="dev_restart", description="Restart the bot process (Developer only)")
     async def dev_restart(self, ctx: commands.Context) -> None:
-        authorized_ids = {744831273406824449, 839182501091344444}
-        if ctx.author.id not in authorized_ids:
+        import config
+        if ctx.author.id not in config.ADMIN_IDS:
             await send_hybrid_response(ctx, "❌ **Unauthorized:** Only bot developers can run this command.", ephemeral=True)
             return
 

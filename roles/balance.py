@@ -78,36 +78,34 @@ def _pick_town(count: int) -> list[str]:
 
 
 def _pick_mafia(count: int) -> list[str]:
-    """Guarantees exactly 1 Killing role and, if there's room, exactly 1 support role
-    from Deception/Control/Utility. Extra mafia slots (larger lobbies) are filled with
-    unused mafia roles so every category gets a chance to shine, falling back to
-    Default Villain when the small starter roster runs dry."""
+    """Guarantees default_villain is always present, then adds support and other
+    mafia roles as slots allow."""
     if count <= 0:
         return []
 
-    killing_pool = _roles_with_tag(RoleCategory.KILLING, RoleFaction.VILLAIN)
+    picks: list[str] = []
+    remaining = count
+
+    # Always guarantee default_villain
+    picks.append("default_villain")
+    remaining -= 1
+
+    if remaining <= 0:
+        return picks
+
+    # Pick a support role (Deception, Control, or Utility) if there is room.
     support_pool: list[str] = []
     for cat in RoleCategory.MAFIA_SUPPORT:
         support_pool.extend(_roles_with_tag(cat, RoleFaction.VILLAIN))
     support_pool = list(dict.fromkeys(support_pool))
 
-    picks: list[str] = []
-    remaining = count
-
-    # Exactly 1 killing role.
-    killer_choice = random.choice(killing_pool) if killing_pool else "default_villain"
-    picks.append(killer_choice)
-    remaining -= 1
-
-    # Exactly 1 mafia support role (Deception, Control, or Utility).
-    if remaining > 0:
-        support_choices = [k for k in support_pool if k != killer_choice]
-        support_choice = random.choice(support_choices) if support_choices else "default_villain"
+    support_choices = [k for k in support_pool if k != "default_villain"]
+    if support_choices:
+        support_choice = random.choice(support_choices)
         picks.append(support_choice)
         remaining -= 1
 
-    # Extra mafia slots for bigger lobbies: fill with unused unique mafia roles,
-    # alternating flavor, then pad with Default Villain.
+    # Extra mafia slots: fill with unused unique mafia roles, then pad with default_villain.
     unique_pool = [
         k for k in _all_faction_roles(RoleFaction.VILLAIN, unique_only=True)
         if k not in picks

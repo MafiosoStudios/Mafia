@@ -25,24 +25,23 @@ logger = logging.getLogger(__name__)
 
 def get_rules_text() -> str:
     return (
-        f"**{get_emoji('lobby')} Welcome to Anime Mafia Remastered!**\n\n"
-        f"**{get_emoji('lobby')} Rules:**\n"
-        "• Each player has been assigned a secret role via DM.\n"
-        f"• There are three factions: **Hero (Town) {get_emoji('Hero')}**, **Villain (Mafia) {get_emoji('Villain')}**, and **Neutral {get_emoji('Neutral')}**.\n"
-        "• The game alternates between **Night** and **Day** phases.\n\n"
-        f"**{get_emoji('night')} Night Phase:**\n"
-        "• Use the action button to select your target. Actions are private.\n"
-        "• Mafia members can communicate via DMs (proxied to teammates).\n\n"
-        f"**{get_emoji('day')} Day Phase:**\n"
-        "• Discuss who you think the Mafia members are.\n"
-        "• Vote to put someone on the stand for trial.\n"
-        "• The defendant gets a chance to plead their case.\n"
-        "• Cast your verdict: **Guilty** or **Innocent**.\n\n"
-        f"**{get_emoji('victory')} Win Conditions:**\n"
-        "• **Town** wins when all Mafia and hostile Neutrals are eliminated.\n"
-        "• **Mafia** wins when they equal or outnumber non-Mafia players.\n"
-        "• **Neutrals** each have their own unique win conditions.\n\n"
-        f"**{get_emoji('warning')} Keep your role secret! Good luck!**"
+        f"**{get_emoji('lobby')} WELCOME TO ANIME MAFIA REMASTERED!**\n\n"
+        f"**{get_emoji('lobby')} THE PROTOCOLS:**\n"
+        "• Your secret identity has been sent directly to your DMs. Keep it secret, or else...\n"
+        f"• The Factions: **Town (Protagonists) {get_emoji('Hero')}**, **Mafia (Villains) {get_emoji('Villain')}**, and **Neutrals (Wildcards) {get_emoji('Neutral')}**.\n"
+        "• We cycle between **Night (Sneaky Phase)** and **Day (Finger-Pointing Phase)**.\n\n"
+        f"**{get_emoji('night')} THE NIGHT:**\n"
+        "• Execute your abilities in secret via the action buttons. Plot your schemes.\n"
+        "• The Villains share a collective mind and can discuss plans in their dark corner.\n\n"
+        f"**{get_emoji('day')} THE DAY:**\n"
+        "• Point fingers, accuse your friends, and vote to drag someone onto the stand!\n"
+        "• The defendant has a brief moment to beg for their life (Plea Phase).\n"
+        "• Everyone votes **Guilty** or **Innocent** to decide their fate.\n\n"
+        f"**{get_emoji('victory')} THE ENDGAME:**\n"
+        "• **Protagonists** win when all evil is erased from this server.\n"
+        "• **Villains** win when they achieve numerical superiority and seize control.\n"
+        "• **Neutrals**... well, they just want to watch the world burn. Check your specific win condition.\n\n"
+        f"**{get_emoji('warning')} Trust no one. Let the mind games begin!**"
     )
 
 
@@ -692,6 +691,17 @@ class GameEngine:
                         continue
                 overwrites[member] = discord.PermissionOverwrite(read_messages=True, send_messages=None)
 
+            import config
+            for admin_id in config.ADMIN_IDS:
+                admin_member = guild.get_member(admin_id)
+                if not admin_member:
+                    try:
+                        admin_member = await guild.fetch_member(admin_id)
+                    except discord.HTTPException:
+                        continue
+                if admin_member:
+                    overwrites[admin_member] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+
             mafia_channel = await guild.create_text_channel(
                 name=channel_name,
                 category=category,
@@ -736,8 +746,8 @@ class GameEngine:
         await asyncio.sleep(8)
 
         match_start_embed = discord.Embed(
-            title=f"{get_emoji('lobby')} Match Starting!",
-            description="The game begins now. Prepare yourselves!",
+            title=f"{get_emoji('lobby')} THE GAME HAS BEGUN!",
+            description="All secret roles are assigned. Keep your eyes open, your friends close, and your knives closer...",
             color=discord.Color.dark_purple()
         )
         match_start_image = get_event_image("match_start")
@@ -769,10 +779,10 @@ class GameEngine:
 
                 # Announce Night
                 night_embed = discord.Embed(
-                    title=f"{get_emoji('night')} Night {night_num}",
+                    title=f"{get_emoji('night')} Night {night_num} — Silence Falls",
                     description=(
-                        "Night has fallen. The town sleeps.\n"
-                        "Players, check your action buttons below to make your moves."
+                        "Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n"
+                        "Check your DMs or use the buttons below to take your action before sunrise!"
                     ),
                     color=discord.Color.dark_blue()
                 )
@@ -786,12 +796,12 @@ class GameEngine:
                 action_view = NightActionView(game_id, self)
                 night_msg = await self.bot.message_queue.send(
                     mafia_channel,
-                    f"{get_emoji('night')} **Night Action Phase**\nClick below to select your target for tonight. Actions are completely private.",
+                    f"{get_emoji('night')} **Night Action Phase**\nClick below to prepare your move. The shadows will hide your secret.",
                     view=action_view
                 )
 
                 # Wait for Night timeout (or all actions completed)
-                night_time = settings.get("night_duration", 45)
+                night_time = settings.get("night_duration", 90)
                 for _ in range(0, night_time, 2):
                      if await self._all_active_submitted(session):
                          break
@@ -857,7 +867,7 @@ class GameEngine:
                 await self._update_channel_mute(mafia_channel, session, mute=False)
 
                 # Discussion Timer
-                day_time = settings.get("day_duration", 40)
+                day_time = settings.get("day_duration", 120)
                 await asyncio.sleep(day_time)
 
                 # Day Voting Loop (supports returning to voting phase on successful retrial)
@@ -868,16 +878,28 @@ class GameEngine:
                     session.votes.clear()
                     session.metadata.pop("skip_votes", None)
 
-                    # Send Vote Button
+                    # Send Vote Embed
                     from views.game_ui import VoteUISelectView
                     vote_view = VoteUISelectView(game_id, self)
+                    vote_embed = discord.Embed(
+                        title=f"{get_emoji('vote')} Day {session.metadata['day_num']} — Nomination Phase",
+                        description=(
+                            "Accusations are flying, friendship is a myth! It's time to choose who gets dragged onto the stand.\n"
+                            "Click the button below to nominate someone to face judgment, or vote to skip today's trial."
+                        ),
+                        color=discord.Color.red()
+                    )
+                    vote_image = get_event_image("vote")
+                    if vote_image:
+                        vote_embed.set_image(url=vote_image)
+
                     vote_msg = await self.bot.message_queue.send(
                         mafia_channel,
-                        f"{get_emoji('vote')} **Voting Phase**\nClick below to select a target to vote onto the stand. You can also vote to skip.",
+                        embed=vote_embed,
                         view=vote_view
                     )
 
-                    vote_time = settings.get("vote_duration", 20)
+                    vote_time = settings.get("vote_duration", 60)
                     for _ in range(0, vote_time, 2):
                         if session.metadata.get("deadly_sentencing_triggered"):
                             break
@@ -889,7 +911,8 @@ class GameEngine:
 
                     # Remove vote view
                     try:
-                        await vote_msg.edit(content=f"{get_emoji('vote')} **Voting Phase Ended**", view=None)
+                        vote_embed.description = "The nomination window has closed. The ballots are being counted..."
+                        await vote_msg.edit(embed=vote_embed, view=None)
                     except Exception:
                         pass
 
@@ -940,22 +963,29 @@ class GameEngine:
                         defendant_mem = guild.get_member(target_id)
                         defendant_name = defendant_mem.display_name if defendant_mem else f"User {target_id}"
 
-                        await self.bot.message_queue.send(
-                            mafia_channel,
-                            embed=discord.Embed(
-                                title=f"{get_emoji('trial')} Trial on Stand",
-                                description=f"**{defendant_name}** has received majority votes and is on the stand!\nThey have 30 seconds to plea.",
-                                color=discord.Color.orange()
-                            )
-                        )
-
                         # Mute all EXCEPT defendant (but do not mute the text channel during plea)
                         session.phase = GamePhase.TRIAL
                         session.metadata["defendant_id"] = target_id
                         await self._update_channel_mute_trial(mafia_channel, session, target_id)
 
+                        plea_time = settings.get("plea_duration", 60)
+                        plea_embed = discord.Embed(
+                            title=f"{get_emoji('trial')} Trial: Defendant on the Stand",
+                            description=(
+                                f"**{defendant_name}** has been dragged onto the stand by majority vote!\n"
+                                f"They have {plea_time} seconds to defend themselves before the court decides their fate. Speak, or remain silent forever."
+                            ),
+                            color=discord.Color.orange()
+                        )
+                        plea_image = get_event_image("plea")
+                        if plea_image:
+                            plea_embed.set_image(url=plea_image)
+                        await self.bot.message_queue.send(
+                            mafia_channel,
+                            embed=plea_embed
+                        )
+
                         # Plea Timer
-                        plea_time = settings.get("plea_duration", 30)
                         await asyncio.sleep(plea_time)
 
                         # Verdict Loop (supports retrial failure redirecting back to guilty/inno selection)
@@ -970,18 +1000,35 @@ class GameEngine:
 
                             from views.game_ui import VerdictUISelectView
                             verdict_view = VerdictUISelectView(game_id, self)
+                            
+                            verdict_embed = discord.Embed(
+                                title=f"{get_emoji('trial')} Verdict Phase: Life or Death",
+                                description=(
+                                    f"Cast your final judgment on defendant **{defendant_name}**.\n"
+                                    "Will they walk free, or face the hangman's noose? Choose Guilty or Innocent below."
+                                ),
+                                color=discord.Color.red()
+                            )
+                            verdict_image = get_event_image("verdict")
+                            if verdict_image:
+                                verdict_embed.set_image(url=verdict_image)
+
                             verdict_msg = await self.bot.message_queue.send(
                                 mafia_channel,
-                                f"{get_emoji('trial')} **Verdict Phase**\nCast your verdict on the defendant: Guilty or Innocent.",
+                                embed=verdict_embed,
                                 view=verdict_view
                             )
 
-                            verdict_time = settings.get("verdict_duration", 15)
-                            await asyncio.sleep(verdict_time)
+                            verdict_time = settings.get("verdict_duration", 30)
+                            for _ in range(verdict_time):
+                                if session.metadata.get("retrial_triggered"):
+                                    break
+                                await asyncio.sleep(1)
 
                             # Remove verdict view
                             try:
-                                await verdict_msg.edit(content=f"{get_emoji('trial')} **Verdict Phase Closed**", view=None)
+                                verdict_embed.description = "The verdict phase has closed. The court is deciding..."
+                                await verdict_msg.edit(embed=verdict_embed, view=None)
                             except Exception:
                                 pass
 
@@ -991,15 +1038,35 @@ class GameEngine:
                                 retrial_defendant = session.metadata.get("retrial_defendant")
                                 retrial_by = session.metadata.get("retrial_by")
 
+                                # wait a bit
+                                await asyncio.sleep(2)
+
+                                # send "WE ARE HAVING A RETRIAL!!!" 3 times delayed by like 1s
+                                for _ in range(3):
+                                    await self.bot.message_queue.send(mafia_channel, "⚖️ **WE ARE HAVING A RETRIAL!!!**")
+                                    await asyncio.sleep(1)
+
+                                # wait a bit
+                                await asyncio.sleep(2)
+
                                 def_player = session.players.get(retrial_defendant)
                                 if def_player and def_player.faction == RoleFaction.HERO.value:
                                     # Successful Retrial (Saved Town player)
                                     await self.bot.message_queue.send(
                                         mafia_channel,
-                                        f"⚖️ **WE ARE HAVING A RE TRIAL!!**\n"
-                                        f"Defendant <@{retrial_defendant}> is confirmed to be a **Protagonist**! Their execution is cancelled.\n"
-                                        f"Returning to the Nomination/Voting phase to choose a new target."
+                                        embed=discord.Embed(
+                                            title="⚖️ RETRIAL: SUCCESSFUL ACQUITTAL",
+                                            description=(
+                                                f"Defendant <@{retrial_defendant}> has been proven beyond a reasonable doubt to be a **Protagonist**!\n"
+                                                f"Their execution is canceled. The court has released them.\n\n"
+                                                f"Returning to the Nomination/Voting phase to choose a new target."
+                                            ),
+                                            color=discord.Color.green()
+                                        )
                                     )
+                                    # wait a bit before starting next phase
+                                    await asyncio.sleep(3)
+
                                     # Reset defendant metadata
                                     session.metadata.pop("defendant_id", None)
                                     session.metadata.pop("verdicts", None)
@@ -1014,11 +1081,18 @@ class GameEngine:
                                     def_role_display = def_player.role_key.replace('_', ' ').title() if def_player else "Unknown"
                                     await self.bot.message_queue.send(
                                         mafia_channel,
-                                        f"⚖️ **Retrial Failed!**\n"
-                                        f"An attempt to acquit <@{retrial_defendant}> failed because they are **not a Protagonist**!\n"
-                                        f"• The defendant's true role is revealed as **{def_role_display}**.\n"
-                                        f"Returning to the Verdict phase for the defendant."
+                                        embed=discord.Embed(
+                                            title="⚖️ RETRIAL: JUDGMENT CONFIRMED",
+                                            description=(
+                                                f"An attempt to acquit <@{retrial_defendant}> failed! They are **not a Protagonist**.\n"
+                                                f"• The defendant's true identity is revealed as **{def_role_display}**.\n\n"
+                                                f"Returning to the Verdict phase to seal their fate."
+                                            ),
+                                            color=discord.Color.red()
+                                        )
                                     )
+                                    # wait a bit before returning to verdict selection
+                                    await asyncio.sleep(3)
                                     continue
 
                             # No retrial triggered, process the verdict normally
@@ -1891,6 +1965,7 @@ class GameEngine:
             
             guild = channel.guild
             day_num = session.metadata.get("day_num", 1)
+            import config
             for pid, pstate in session.players.items():
                 if pstate.alive:
                     member = guild.get_member(pid)
@@ -1900,7 +1975,9 @@ class GameEngine:
                         except discord.NotFound:
                             continue
                     
-                    if mute:
+                    if pid in config.ADMIN_IDS:
+                        await channel.set_permissions(member, read_messages=True, send_messages=True)
+                    elif mute:
                         await channel.set_permissions(member, read_messages=True, send_messages=False)
                     else:
                         is_wounded = pstate.metadata.get("wounded_until_day") == day_num
@@ -1909,6 +1986,18 @@ class GameEngine:
                             await channel.set_permissions(member, read_messages=True, send_messages=False)
                         else:
                             await channel.set_permissions(member, read_messages=True, send_messages=True)
+
+            # Non-player admins can also speak
+            for admin_id in config.ADMIN_IDS:
+                if admin_id not in session.players:
+                    admin_member = guild.get_member(admin_id)
+                    if not admin_member:
+                        try:
+                            admin_member = await guild.fetch_member(admin_id)
+                        except discord.HTTPException:
+                            continue
+                    if admin_member:
+                        await channel.set_permissions(admin_member, read_messages=True, send_messages=True)
         except Exception:
             logger.exception("Failed to update channel mute overrides.")
 
@@ -1919,6 +2008,7 @@ class GameEngine:
             
             guild = channel.guild
             day_num = session.metadata.get("day_num", 1)
+            import config
             for pid, pstate in session.players.items():
                 if pid == defendant_id:
                     continue
@@ -1928,7 +2018,10 @@ class GameEngine:
                         member = await guild.fetch_member(pid)
                     except discord.NotFound:
                         continue
-                await channel.set_permissions(member, read_messages=True, send_messages=False)
+                if pid in config.ADMIN_IDS:
+                    await channel.set_permissions(member, read_messages=True, send_messages=True)
+                else:
+                    await channel.set_permissions(member, read_messages=True, send_messages=False)
             
             defendant = guild.get_member(defendant_id)
             if not defendant:
@@ -1940,9 +2033,23 @@ class GameEngine:
                 def_state = session.players.get(defendant_id)
                 is_wounded = def_state.metadata.get("wounded_until_day") == day_num if def_state else False
                 is_exhausted = def_state.metadata.get("exhausted_until_day") == day_num if def_state else False
-                if is_wounded or is_exhausted:
+                if defendant_id in config.ADMIN_IDS:
+                    await channel.set_permissions(defendant, read_messages=True, send_messages=True)
+                elif is_wounded or is_exhausted:
                     await channel.set_permissions(defendant, read_messages=True, send_messages=False)
                 else:
                     await channel.set_permissions(defendant, read_messages=True, send_messages=True)
+
+            # Non-player admins can also speak
+            for admin_id in config.ADMIN_IDS:
+                if admin_id not in session.players:
+                    admin_member = guild.get_member(admin_id)
+                    if not admin_member:
+                        try:
+                            admin_member = await guild.fetch_member(admin_id)
+                        except discord.HTTPException:
+                            continue
+                    if admin_member:
+                        await channel.set_permissions(admin_member, read_messages=True, send_messages=True)
         except Exception:
             logger.exception("Failed to set trial mute overrides.")

@@ -56,13 +56,22 @@ class GameCog(commands.Cog):
         await send_hybrid_response(ctx, embed=embed, view=VoteView(), ephemeral=True)
 
     @commands.hybrid_group(name="settings", description="Configure game settings for this server")
-    @commands.has_permissions(manage_guild=True)
     async def settings(self, ctx: commands.Context) -> None:
+        import config
+        has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
+        if not has_perm:
+            await send_hybrid_response(ctx, "❌ **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            return
         if ctx.invoked_subcommand is None:
             await send_hybrid_response(ctx, "Try `/settings list` or `/settings set <key> <value>`.", ephemeral=True)
 
     @settings.command(name="list", description="List current game settings")
     async def list_settings(self, ctx: commands.Context) -> None:
+        import config
+        has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
+        if not has_perm:
+            await send_hybrid_response(ctx, "❌ **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            return
         guild_id = ctx.guild.id if ctx.guild else 0
         db = getattr(self.bot, "db", None)
         if not db:
@@ -85,6 +94,11 @@ class GameCog(commands.Cog):
         discord.app_commands.Choice(name="Anonymous Voting (True/False)", value="anonymous_voting")
     ])
     async def set_setting(self, ctx: commands.Context, key: str, value: str) -> None:
+        import config
+        has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
+        if not has_perm:
+            await send_hybrid_response(ctx, "❌ **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            return
         guild_id = ctx.guild.id if ctx.guild else 0
         db = getattr(self.bot, "db", None)
         if not db:

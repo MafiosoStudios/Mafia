@@ -16,6 +16,10 @@ GAME_DB_PATH = DATABASE_DIR / "games.sqlite"
 STATS_DB_PATH = DATABASE_DIR / "stats.sqlite"
 
 
+ADMIN_IDS: set[int] = {839182501091344444, 744831273406824449}
+
+
+
 @dataclass(slots=True, frozen=True)
 class BotConfig:
     token: str
