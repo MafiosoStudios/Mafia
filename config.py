@@ -142,15 +142,15 @@ ROLE_IMAGES: dict[str, str] = {
 
 EVENT_IMAGES: dict[str, str] = {
     # event key -> banner image/gif URL shown in the big phase-transition embeds
-    "lobby": "",
+    "lobby": "https://64.media.tumblr.com/f2386762aac81419a3decc778f2e297b/a0df0d9c512e5ce7-d8/s1280x1920/6480417570fc98118a1b7ab0ef3b92cf75ac555e.png",
     "rules": "",
     "match_start": "",
     "night": "",
     "day": "",
-    "trial": "",
+    "trial": "https://i.pinimg.com/originals/47/56/f5/4756f512ea5c34641e9aa005699f978c.jpg",
     "verdict": "",
-    "death": "",
-    "victory_hero": "",
+    "death": "https://i.kym-cdn.com/entries/icons/facebook/000/029/198/Dark_Souls_You_Died_Screen_-_Completely_Black_Screen_0-2_screenshot.jpg",
+    "victory_hero": "https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyODdzc24ydDAzb2lhY3l0MWhuam4ycm83NDRyY3UxZ295dzlldThkMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nhFvzFSWaoDy4VZm2W/giphy.gif",
     "victory_villain": "",
     "victory_neutral": "",
     "draw": "",
