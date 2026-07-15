@@ -1288,6 +1288,9 @@ class GameEngine:
                             # Reset defendant metadata and break the verdict loop
                             session.metadata.pop("defendant_id", None)
                             session.metadata.pop("verdicts", None)
+
+                            # Announce trial concluded
+                            await self.bot.message_queue.send(mafia_channel, f"{get_emoji('trial')} **Trial concluded.**")
                             break
                         
                         if break_to_voting:
@@ -1304,6 +1307,16 @@ class GameEngine:
                     session.state = GameState.ENDED
                     session.winner_faction = winner
                     break
+
+                # Make sure all day/trial messages have finished sending
+                if self.bot and hasattr(self.bot, "message_queue"):
+                    try:
+                        await self.bot.message_queue._queue.join()
+                    except Exception:
+                        pass
+
+                # Wait 8 seconds before locking the channel and starting the next night
+                await asyncio.sleep(8)
 
         except Exception:
             logger.exception("Game loop error for game_id: %s", game_id)
@@ -1489,6 +1502,7 @@ class GameEngine:
         if death_image:
             death_embed.set_image(url=death_image)
         await self.bot.message_queue.send(channel, embed=death_embed)
+        await asyncio.sleep(2.5)  # Wait 2.5 seconds between embeds to prevent spam
 
         # 2. Other Casualties Report
         if other_deaths:
@@ -1502,6 +1516,7 @@ class GameEngine:
             if other_image:
                 other_embed.set_image(url=other_image)
             await self.bot.message_queue.send(channel, embed=other_embed)
+            await asyncio.sleep(2.5)  # Wait 2.5 seconds between embeds to prevent spam
 
         alive_list = []
         dead_list = []
@@ -1522,6 +1537,7 @@ class GameEngine:
         status_embed.add_field(name=f"{get_emoji('alive')} Alive Players", value="\n".join(alive_list) if alive_list else "None", inline=True)
         status_embed.add_field(name=f"{get_emoji('death')} Dead Players", value="\n".join(dead_list) if dead_list else "None", inline=True)
         await self.bot.message_queue.send(channel, embed=status_embed)
+        await asyncio.sleep(2.5)  # Wait 2.5 seconds after player status embed before proceeding
 
     async def _all_active_submitted(self, session: GameSession) -> bool:
         """Checks if all alive players who have active night actions have submitted."""
@@ -1589,6 +1605,10 @@ class GameEngine:
                         makima_payload["control_success"] = False
                         makima_payload["error"] = "Your target resisted your ability."
                         makima_payload["log"] = f"Makima attempted to control <@{controlled_pid}>, but they resisted!"
+                    elif controlled_state.role_key in ("dazai", "asta"):
+                        makima_payload["control_success"] = False
+                        makima_payload["error"] = "Your target resisted your ability."
+                        makima_payload["log"] = f"Makima attempted to control <@{controlled_pid}>, but they resisted!"
                     else:
                         last_controlled = makima_state.metadata.get("last_controlled_player")
                         if last_controlled != controlled_pid:
@@ -1633,6 +1653,9 @@ class GameEngine:
         # Apply Hisoka's Bloodlust redirects directly to session.night_actions
         challenges = session.metadata.get("bloodlust_challenges", {})
         for actor_id, hisoka_id in challenges.items():
+            actor_state = session.players.get(actor_id)
+            if actor_state and actor_state.role_key in ("dazai", "asta"):
+                continue  # Dazai and Asta are immune to redirects
             payload = session.night_actions.get(actor_id)
             if payload:
                 if payload.get("target_id") == hisoka_id:
@@ -1698,6 +1721,54 @@ class GameEngine:
                 continue
             if actor_state.metadata.get("detained"):
                 continue
+
+            # Dazai No Longer Human nullification
+            if actor_state.metadata.get("nullified"):
+                continue
+
+            # Asta Black Divider nullification
+            if actor_state.metadata.get("black_divider_nullified"):
+                import asyncio
+                async def notify_null(s=session, a_id=actor_id, bot=self.bot):
+                    if bot:
+                        guild = bot.get_guild(s.game_handle.guild_id)
+                        member = guild.get_member(a_id) if guild else None
+                        if member:
+                            try:
+                                bot.message_queue.send(member, "❌ **Your ability was nullified tonight.**")
+                            except Exception:
+                                pass
+                asyncio.create_task(notify_null())
+                continue
+
+            # Asta Devil Union nullification
+            if session.metadata.get("devil_union_active"):
+                if actor_state.faction in (RoleFaction.VILLAIN.value, RoleFaction.NEUTRAL.value):
+                    targets_town = False
+                    t_id = payload.get("target_id")
+                    if t_id:
+                        t_st = session.players.get(t_id)
+                        if t_st and t_st.faction == RoleFaction.HERO.value:
+                            targets_town = True
+                    targets_list = payload.get("targets", ())
+                    if targets_list:
+                        for t in targets_list:
+                            t_st = session.players.get(t)
+                            if t_st and t_st.faction == RoleFaction.HERO.value:
+                                targets_town = True
+                    if targets_town:
+                        import asyncio
+                        async def notify_union(s=session, a_id=actor_id, bot=self.bot):
+                            if bot:
+                                guild = bot.get_guild(s.game_handle.guild_id)
+                                member = guild.get_member(a_id) if guild else None
+                                if member:
+                                    try:
+                                        bot.message_queue.send(member, "❌ **Your action failed due to Asta's Devil Union!**")
+                                    except Exception:
+                                        pass
+                        asyncio.create_task(notify_union())
+                        continue
 
             # Tōsen Bankai protection: prevent most players from targeting a detained prisoner
             if actor_state.role_key != "tosen":
@@ -2128,10 +2199,13 @@ class GameEngine:
         for pstate in session.players.values():
             pstate.metadata.pop("disguised_faction", None)
             pstate.metadata.pop("disguised_category", None)
+            pstate.metadata.pop("nullified", None)
+            pstate.metadata.pop("black_divider_nullified", None)
 
         session.metadata.pop("pending_kills", None)
         session.metadata.pop("healed_players", None)
         session.metadata.pop("bungee_gum_links", None)
+        session.metadata.pop("devil_union_active", None)
 
     async def _notify_muzan_conversion(
         self,
@@ -2236,8 +2310,9 @@ class GameEngine:
                             if not current_ow or current_ow.send_messages != False:
                                 await channel.set_permissions(member, read_messages=True, send_messages=False)
                         else:
-                            if current_ow and current_ow.send_messages is not None:
-                                await channel.set_permissions(member, read_messages=True, send_messages=None)
+                            target_player_send = False if mute else None
+                            if not current_ow or current_ow.send_messages != target_player_send:
+                                await channel.set_permissions(member, read_messages=True, send_messages=target_player_send)
 
             # Non-player admins can also speak
             for admin_id in config.ADMIN_IDS:
@@ -2288,8 +2363,8 @@ class GameEngine:
                             if not current_ow or current_ow.send_messages != False:
                                 await channel.set_permissions(member, read_messages=True, send_messages=False)
                         else:
-                            if current_ow and current_ow.send_messages is not None:
-                                await channel.set_permissions(member, read_messages=True, send_messages=None)
+                            if not current_ow or current_ow.send_messages != False:
+                                await channel.set_permissions(member, read_messages=True, send_messages=False)
 
             # 3. Unmute the defendant explicitly
             defendant = guild.get_member(defendant_id)

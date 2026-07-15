@@ -226,7 +226,7 @@
     "name": "Kishibe",
     "faction": "Protagonist",
     "description": "A grizzled, battle worn hunter who survived countless encounters with devils. Kishibe has no illusions about humanity, he fights because he has nothing left to lose. Taciturn and ruthless, he is considered one of the strongest humans alive.",
-    "active_ability": "Veteran's Instinct (Alert) - Go on Alert, anyone who visits you is attacked with a Powerful Attack, 3 charges. Broken Screw - Once per game, Choose a player, if they visit you tonight, your Alert charge is saved.",
+    "active_ability": "Veteran's Instinct (Alert) - Go on Alert, anyone who visits you is attacked with a Powerful Attack, 3 charges / Broken Screw - Once per game, Choose a player, if they visit you tonight, your Alert charge is saved.",
     "passive_ability": "Battle-Hardened - The first time someone attempts to roleblock, control, or redirect Kishibe, the effect fails and the visitor is notified that their target resisted them.",
     "win_condition": "Help the protagonists win.",
     "action_prompt": "Select an action to perform:",
@@ -243,5 +243,27 @@
     "action_prompt": "Select an action to perform:",
     "footer": "Justice without power is mere sentiment. Power without justice is tyranny.",
     "image_url": "https://i.pinimg.com/736x/40/cf/1b/40cf1be8c6ffdce60e3ab8bf60f4c2e5.jpg"
+  },
+  "dazai": {
+    "name": "Osamu Dazai",
+    "faction": "Protagonist",
+    "description": "A member of the Armed Detective Agency, Dazai possesses the ability to nullify any supernatural power with a single touch. Beneath his eccentric, suicidal exterior lies a mind of unmatched strategic genius.",
+    "active_ability": "No Longer Human - Select a player every night, nullify the target's abilities for the night, they cannot use active abilities, their passive is suppressed, and visits are cancelled. The cooldown is 1 night.",
+    "passive_ability": "Unpredictable - Dazai is immune to redirects, control, or forced visits. His chosen action will always proceed.",
+    "win_condition": "Help the protagonists win.",
+    "action_prompt": "Select an action to perform:",
+    "footer": "There is no such thing as an ideal in this world.",
+    "image_url": "https://images4.alphacoders.com/131/1314582.png"
+  },
+  "asta": {
+    "name": "Asta",
+    "faction": "Protagonist",
+    "description": "An orphan who received a five-leaf clover grimoire and wields Anti-Magic swords. Despite having zero mana, his sheer physical strength, determination, and anti-magic make him one of the most formidable magic knights.",
+    "active_ability": "Demon Destroyer Sword - Select a player every night to cleanse all negative status effects from them. / Black Divider - Choose a player every other night and nullify their abilities for that day. / Devil Union - Once per game, Asta can merge with his devil and nullify EVERY hostile ability to protect the town",
+    "passive_ability": "Anti-Magic - Immune to all negative non-physical abilities (Roleblocks, frames, hexes, silences, curses, redirects). Not immune to direct kills or lynching.",
+    "win_condition": "Help the protagonists win.",
+    "action_prompt": "Select an action to perform:",
+    "footer": "My magic is never giving up!",
+    "image_url": "https://images.alphacoders.com/139/thumb-1920-1399535.jpg"
   }
 }

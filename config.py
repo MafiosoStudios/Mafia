@@ -89,6 +89,8 @@ EMOJIS: dict[str, str] = {
     "frieren": "✨",
     "kishibe": "🥃",
     "tosen": "🌑",
+    "dazai": "✋",
+    "asta": "🍀",
 
     # Role categories (used for role-reveal / role-list UI)
     "category_protective": "🩹",

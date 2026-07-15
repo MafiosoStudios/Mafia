@@ -874,3 +874,207 @@ class KanameTosen(BaseRole):
     def __init__(self) -> None:
         super().__init__()
         self.abilities = [TosenBankai(), TosenExecute()]
+
+
+# =============================================================================
+# Osamu Dazai (No Longer Human)
+# =============================================================================
+
+class DazaiNoLongerHuman(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="No Longer Human",
+            description="Nullify target's supernatural abilities for the night. Cooldown: 1 Night.",
+            priority=0  # Runs first to nullify before any action executes
+        )
+
+    def can_use(self, session, player_state):
+        last_used = player_state.metadata.get("dazai_nullify_last_used")
+        if last_used is not None and session.metadata.get("night_num", 1) - last_used < 2:
+            return False, f"No Longer Human is on cooldown until Night {last_used + 2}."
+        return True, None
+
+    async def execute(self, context):
+        target_id = context.target_id
+        if not target_id:
+            return
+        session = context.payload.get("session")
+        if not session:
+            return
+        
+        dazai_state = session.players.get(context.user_id)
+        if dazai_state:
+            dazai_state.metadata["dazai_nullify_last_used"] = session.metadata.get("night_num", 1)
+
+        target_state = session.players.get(target_id)
+        if target_state:
+            # Asta is immune to negative non-physical abilities (like Dazai's nullification)
+            if target_state.role_key == "asta":
+                context.payload["log"] = f"Dazai attempted to nullify <@{target_id}>, but their Anti-Magic resisted it!"
+                context.payload["result"] = "Your target resisted your ability."
+                return
+
+            target_state.metadata["nullified"] = True
+            context.payload["log"] = f"Dazai nullified <@{target_id}>'s abilities."
+            context.payload["result"] = f"✋ **No Longer Human!** You have nullified <@{target_id}>'s abilities tonight."
+
+            # Notify target
+            import asyncio
+            async def notify_nullified(s=session, t_id=target_id, bot=context.bot):
+                if bot:
+                    guild = bot.get_guild(s.game_handle.guild_id)
+                    member = guild.get_member(t_id) if guild else None
+                    if member:
+                        try:
+                            bot.message_queue.send(member, "❌ **Your abilities were nullified tonight.**")
+                        except Exception:
+                            pass
+            asyncio.create_task(notify_nullified())
+
+    async def get_night_feedback(self, context):
+        return context.payload.get("result")
+
+
+@role_registry.register
+class OsamuDazai(BaseRole):
+    role_key = "dazai"
+    priority = 1
+    tags = (RoleCategory.UTILITY,)
+    is_unique = True
+    cooldown_text = "1 Night"
+    limitations_text = "Unpredictable passive: Immune to redirects, control, or forced visits."
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [DazaiNoLongerHuman()]
+
+
+# =============================================================================
+# Asta (Anti-Magic Knight)
+# =============================================================================
+
+class AstaDemonDestroyer(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Demon Destroyer Sword",
+            description="Remove all negative status effects from a player.",
+            priority=1  # Runs early to cleanse targets before they act if possible
+        )
+
+    async def execute(self, context):
+        target_id = context.target_id
+        if not target_id:
+            return
+        session = context.payload.get("session")
+        if not session:
+            return
+
+        target_state = session.players.get(target_id)
+        if target_state:
+            # Cleanses negative effects
+            cleansed = []
+            negative_keys = ["framed", "silenced", "cursed", "hexed", "poisoned", "marked", "roleblocked", "ability_disabled", "nullified", "black_divider_nullified"]
+            for key in negative_keys:
+                if target_state.metadata.pop(key, None) is not None:
+                    cleansed.append(key)
+
+            context.payload["log"] = f"Asta cleansed <@{target_id}> of negative effects: {', '.join(cleansed) if cleansed else 'none'}."
+            context.payload["result"] = f"⚔️ **Demon Destroyer Sword!** You have cleansed <@{target_id}> of all negative status effects."
+
+            # Notify target
+            if cleansed:
+                import asyncio
+                async def notify_cleansed(s=session, t_id=target_id, bot=context.bot):
+                    if bot:
+                        guild = bot.get_guild(s.game_handle.guild_id)
+                        member = guild.get_member(t_id) if guild else None
+                        if member:
+                            try:
+                                bot.message_queue.send(member, "⚔️ **Asta's Demon Destroyer Sword has cleansed you of all negative effects!**")
+                            except Exception:
+                                pass
+                asyncio.create_task(notify_cleansed())
+
+    async def get_night_feedback(self, context):
+        return context.payload.get("result")
+
+
+class AstaBlackDivider(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Black Divider",
+            description="Target a player. If they attempt to act, nullify their ability, bypassing immunity. Cooldown: 1 Night.",
+            priority=1
+        )
+
+    def can_use(self, session, player_state):
+        last_used = player_state.metadata.get("asta_divider_last_used")
+        if last_used is not None and session.metadata.get("night_num", 1) - last_used < 2:
+            return False, f"Black Divider is on cooldown until Night {last_used + 2}."
+        return True, None
+
+    async def execute(self, context):
+        target_id = context.target_id
+        if not target_id:
+            return
+        session = context.payload.get("session")
+        if not session:
+            return
+
+        asta_state = session.players.get(context.user_id)
+        if asta_state:
+            asta_state.metadata["asta_divider_last_used"] = session.metadata.get("night_num", 1)
+
+        target_state = session.players.get(target_id)
+        if target_state:
+            target_state.metadata["black_divider_nullified"] = True
+            context.payload["log"] = f"Asta targeted <@{target_id}> with Black Divider."
+            context.payload["result"] = f"⚔️ **Black Divider Active!** If <@{target_id}> attempts to use an ability tonight, it will be nullified."
+
+    async def get_night_feedback(self, context):
+        return context.payload.get("result")
+
+
+class AstaDevilUnion(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Devil Union",
+            description="For one night, every hostile ability targeting Town is nullified. (Once per game)",
+            priority=1
+        )
+        self.num_targets = 0
+
+    def can_use(self, session, player_state):
+        if player_state.metadata.get("devil_union_used"):
+            return False, "You have already used Devil Union once this game."
+        return True, None
+
+    async def execute(self, context):
+        session = context.payload.get("session")
+        if not session:
+            return
+
+        asta_state = session.players.get(context.user_id)
+        if asta_state:
+            asta_state.metadata["devil_union_used"] = True
+
+        session.metadata["devil_union_active"] = True
+        context.payload["log"] = "Asta activated Devil Union!"
+        context.payload["result"] = "😈 **Devil Union Activated!** For tonight, all hostile actions targeting Town players will fail."
+
+    async def get_night_feedback(self, context):
+        return context.payload.get("result")
+
+
+@role_registry.register
+class Asta(BaseRole):
+    role_key = "asta"
+    priority = 1
+    tags = (RoleCategory.UTILITY,)
+    is_unique = True
+    cooldown_text = "Black Divider: 1 Night. Devil Union: Once per game."
+    limitations_text = "Anti-Magic passive: Immune to non-physical negative abilities and redirects."
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [AstaDemonDestroyer(), AstaBlackDivider(), AstaDevilUnion()]
