@@ -81,12 +81,14 @@ EMOJIS: dict[str, str] = {
     "demon": "👿",
     "lower_moon": "🌙",
     "upper_moon": "💀",
-    "goon_lord": "👤",
+    "frieza": "👽",
     "tobirama_senju": "🌊",
     "hiromi_higuruma": "⚖️",
     "levi_ackerman": "⚔️",
     "maomao": "🧪",
     "frieren": "✨",
+    "kishibe": "🥃",
+    "tosen": "🌑",
 
     # Role categories (used for role-reveal / role-list UI)
     "category_protective": "🩹",
@@ -242,6 +244,16 @@ DEATH_MESSAGES: dict[str, list[str]] = {
     ],
     "wrongful_judgment": [
         "**{player}** wrongfully prosecuted a town member and was executed by the Hangman for their judgment.",
+    ],
+    "tosen_kill": [
+        "**{player}** was erased from existence inside Tōsen's Bankai — absolute judgment, no appeal.",
+        "**{player}**'s senses were devoured by Enma Kōrogi. Kaname Tōsen's verdict was final.",
+        "**{player}** was executed within Suzumushi's world — no one heard them scream.",
+    ],
+    "kishibe_alert_kill": [
+        "**{player}** visited the wrong person tonight — Kishibe's battle instincts did the rest.",
+        "**{player}** approached Kishibe's door and never left. A Veteran's Alert is not to be trifled with.",
+        "**{player}** made the last mistake of their life: visiting Kishibe while he was on guard.",
     ],
 }
 

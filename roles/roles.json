@@ -134,10 +134,10 @@
   "hisoka": {
     "name": "Hisoka Morow",
     "faction": "Neutral",
-    "win_condition": "WinCondition 1: Get voted out before Night 5 (revive for 3 days with roleblock, steal, and kill abilities). WinCondition 2: Correctly predict two players visiting one another 3 times using Bungee Gum.",
-    "description": "A thrill-seeking magician whose only true passion is battling powerful opponents. Charismatic, unpredictable, and dangerously cunning, Hisoka follows his own desires without loyalty to anyone but himself.",
-    "active_ability": "Bungee Gum - Link two players. If one visits the other, gain 1 point. Needs 3 points.",
-    "passive_ability": "Post-Mortem Nen - Revive if voted out early. You win the game.",
+    "win_condition": "Survive until the end of the game, and successfully use all of your abilities (Bungee Gum, Texture Surprise, Bloodlust) at least once during the game.",
+    "description": "Hisoka has no interest in justice or domination. He lives for excitement, manipulating others and turning the game into his own personal playground.",
+    "active_ability": "Bungee Gum - Link two players. If either wins while both are alive, they both win / Texture Surprise - Twice per game, disguise a players faction alignment / Bloodlust - Once per game, redirect any ability targeted at Hisoka back to the attacker.",
+    "passive_ability": "Bound by Bungee Gum",
     "action_prompt": "Select the first player to link with Bungee Gum:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3YxjRq2L8N8jP6rPDY-UlywimP6uXRdt0GVxAJfrS5ykUL3HEnv5BBYVg&s=10",
     "footer": "The pleasure comes not from victory, but from the fight itself."
@@ -156,9 +156,9 @@
   "eren_jaeger": {
     "name": "Eren Jaeger",
     "faction": "Neutral",
-    "win_condition": "Survive until Night 8 to trigger The Rumbling, then kill everyone until you are the last one standing.",
+    "win_condition": "Survive until Night 5 to trigger The Rumbling, then kill everyone until you are the last one standing.",
     "description": "A determined soldier whose unyielding desire for freedom drives him to challenge the fate of the world itself. Fiercely passionate and willing to sacrifice everything for his convictions, Eren's choices forever reshape history.",
-    "active_ability": "Founding Vision - Select a player every night and learn their faction / The Rumbling - From Night 8 onwards, Eren transforms and gains the ability to kill a player every day. Eren cannot be lynched after the Rumbling begins.",
+    "active_ability": "Founding Vision - Select a player every night and learn their faction / The Rumbling - From Night 5 onwards, Eren transforms and gains the ability to kill a player every day. Eren cannot be lynched after the Rumbling begins.",
     "passive_ability": "None",
     "action_prompt": "Select a player to look at or attack:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRVVq9KyxX88t_0aepOHjeEUNTptvkO574E4ZGjBj0B9jTNlpeZ3z2OQo0H&s=10",
@@ -184,14 +184,16 @@
     "passive_ability": "None",
     "action_prompt": ""
   },
-  "goon_lord": {
-    "name": "GoonLord",
+  "frieza": {
+    "name": "Frieza",
     "faction": "Antagonist",
     "win_condition": "Help the antagonists win.",
-    "description": "A standard antagonist who works from the shadows.",
-    "active_ability": "Assassinate (Select a target to eliminate every night).",
-    "passive_ability": "None",
-    "action_prompt": "Select a player to assassinate:"
+    "description": "The ruthless emperor of the universe, Frieza rules through fear, overwhelming power, and absolute cruelty. Arrogant yet calculating, he views all life as beneath him and will stop at nothing to dominate those who oppose him.",
+    "active_ability": "Death Beam - Choose a player to eliminate every night.",
+    "passive_ability": "Golden Frieza - Ignores protection, immune to blocks/redirections after 3 kills.",
+    "action_prompt": "Select a player to target with Death Beam:",
+    "image_url": "https://static.wikia.nocookie.net/villains/images/e/e1/2017-06-18-1-850x560.jpg/revision/latest?cb=20170619013517",
+    "footer": "Die you monkeys!"
   },
   "demon": {
     "name": "Demon",
@@ -219,5 +221,27 @@
     "active_ability": "Demon Strike (Kill a player).",
     "passive_ability": "None",
     "action_prompt": "Select a player to attack:"
+  },
+  "kishibe": {
+    "name": "Kishibe",
+    "faction": "Protagonist",
+    "description": "A grizzled, battle worn hunter who survived countless encounters with devils. Kishibe has no illusions about humanity, he fights because he has nothing left to lose. Taciturn and ruthless, he is considered one of the strongest humans alive.",
+    "active_ability": "Veteran's Instinct (Alert) - Go on Alert, anyone who visits you is attacked with a Powerful Attack, 3 charges. Broken Screw - Once per game, Choose a player, if they visit you tonight, your Alert charge is saved.",
+    "passive_ability": "Battle-Hardened - The first time someone attempts to roleblock, control, or redirect Kishibe, the effect fails and the visitor is notified that their target resisted them.",
+    "win_condition": "Help the protagonists win.",
+    "action_prompt": "Select an action to perform:",
+    "footer": "I became a devil hunter so I could kill them. That is all.",
+    "image_url": "https://c4.wallpaperflare.com/wallpaper/568/867/664/chainsaw-man-kishibe-chainsaw-man-hd-wallpaper-preview.jpg"
+  },
+  "tosen": {
+    "name": "Kaname Tosen",
+    "faction": "Protagonist",
+    "description": "The Blind Judge who seeks a path of least bloodshed. Tosen wields the most terrifying Bankai - Suzumushi Tsuishiki: Enma Korogi - which erases all senses of those trapped within it. His absolute judgment cannot be defied.",
+    "active_ability": "Bankai: Enma Korogi - Every night, detain a player inside your Bankai. They cannot act, cannot be targeted, and may only communicate privately with Tosen. On the following night, choose to release them or execute them (max 3 executions). Executing a protagonist permanently removes your execution ability.",
+    "passive_ability": "Suzumushi - Players detained inside Enma Korogi cannot activate any abilities that trigger upon death, while dying, or after death. Roles that passively evade death will not be activated. His judgment is absolute.",
+    "win_condition": "Help the protagonists win.",
+    "action_prompt": "Select an action to perform:",
+    "footer": "Justice without power is mere sentiment. Power without justice is tyranny.",
+    "image_url": "https://i.pinimg.com/736x/40/cf/1b/40cf1be8c6ffdce60e3ab8bf60f4c2e5.jpg"
   }
 }

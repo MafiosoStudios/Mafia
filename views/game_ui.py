@@ -86,6 +86,41 @@ class StartGameView(discord.ui.View):
         asyncio.create_task(self.engine.run_game_loop(self.game_id))
 
 
+class SpectateView(discord.ui.View):
+    """Shown in the lobby channel when a game begins, allowing non-players to spectate the match channel."""
+
+    def __init__(self, game_id: str, engine: GameEngine) -> None:
+        super().__init__(timeout=None)
+        self.game_id = game_id
+        self.engine = engine
+
+    @discord.ui.button(label="Spectate", style=discord.ButtonStyle.blurple, custom_id="spectate_button")
+    async def spectate(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        session = await self.engine.get_session(self.game_id)
+        if not session:
+            await interaction.response.send_message("❌ This game is no longer active.", ephemeral=True)
+            return
+
+        if interaction.user.id in session.player_ids:
+            await interaction.response.send_message("❌ You are a player in this game! You cannot spectate.", ephemeral=True)
+            return
+
+        mafia_ch_id = session.metadata.get("mafia_channel_id")
+        if not mafia_ch_id:
+            await interaction.response.send_message("❌ Match channel not found.", ephemeral=True)
+            return
+
+        guild = interaction.guild
+        if guild:
+            ch = guild.get_channel(mafia_ch_id)
+            if ch:
+                await ch.set_permissions(interaction.user, read_messages=True, send_messages=False)
+                await interaction.response.send_message(f"✅ You are now spectating! Check out <#{mafia_ch_id}>.", ephemeral=True)
+                return
+
+        await interaction.response.send_message("❌ Failed to add spectator permissions.", ephemeral=True)
+
+
 class NightActionView(discord.ui.View):
     def __init__(self, game_id: str, engine: GameEngine) -> None:
         super().__init__(timeout=None)
@@ -121,6 +156,10 @@ class NightActionView(discord.ui.View):
 
         if player.metadata.get("roleblocked"):
             await interaction.response.send_message("You feel disoriented... You have been roleblocked and cannot act tonight!", ephemeral=True)
+            return
+
+        if player.metadata.get("detained"):
+            await interaction.response.send_message("🌑 You are detained inside Tōsen's Bankai and cannot act tonight.", ephemeral=True)
             return
 
         role_key = player.role_key
@@ -160,6 +199,19 @@ class NightActionView(discord.ui.View):
             view = discord.ui.View(timeout=120)
             select_type = LightYagamiActionSelect(self.game_id, self.engine, options)
             view.add_item(select_type)
+            
+            cancel_btn = discord.ui.Button(label="Cancel Action", style=discord.ButtonStyle.danger)
+            async def ly_cancel_callback(inter: discord.Interaction) -> None:
+                async with self.engine._lock:
+                    if inter.user.id in session.night_actions:
+                        session.night_actions.pop(inter.user.id, None)
+                        player.night_actions_used = max(0, player.night_actions_used - 1)
+                        await inter.response.edit_message(content="✅ **Your night action has been cancelled.**", view=None)
+                        return
+                await inter.response.send_message("❌ You have not submitted any night actions yet tonight.", ephemeral=True)
+            cancel_btn.callback = ly_cancel_callback
+            view.add_item(cancel_btn)
+            
             await interaction.response.send_message("Select which ability you wish to use:", view=view, ephemeral=True)
             return
 
@@ -188,6 +240,15 @@ class NightAbilityButtonsView(discord.ui.View):
                 btn.callback = self.make_callback(ability, idx)
                 self.add_item(btn)
 
+        # Cancel Action button
+        cancel_btn = discord.ui.Button(
+            label="Cancel Action",
+            style=discord.ButtonStyle.danger,
+            custom_id=f"mafia_ability_cancel_{player_id}"
+        )
+        cancel_btn.callback = self.cancel_action_callback
+        self.add_item(cancel_btn)
+
     def make_callback(self, ability: Any, idx: int):
         async def callback(interaction: discord.Interaction) -> None:
             session = await self.engine.get_session(self.game_id)
@@ -202,6 +263,10 @@ class NightAbilityButtonsView(discord.ui.View):
 
             if player_state.metadata.get("roleblocked"):
                 await interaction.response.send_message("You are roleblocked and cannot act tonight!", ephemeral=True)
+                return
+
+            if player_state.metadata.get("detained"):
+                await interaction.response.send_message("🌑 You are detained inside Tōsen's Bankai and cannot act tonight.", ephemeral=True)
                 return
 
             # Check if wounded/exhausted
@@ -265,16 +330,51 @@ class NightAbilityButtonsView(discord.ui.View):
                 return
 
             view = discord.ui.View(timeout=120)
-            if ability.num_targets == 2:
+            if ability.name == "Texture Surprise":
+                select = TextureSurpriseStep1(self.game_id, self.engine, ability, idx, options)
+                view.add_item(select)
+            elif ability.num_targets == 2:
                 select = TwoTargetSelectStep1(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
-                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the first target:", view=view)
             else:
                 select = AbilityTargetSelect(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
+
+            # Go Back / Cancel button for target selection
+            back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
+            async def back_callback(inter: discord.Interaction) -> None:
+                orig_view = NightAbilityButtonsView(self.game_id, self.engine, self.player_id, self.role_inst, session)
+                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+            back_btn.callback = back_callback
+            view.add_item(back_btn)
+
+            if ability.name == "Texture Surprise":
+                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the player to disguise:", view=view)
+            elif ability.num_targets == 2:
+                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the first target:", view=view)
+            else:
                 await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect your target:", view=view)
 
         return callback
+
+    async def cancel_action_callback(self, interaction: discord.Interaction) -> None:
+        session = await self.engine.get_session(self.game_id)
+        if not session:
+            await interaction.response.send_message("This game is no longer active.", ephemeral=True)
+            return
+
+        player_state = session.players.get(self.player_id)
+        if not player_state:
+            return
+
+        async with self.engine._lock:
+            if self.player_id in session.night_actions:
+                session.night_actions.pop(self.player_id, None)
+                player_state.night_actions_used = max(0, player_state.night_actions_used - 1)
+                await interaction.response.edit_message(content="✅ **Your night action has been cancelled.**\nFeel free to select a new target at any time tonight.", view=None)
+                return
+        
+        await interaction.response.send_message("❌ You have not submitted any night actions yet tonight.", ephemeral=True)
 
 
 class AbilityTargetSelect(discord.ui.Select):
@@ -334,6 +434,101 @@ class TwoTargetSelectStep2(discord.ui.Select):
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
         await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered on <@{self.target1}> and <@{target2}>.", view=None)
+
+
+class TextureSurpriseStep1(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select a player to disguise...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        target_id = int(self.values[0])
+        view = discord.ui.View(timeout=120)
+        faction_options = [
+            discord.SelectOption(label="Town (Protagonist)", value="Hero"),
+            discord.SelectOption(label="Mafia (Antagonist)", value="Villain"),
+            discord.SelectOption(label="Neutral", value="Neutral")
+        ]
+        select2 = TextureSurpriseStep2(self.game_id, self.engine, self.ability, self.action_index, target_id, faction_options)
+        view.add_item(select2)
+        
+        back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
+        async def back_callback(inter: discord.Interaction) -> None:
+            session = await self.engine.get_session(self.game_id)
+            if session:
+                from views.game_ui import NightAbilityButtonsView
+                role_inst = session.players[interaction.user.id].role_inst
+                orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
+                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+        back_btn.callback = back_callback
+        view.add_item(back_btn)
+        
+        await interaction.response.edit_message(content=f"Using **{self.ability.name}** on <@{target_id}>.\nChoose disguised Faction:", view=view)
+
+
+class TextureSurpriseStep2(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target_id: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Choose faction...", options=options)
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.target_id = target_id
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        faction_choice = self.values[0]
+        view = discord.ui.View(timeout=120)
+        category_options = [
+            discord.SelectOption(label="Protective", value="protective"),
+            discord.SelectOption(label="Investigative", value="investigative"),
+            discord.SelectOption(label="Council", value="council"),
+            discord.SelectOption(label="Utility", value="utility"),
+            discord.SelectOption(label="Killing", value="killing"),
+            discord.SelectOption(label="Deception", value="deception"),
+            discord.SelectOption(label="Control", value="control"),
+            discord.SelectOption(label="Neutral", value="neutral")
+        ]
+        select3 = TextureSurpriseStep3(self.game_id, self.engine, self.ability, self.action_index, self.target_id, faction_choice, category_options)
+        view.add_item(select3)
+        
+        back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
+        async def back_callback(inter: discord.Interaction) -> None:
+            session = await self.engine.get_session(self.game_id)
+            if session:
+                from views.game_ui import NightAbilityButtonsView
+                role_inst = session.players[interaction.user.id].role_inst
+                orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
+                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+        back_btn.callback = back_callback
+        view.add_item(back_btn)
+        
+        await interaction.response.edit_message(content=f"Using **{self.ability.name}** on <@{self.target_id}>.\nChoose disguised Category:", view=view)
+
+
+class TextureSurpriseStep3(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target_id: int, faction_choice: str, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Choose category...", options=options)
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.target_id = target_id
+        self.faction_choice = faction_choice
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        category_choice = self.values[0]
+        payload = {
+            "action_index": self.action_index,
+            "target_id": self.target_id,
+            "disguised_faction": self.faction_choice,
+            "disguised_category": category_choice
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
+        await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered. Target <@{self.target_id}> will appear as faction **{self.faction_choice}** and category **{category_choice}** tonight.", view=None)
 
 
 class StandardActionSelect(discord.ui.Select):

@@ -97,6 +97,7 @@ class DatabaseManager:
         guild_id: int,
         player_faction: str | None,
         winner_faction: str | None,
+        has_won: bool = False,
     ) -> StatisticsRecord:
         current = await self.get_statistics(user_id, guild_id)
         statistics = current or StatisticsRecord(user_id=user_id, guild_id=guild_id)
@@ -104,7 +105,7 @@ class DatabaseManager:
         games_played = statistics.games_played + 1
         if winner_faction is None or winner_faction == "Draw":
             wins, losses, draws = statistics.wins, statistics.losses, statistics.draws + 1
-        elif player_faction == winner_faction:
+        elif has_won or player_faction == winner_faction:
             wins, losses, draws = statistics.wins + 1, statistics.losses, statistics.draws
         else:
             wins, losses, draws = statistics.wins, statistics.losses + 1, statistics.draws
@@ -345,10 +346,10 @@ class DatabaseManager:
     async def get_guild_settings(self, guild_id: int) -> dict[str, Any]:
         doc = await self.db.settings.find_one({"guild_id": guild_id})
         defaults = {
-            "night_duration": 90,
-            "day_duration": 120,
-            "vote_duration": 60,
-            "plea_duration": 60,
+            "night_duration": 45,
+            "day_duration": 30,
+            "vote_duration": 30,
+            "plea_duration": 30,
             "verdict_duration": 30,
             "anonymous_voting": True,
         }

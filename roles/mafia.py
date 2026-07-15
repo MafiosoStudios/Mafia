@@ -37,8 +37,13 @@ class BlackbeardDarknessLogia(NightAction):
 
         target_player = session.players.get(target_id)
         if target_player:
-            target_player.metadata["roleblocked"] = True
-            context.payload["log"] = f"Blackbeard roleblocked <@{target_id}> using Darkness Logia."
+            if target_player.role_key == "kishibe" and not target_player.metadata.get("battle_hardened_used"):
+                target_player.metadata["battle_hardened_used"] = True
+                context.payload["log"] = f"Blackbeard attempted to roleblock <@{target_id}> using Darkness Logia, but they resisted!"
+                context.payload["result"] = "Your target resisted your ability."
+            else:
+                target_player.metadata["roleblocked"] = True
+                context.payload["log"] = f"Blackbeard roleblocked <@{target_id}> using Darkness Logia."
 
 
 class BlackbeardTremorFruit(NightAction):
@@ -66,11 +71,37 @@ class BlackbeardTremorFruit(NightAction):
         blocked_count = 0
         for pid, pstate in session.players.items():
             if pstate.alive and pstate.faction != RoleFaction.VILLAIN.value:
-                pstate.metadata["roleblocked"] = True
-                blocked_count += 1
+                if pstate.role_key == "kishibe" and not pstate.metadata.get("battle_hardened_used"):
+                    pstate.metadata["battle_hardened_used"] = True
+                    import asyncio
+                    async def notify_bb(s=session, bb_id=context.user_id, k_id=pid):
+                        if context.bot:
+                            guild = context.bot.get_guild(s.game_handle.guild_id)
+                            member = guild.get_member(bb_id) if guild else None
+                            if member:
+                                try:
+                                    context.bot.message_queue.send(member, f"⚠️ **Your Tremor Fruit was resisted by <@{k_id}>!**")
+                                except Exception:
+                                    pass
+                    asyncio.create_task(notify_bb())
+                else:
+                    pstate.metadata["roleblocked"] = True
+                    blocked_count += 1
 
         context.payload["action_type"] = "tremor"
         context.payload["log"] = f"Blackbeard triggered the Tremor Fruit! An earthquake roleblocked {blocked_count} players."
+
+        # Send epic public dialogue warning to match channel!
+        mafia_ch_id = session.metadata.get("mafia_channel_id")
+        if mafia_ch_id:
+            ch = context.bot.get_channel(mafia_ch_id)
+            if ch:
+                dialogue = (
+                    "🌋 **ZEHAHAHAHA! THE EARTHQUAKE IS SHAKING THE LOBBY!**\n"
+                    "**\"From now on, this is my era!\"**\n"
+                    "Blackbeard has unleashed the Tremor Fruit power! The ground trembles violently, disrupting everyone's actions tonight..."
+                )
+                await context.bot.message_queue.send(ch, dialogue)
 
 
 @role_registry.register
@@ -416,8 +447,13 @@ class LowerMoonDistract(NightAction):
             
         target_player = session.players.get(target_id)
         if target_player:
-            target_player.metadata["roleblocked"] = True
-            context.payload["log"] = f"Lower Moon Demon distracted <@{target_id}>."
+            if target_player.role_key == "kishibe" and not target_player.metadata.get("battle_hardened_used"):
+                target_player.metadata["battle_hardened_used"] = True
+                context.payload["log"] = f"Lower Moon Demon attempted to distract <@{target_id}>, but they resisted!"
+                context.payload["result"] = "Your target resisted your ability."
+            else:
+                target_player.metadata["roleblocked"] = True
+                context.payload["log"] = f"Lower Moon Demon distracted <@{target_id}>."
 
 
 @role_registry.register
@@ -468,11 +504,11 @@ class UpperMoon(BaseRole):
         self.abilities = [UpperMoonStrike()]
 
 
-class VillainAssassinate(NightAction):
+class FriezaDeathBeam(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Assassinate",
-            description="Select a target to eliminate every night.",
+            name="Death Beam",
+            description="Every night, choose a player to eliminate.",
             priority=4
         )
 
@@ -486,13 +522,13 @@ class VillainAssassinate(NightAction):
             return
             
         kills = session.metadata.setdefault("pending_kills", {})
-        kills[target_id] = kills.get(target_id, []) + ["mafia_strike"]
-        context.payload["log"] = f"GoonLord attacked <@{target_id}>."
+        kills[target_id] = kills.get(target_id, []) + ["frieza_kill"]
+        context.payload["log"] = f"Frieza fired a Death Beam at <@{target_id}>."
 
 
 @role_registry.register
-class GoonLord(BaseRole):
-    role_key: ClassVar[str] = "goon_lord"
+class Frieza(BaseRole):
+    role_key: ClassVar[str] = "frieza"
     priority: ClassVar[int] = 4
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
     is_unique: ClassVar[bool] = False
@@ -501,4 +537,7 @@ class GoonLord(BaseRole):
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [VillainAssassinate()]
+        self.abilities = [FriezaDeathBeam()]
+
+    def is_active_threat(self, session: Any, player_state: Any) -> bool:
+        return player_state.alive

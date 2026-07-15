@@ -72,13 +72,59 @@ class EventsCog(commands.Cog):
         player_state = None
         for session in list(game_engine._sessions.values()):
             if message.author.id in session.players:
-                pstate = session.players[message.author.id]
-                if pstate.faction == "Villain":
-                    target_session = session
-                    player_state = pstate
-                    break
+                target_session = session
+                player_state = session.players[message.author.id]
+                break
 
         if not target_session or not player_state:
+            return
+
+        # Check Tōsen Bankai communication
+        if player_state.alive and message.content.startswith("."):
+            content_without_dot = message.content[1:].strip()
+            
+            # Case 1: Tōsen sending to Prisoner
+            if player_state.role_key == "tosen":
+                prisoner_id = player_state.metadata.get("detained_player_id")
+                if prisoner_id:
+                    guild = self.bot.get_guild(target_session.game_handle.guild_id)
+                    prisoner_mem = guild.get_member(prisoner_id) if guild else None
+                    if prisoner_mem:
+                        try:
+                            self.bot.message_queue.send(prisoner_mem, f"🌑 **[Bankai Chat] Tōsen**: {content_without_dot}")
+                            await message.channel.send(f"🌑 **[Bankai Chat] To Prisoner**: {content_without_dot}")
+                        except Exception:
+                            pass
+                    else:
+                        await message.channel.send("❌ Could not send message: Prisoner is not in the server.")
+                else:
+                    await message.channel.send("❌ You do not have any prisoner detained tonight.")
+                return
+            
+            # Case 2: Prisoner sending to Tōsen
+            elif player_state.metadata.get("detained"):
+                tosen_id = None
+                for pid, ps in target_session.players.items():
+                    if ps.role_key == "tosen" and ps.alive:
+                        tosen_id = pid
+                        break
+                if tosen_id:
+                    guild = self.bot.get_guild(target_session.game_handle.guild_id)
+                    tosen_mem = guild.get_member(tosen_id) if guild else None
+                    if tosen_mem:
+                        try:
+                            self.bot.message_queue.send(tosen_mem, f"🌑 **[Bankai Chat] Prisoner**: {content_without_dot}")
+                            await message.channel.send(f"🌑 **[Bankai Chat] To Tōsen**: {content_without_dot}")
+                        except Exception:
+                            pass
+                    else:
+                        await message.channel.send("❌ Could not send message: Tōsen is not in the server.")
+                else:
+                    await message.channel.send("❌ Tōsen is not active or dead.")
+                return
+
+        # Fallback to Mafia Chat if they belong to Villain faction
+        if player_state.faction != "Villain":
             return
 
         guild = self.bot.get_guild(target_session.game_handle.guild_id)

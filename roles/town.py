@@ -193,7 +193,7 @@ class LDeduction(NightAction):
         scan_count = scans.get(str(target_id), 0) + 1
         scans[str(target_id)] = scan_count
 
-        faction = target_player.faction
+        faction = target_player.metadata.get("disguised_faction", target_player.faction)
         if target_player.metadata.get("framed"):
             faction = RoleFaction.VILLAIN.value
 
@@ -236,8 +236,8 @@ class LCrossExamination(NightAction):
         if not p1 or not p2:
             return
 
-        f1 = RoleFaction.VILLAIN.value if p1.metadata.get("framed") else p1.faction
-        f2 = RoleFaction.VILLAIN.value if p2.metadata.get("framed") else p2.faction
+        f1 = RoleFaction.VILLAIN.value if p1.metadata.get("framed") else p1.metadata.get("disguised_faction", p1.faction)
+        f2 = RoleFaction.VILLAIN.value if p2.metadata.get("framed") else p2.metadata.get("disguised_faction", p2.faction)
 
         same = (f1 == f2)
         context.payload["result"] = f"🕵️ **Cross Examination:** <@{t1}> and <@{t2}> belong to **{'the same faction' if same else 'different factions'}**."
@@ -525,8 +525,8 @@ class MaomaoComparative(NightAction):
         if not p1 or not p2:
             return
 
-        f1 = RoleFaction.VILLAIN.value if p1.metadata.get("framed") else p1.faction
-        f2 = RoleFaction.VILLAIN.value if p2.metadata.get("framed") else p2.faction
+        f1 = RoleFaction.VILLAIN.value if p1.metadata.get("framed") else p1.metadata.get("disguised_faction", p1.faction)
+        f2 = RoleFaction.VILLAIN.value if p2.metadata.get("framed") else p2.metadata.get("disguised_faction", p2.faction)
 
         same = (f1 == f2)
         context.payload["result"] = f"🧪 **Comparative Analysis:** <@{t1}> and <@{t2}> belong to **{'the same faction' if same else 'different factions'}**."
@@ -648,3 +648,229 @@ class DefaultVillager(BaseRole):
     is_unique: ClassVar[bool] = False
     cooldown_text: ClassVar[str] = "None"
     limitations_text: ClassVar[str] = "None"
+
+
+# =============================================================================
+# Kishibe (Town Killing)
+# =============================================================================
+
+class KishibeAlert(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Veteran's Instinct (Alert)",
+            description="Go on Alert tonight. Anyone who visits you will be hit with a Powerful Attack (3 charges total).",
+            priority=1
+        )
+
+    def can_use(self, session, player_state):
+        alerts = player_state.metadata.get("alerts_left", 3)
+        if alerts <= 0:
+            return False, "You have no Alert charges remaining."
+        return True, None
+
+    async def execute(self, context):
+        session = context.payload.get("session")
+        if not session:
+            return
+        pstate = session.players.get(context.user_id)
+        if not pstate:
+            return
+        alerts = pstate.metadata.get("alerts_left", 3)
+        remaining = max(0, alerts - 1)
+        context.payload["log"] = f"Kishibe went on Alert. ({remaining} charges remaining after this night)"
+        context.payload["result"] = (
+            f"🥃 **Alert Active!** You are on guard tonight. Anyone who visits you will be attacked with a Powerful Attack.\n"
+            f"Alert charges after tonight: **{remaining}/3**."
+        )
+
+    async def get_night_feedback(self, context):
+        return context.payload.get("result")
+
+
+class KishibeBrokenScrew(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Broken Screw",
+            description="(Once per game) Choose a player. If they visit you tonight while on Alert, your Alert charge is not consumed.",
+            priority=1
+        )
+
+    def can_use(self, session, player_state):
+        alerts = player_state.metadata.get("alerts_left", 3)
+        if alerts <= 0:
+            return False, "You have no Alert charges remaining."
+        if player_state.metadata.get("broken_screw_used"):
+            return False, "You have already used Broken Screw."
+        return True, None
+
+    async def execute(self, context):
+        target_id = context.target_id
+        if not target_id:
+            return
+        session = context.payload.get("session")
+        if not session:
+            return
+        pstate = session.players.get(context.user_id)
+        if not pstate:
+            return
+        pstate.metadata["broken_screw_used"] = True
+        context.payload["log"] = f"Kishibe used Broken Screw on <@{target_id}>."
+        context.payload["result"] = (
+            f"🥃 **Broken Screw Active!** You are on Alert. If <@{target_id}> visits you tonight, "
+            f"your Alert charge will be saved."
+        )
+
+    async def get_night_feedback(self, context):
+        return context.payload.get("result")
+
+
+@role_registry.register
+class Kishibe(BaseRole):
+    role_key = "kishibe"
+    priority = 1
+    tags = (RoleCategory.KILLING,)
+    is_unique = True
+    cooldown_text = "None"
+    limitations_text = "Alert has 3 charges. Broken Screw is once per game."
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [KishibeAlert(), KishibeBrokenScrew()]
+
+
+# =============================================================================
+# Kaname Tosen (Vanguard / Town Killing)
+# =============================================================================
+
+import asyncio as _asyncio_town
+
+
+class TosenBankai(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Bankai: Enma Korogi",
+            description=(
+                "Detain a player inside your Bankai. They cannot act and cannot be targeted by others tonight. "
+                "Communicate privately via DM (prefix with '.'). Next night: release or execute them."
+            ),
+            priority=1
+        )
+
+    async def execute(self, context):
+        target_id = context.target_id
+        if not target_id:
+            return
+        session = context.payload.get("session")
+        if not session:
+            return
+        tosen_state = session.players.get(context.user_id)
+        if not tosen_state:
+            return
+
+        prev_id = tosen_state.metadata.get("detained_player_id")
+        if prev_id and prev_id != target_id:
+            prev = session.players.get(prev_id)
+            if prev:
+                prev.metadata.pop("detained", None)
+
+        tosen_state.metadata["detained_player_id"] = target_id
+        prisoner_state = session.players.get(target_id)
+        if prisoner_state:
+            prisoner_state.metadata["detained"] = True
+
+        context.payload["log"] = f"Tosen detained <@{target_id}> inside Enma Korogi."
+        context.payload["result"] = (
+            f"🌑 **Bankai Active!** You have detained <@{target_id}> inside Enma Korogi.\n"
+            f"They cannot act or be targeted tonight. Communicate via DM by prefixing with **'.'**\n"
+            f"Next night: choose to **release** and detain someone new, or **execute** them."
+        )
+
+        import asyncio
+        async def _notify(s=session, p_id=target_id, bot=context.bot):
+            if not bot:
+                return
+            guild = bot.get_guild(s.game_handle.guild_id)
+            if not guild:
+                return
+            p_member = guild.get_member(p_id)
+            if p_member:
+                try:
+                    bot.message_queue.send(
+                        p_member,
+                        "🌑 **Enma Korogi - You Have Been Detained!**\n"
+                        "Kaname Tosen has imprisoned you inside his Bankai tonight.\n"
+                        "- You **cannot** perform your night ability.\n"
+                        "- You **cannot** be targeted by other players.\n"
+                        "- You **may** privately message Tosen by sending a DM starting with a dot (e.g. `.hello`)."
+                    )
+                except Exception:
+                    pass
+        asyncio.create_task(_notify())
+
+    async def get_night_feedback(self, context):
+        return context.payload.get("result")
+
+
+class TosenExecute(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Execute Prisoner",
+            description=(
+                "Execute your currently detained prisoner with absolute judgment. "
+                "Vanguard prisoner: they die, you lose execution ability permanently. "
+                "Abyss/Rogues prisoner: they die, you retain remaining executions. "
+                "Max 3 executions. Bypasses all protection and death-evasion passives."
+            ),
+            priority=2
+        )
+
+    def can_use(self, session, player_state):
+        if player_state.metadata.get("lost_execution_ability"):
+            return False, "You have permanently lost the ability to execute (you executed a Vanguard member)."
+        execs = player_state.metadata.get("executions_left", 3)
+        if execs <= 0:
+            return False, "You have no execution charges remaining (max 3 executions)."
+        if not player_state.metadata.get("detained_player_id"):
+            return False, "You have no prisoner currently detained."
+        return True, None
+
+    async def execute(self, context):
+        session = context.payload.get("session")
+        if not session:
+            return
+        tosen_state = session.players.get(context.user_id)
+        if not tosen_state:
+            return
+        prisoner_id = tosen_state.metadata.get("detained_player_id")
+        if not prisoner_id:
+            context.payload["error"] = "No prisoner to execute."
+            return
+        prisoner_state = session.players.get(prisoner_id)
+        if not prisoner_state or not prisoner_state.alive:
+            tosen_state.metadata["detained_player_id"] = None
+            context.payload["error"] = "Your prisoner is already dead."
+            return
+        kills = session.metadata.setdefault("pending_kills", {})
+        kills[prisoner_id] = kills.get(prisoner_id, []) + ["tosen_kill"]
+        context.payload["log"] = f"Tosen delivered absolute judgment upon <@{prisoner_id}>."
+        context.payload["result"] = f"🌑 **Judgment Delivered.** You have executed <@{prisoner_id}>."
+
+    async def get_night_feedback(self, context):
+        return context.payload.get("result")
+
+
+@role_registry.register
+class KanameTosen(BaseRole):
+    role_key = "tosen"
+    priority = 1
+    tags = (RoleCategory.KILLING,)
+    is_unique = True
+    cooldown_text = "None"
+    limitations_text = (
+        "Max 3 executions. Executing a Vanguard member permanently removes your execution ability. "
+        "Suzumushi passive: Bankai prisoners cannot trigger death abilities or evade death."
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [TosenBankai(), TosenExecute()]

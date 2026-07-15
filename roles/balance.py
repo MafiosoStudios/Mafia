@@ -17,6 +17,7 @@ def _roles_with_tag(tag: str, faction: RoleFaction) -> list[str]:
         if cls.faction == faction
         and tag in getattr(cls, "tags", ())
         and cls.role_key not in SPAWN_ONLY_ROLES
+        and cls.role_key != "villager"
     ]
 
 
@@ -27,6 +28,7 @@ def _all_faction_roles(faction: RoleFaction, *, unique_only: bool = False) -> li
         if cls.faction == faction
         and cls.role_key not in SPAWN_ONLY_ROLES
         and (not unique_only or getattr(cls, "is_unique", True))
+        and cls.role_key != "villager"
     ]
 
 
@@ -78,7 +80,7 @@ def _pick_town(count: int) -> list[str]:
 
 
 def _pick_mafia(count: int) -> list[str]:
-    """Guarantees goon_lord is always present, then adds support and other
+    """Guarantees frieza is always present, then adds support and other
     mafia roles as slots allow."""
     if count <= 0:
         return []
@@ -86,8 +88,8 @@ def _pick_mafia(count: int) -> list[str]:
     picks: list[str] = []
     remaining = count
 
-    # Always guarantee goon_lord
-    picks.append("goon_lord")
+    # Always guarantee frieza
+    picks.append("frieza")
     remaining -= 1
 
     if remaining <= 0:
@@ -99,13 +101,13 @@ def _pick_mafia(count: int) -> list[str]:
         support_pool.extend(_roles_with_tag(cat, RoleFaction.VILLAIN))
     support_pool = list(dict.fromkeys(support_pool))
 
-    support_choices = [k for k in support_pool if k != "goon_lord"]
+    support_choices = [k for k in support_pool if k != "frieza"]
     if support_choices:
         support_choice = random.choice(support_choices)
         picks.append(support_choice)
         remaining -= 1
 
-    # Extra mafia slots: fill with unused unique mafia roles, then pad with goon_lord.
+    # Extra mafia slots: fill with unused unique mafia roles, then pad with frieza.
     unique_pool = [
         k for k in _all_faction_roles(RoleFaction.VILLAIN, unique_only=True)
         if k not in picks
@@ -115,7 +117,7 @@ def _pick_mafia(count: int) -> list[str]:
         if unique_pool:
             picks.append(unique_pool.pop())
         else:
-            picks.append("goon_lord")
+            picks.append("frieza")
         remaining -= 1
 
     return picks

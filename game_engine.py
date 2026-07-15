@@ -297,6 +297,56 @@ class GameEngine:
             player.alive = False
             player.metadata["death_cause"] = cause
 
+            # Clear Bungee Gum bond if one of the linked players dies
+            bond = session.metadata.get("bungee_gum_bond")
+            if bond and user_id in bond:
+                session.metadata.pop("bungee_gum_bond", None)
+
+            # Tōsen — release prisoner if Tōsen dies
+            if player.role_key == "tosen":
+                prisoner_id = player.metadata.get("detained_player_id")
+                if prisoner_id:
+                    prisoner = session.players.get(prisoner_id)
+                    if prisoner:
+                        prisoner.metadata.pop("detained", None)
+                player.metadata.pop("detained_player_id", None)
+
+            # Clear detained flag if the detained player dies inside Bankai
+            if player.metadata.get("detained"):
+                for pid, pstate in session.players.items():
+                    if pstate.role_key == "tosen" and pstate.alive:
+                        if pstate.metadata.get("detained_player_id") == user_id:
+                            pstate.metadata["detained_player_id"] = None
+                player.metadata.pop("detained", None)
+
+            if cause == "frieza_kill":
+                for pid, pstate in session.players.items():
+                    if pstate.role_key == "frieza" and pstate.alive:
+                        action = session.night_actions.get(pid)
+                        if action and action.get("target_id") == user_id:
+                            kills_count = pstate.metadata.get("frieza_kills", 0) + 1
+                            pstate.metadata["frieza_kills"] = kills_count
+                            if kills_count == 3 and not pstate.metadata.get("golden_frieza"):
+                                pstate.metadata["golden_frieza"] = True
+                                async def notify_transformation(eng=self, s=session, f_id=pid):
+                                    guild = eng.bot.get_guild(s.game_handle.guild_id) if eng.bot else None
+                                    if guild:
+                                        mafia_ids = [k for k, p in s.players.items() if p.faction == RoleFaction.VILLAIN.value]
+                                        msg = (
+                                            "🌟 **Frieza Has Transformed!**\n"
+                                            "Frieza has personally eliminated 3 players and evolved into **Golden Frieza**!\n"
+                                            "☄️ *Death Beam now ignores Basic Protection.*\n"
+                                            "🛡️ *Frieza is immune to Roleblocks and cannot be redirected.*"
+                                        )
+                                        for mid in mafia_ids:
+                                            member = guild.get_member(mid)
+                                            if member:
+                                                try:
+                                                    eng.bot.message_queue.send(member, msg)
+                                                except Exception:
+                                                    pass
+                                asyncio.create_task(notify_transformation())
+
             if not death_message:
                 guild = self.bot.get_guild(session.game_handle.guild_id) if self.bot else None
                 member = guild.get_member(user_id) if guild else None
@@ -421,12 +471,57 @@ class GameEngine:
                     draw_reason=draw_reason,
                 )
             )
+            # Resolve Bungee Gum Win Sharing
+            bond = session.metadata.get("bungee_gum_bond")
+            if bond:
+                p1_id, p2_id = bond
+                p1_state = session.players.get(p1_id)
+                p2_state = session.players.get(p2_id)
+                if p1_state and p2_state and p1_state.alive and p2_state.alive:
+                    def player_wins_base(p_state):
+                        if winner_faction == "Draw":
+                            return False
+                        if winner_faction == RoleFaction.HERO.value:
+                            return p_state.faction == RoleFaction.HERO.value
+                        if winner_faction == RoleFaction.VILLAIN.value:
+                            return p_state.faction == RoleFaction.VILLAIN.value
+                        if p_state.metadata.get("has_won"):
+                            return True
+                        r_key = p_state.role_key
+                        if r_key and roles.ROLES_METADATA.get(r_key, {}).get("name") == winner_faction:
+                            return True
+                        return False
+                    
+                    if player_wins_base(p1_state) or player_wins_base(p2_state):
+                        p1_state.metadata["has_won"] = True
+                        p2_state.metadata["has_won"] = True
+
             for user_id, player in session.players.items():
+                is_winner = False
+                if winner_faction == "Draw":
+                    is_winner = False
+                elif winner_faction == RoleFaction.HERO.value:
+                    if player.faction == RoleFaction.HERO.value:
+                        is_winner = True
+                elif winner_faction == RoleFaction.VILLAIN.value:
+                    if player.faction == RoleFaction.VILLAIN.value:
+                        is_winner = True
+                else:
+                    if player.metadata.get("has_won"):
+                        is_winner = True
+                    r_key = player.role_key
+                    if r_key and roles.ROLES_METADATA.get(r_key, {}).get("name") == winner_faction:
+                        is_winner = True
+
+                if player.metadata.get("has_won"):
+                    is_winner = True
+
                 await self._database.update_statistics_for_match(
                     user_id=user_id,
                     guild_id=session.game_handle.guild_id,
                     player_faction=player.faction,
                     winner_faction=winner_faction,
+                    has_won=is_winner,
                 )
             await self._database.save_match_history(history)
             self._sessions.pop(game_id, None)
@@ -728,6 +823,21 @@ class GameEngine:
 
         if not mafia_channel:
             return
+
+        # Send spectate invite in lobby channel
+        lobby_channel = self.bot.get_channel(session.game_handle.channel_id)
+        if lobby_channel:
+            from views.game_ui import SpectateView
+            view = SpectateView(game_id, self)
+            embed = discord.Embed(
+                title=f"👀 Spectate Anime Mafia",
+                description=(
+                    "A new match has started!\n"
+                    f"Click the button below to spectate the match channel <#{mafia_channel.id}>."
+                ),
+                color=discord.Color.blue()
+            )
+            self.bot.message_queue.send(lobby_channel, embed=embed, view=view)
 
         # 2. Ping all alive players so they can find the channel easily
         # 2. Ping all alive players so they can find the channel easily
@@ -1348,7 +1458,7 @@ class GameEngine:
 
         mafia_deaths = []
         other_deaths = []
-        MAFIA_DEATH_CAUSES = {"mafia_strike", "demon_strike", "light_guess", "bang_kill"}
+        MAFIA_DEATH_CAUSES = {"mafia_strike", "frieza_kill", "demon_strike", "light_guess", "bang_kill"}
 
         for dpid in dead_this_round:
             pstate = session.players.get(dpid)
@@ -1422,6 +1532,8 @@ class GameEngine:
                 continue
             if pstate.metadata.get("roleblocked"):
                 continue
+            if pstate.metadata.get("detained"):
+                continue
             if pid not in session.night_actions:
                 return False
         return True
@@ -1443,6 +1555,17 @@ class GameEngine:
         session.metadata["magical_barriers"] = {}
         session.metadata["life_supports"] = {}
 
+        # Pre-populate Hisoka's Bloodlust challenges lookup early
+        session.metadata["bloodlust_challenges"] = {}
+        for pid, pstate in session.players.items():
+            if pstate.role_key == "hisoka" and pstate.alive:
+                if not pstate.metadata.get("roleblocked"):
+                    payload = session.night_actions.get(pid)
+                    if payload and payload.get("action_index") == 2:
+                        target_id = payload.get("target_id")
+                        if target_id:
+                            session.metadata["bloodlust_challenges"][target_id] = pid
+
         # 0. Check Makima controls before processing actions and visits
         makima_id = None
         for pid, pstate in session.players.items():
@@ -1461,9 +1584,15 @@ class GameEngine:
                 makima_state = session.players.get(makima_id)
                 
                 if controlled_state and controlled_state.alive and controlled_state.faction != RoleFaction.VILLAIN.value:
-                    last_controlled = makima_state.metadata.get("last_controlled_player")
-                    if last_controlled != controlled_pid:
-                        makima_state.metadata["last_controlled_player"] = controlled_pid
+                    if controlled_state.role_key == "kishibe" and not controlled_state.metadata.get("battle_hardened_used"):
+                        controlled_state.metadata["battle_hardened_used"] = True
+                        makima_payload["control_success"] = False
+                        makima_payload["error"] = "Your target resisted your ability."
+                        makima_payload["log"] = f"Makima attempted to control <@{controlled_pid}>, but they resisted!"
+                    else:
+                        last_controlled = makima_state.metadata.get("last_controlled_player")
+                        if last_controlled != controlled_pid:
+                            makima_state.metadata["last_controlled_player"] = controlled_pid
                         
                         # Target must perform an active visit (be in night_actions and have target_id or targets)
                         if controlled_pid in session.night_actions:
@@ -1497,19 +1626,32 @@ class GameEngine:
                         else:
                             makima_payload["control_success"] = False
                             makima_payload["error"] = "Target player did not perform an active visit."
-                    else:
-                        makima_payload["control_success"] = False
-                        makima_payload["error"] = "Cannot control the same player on consecutive nights."
                 else:
                     makima_payload["control_success"] = False
                     makima_payload["error"] = "Invalid target."
+
+        # Apply Hisoka's Bloodlust redirects directly to session.night_actions
+        challenges = session.metadata.get("bloodlust_challenges", {})
+        for actor_id, hisoka_id in challenges.items():
+            payload = session.night_actions.get(actor_id)
+            if payload:
+                if payload.get("target_id") == hisoka_id:
+                    payload["target_id"] = actor_id
+                ts = payload.get("targets", ())
+                if ts:
+                    new_ts = tuple(actor_id if target == hisoka_id else target for target in ts)
+                    if new_ts != ts:
+                        payload["targets"] = new_ts
+                if payload.get("controlled_vote_target") == hisoka_id:
+                    payload["controlled_vote_target"] = actor_id
 
         # Collect visits for history (to support Maomao)
         history = session.metadata.setdefault("night_visits_history", {})
         night_visits = history.setdefault(night_num, {})
         for actor_id, payload in list(session.night_actions.items()):
             actor_state = session.players.get(actor_id)
-            if not actor_state or not actor_state.alive or actor_state.metadata.get("roleblocked"):
+            is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
+            if not actor_state or not actor_state.alive or is_blocked:
                 continue
             targets = []
             t_id = payload.get("target_id")
@@ -1527,8 +1669,11 @@ class GameEngine:
             if not actor_state or not actor_state.alive:
                 continue
 
-            # Check roleblock early
-            if actor_state.metadata.get("roleblocked"):
+            # Check roleblock / detention early
+            is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
+            if is_blocked:
+                continue
+            if actor_state.metadata.get("detained"):
                 continue
 
             role_key = actor_state.role_key
@@ -1546,10 +1691,25 @@ class GameEngine:
 
         # Execute actions in priority order
         for priority, actor_id, payload, role_inst in action_list:
-            # Check if actor got roleblocked during the resolution
+            # Check if actor got roleblocked or detained during the resolution
             actor_state = session.players.get(actor_id)
-            if actor_state.metadata.get("roleblocked"):
+            is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
+            if is_blocked:
                 continue
+            if actor_state.metadata.get("detained"):
+                continue
+
+            # Tōsen Bankai protection: prevent most players from targeting a detained prisoner
+            if actor_state.role_key != "tosen":
+                t_id = payload.get("target_id")
+                if t_id:
+                    t_st = session.players.get(t_id)
+                    if t_st and t_st.metadata.get("detained"):
+                        continue
+                targets_list = payload.get("targets", ())
+                if targets_list:
+                    if any(session.players.get(t) and session.players[t].metadata.get("detained") for t in targets_list if session.players.get(t)):
+                        continue
 
             context = RoleContext(
                 game_id=session.game_handle.game_id,
@@ -1634,38 +1794,34 @@ class GameEngine:
                             kills = session.metadata.setdefault("pending_kills", {})
                             kills[target_pid] = kills.get(target_pid, []) + ["gates_of_babylon"]
 
-        # 4. Check Hisoka Bungee Gum matches
-        bungee_links = session.metadata.get("bungee_gum_links", {})
-        for hisoka_id, link_data in bungee_links.items():
-            if not isinstance(link_data, (list, tuple)) or len(link_data) < 2:
-                continue
-            t1, t2 = link_data[0], link_data[1]
-            t1_action = session.night_actions.get(t1, {})
-            t2_action = session.night_actions.get(t2, {})
 
-            t1_target = t1_action.get("target_id")
-            t2_target = t2_action.get("target_id")
+        # 4. Kishibe Veteran's Instinct — Alert kills
+        for pid, pstate in session.players.items():
+            if pstate.role_key == "kishibe" and pstate.alive:
+                payload = session.night_actions.get(pid)
+                if not payload:
+                    continue
+                action_idx = payload.get("action_index", 0)
+                is_alert = action_idx in (0, 1)  # 0 = Alert, 1 = Broken Screw
+                if not is_alert:
+                    continue
 
-            if t1_target == t2 or t2_target == t1:
-                hisoka_state = session.players.get(hisoka_id)
-                if hisoka_state:
-                    points = hisoka_state.metadata.get("bungee_points", 0) + 1
-                    hisoka_state.metadata["bungee_points"] = points
+                visitors = night_visits.get(pid, [])
+                for visitor_id in visitors:
+                    v_state = session.players.get(visitor_id)
+                    if v_state and v_state.alive:
+                        kills = session.metadata.setdefault("pending_kills", {})
+                        kills[visitor_id] = kills.get(visitor_id, []) + ["kishibe_alert_kill"]
 
-                    mafia_ch_id = session.metadata.get("mafia_channel_id")
-                    if mafia_ch_id:
-                        ch = self.bot.get_channel(mafia_ch_id)
-                        if ch:
-                            hisoka_mem = ch.guild.get_member(hisoka_id)
-                            if hisoka_mem:
-                                try:
-                                    self.bot.message_queue.send(
-                                        hisoka_mem,
-                                        f"{get_emoji('target')} **Bungee Gum Success!** You correctly linked <@{t1}> and <@{t2}> "
-                                        f"who visited one another! Points: **{points}/3**."
-                                    )
-                                except Exception:
-                                    pass
+                # Broken Screw: if the screw target visited, charge is saved
+                saved_charge = False
+                if action_idx == 1:
+                    screw_target = payload.get("target_id")
+                    if screw_target and screw_target in visitors:
+                        saved_charge = True
+
+                if not saved_charge:
+                    pstate.metadata["alerts_left"] = max(0, pstate.metadata.get("alerts_left", 3) - 1)
 
         # Populate heals history for the night
         heals_history = session.metadata.setdefault("heals_history", {})
@@ -1717,6 +1873,18 @@ class GameEngine:
                             ignore_protection = True
                             pstate.metadata["levi_precision_active"] = False
 
+            if "frieza_kill" in sources:
+                for pid, pstate in session.players.items():
+                    if pstate.role_key == "frieza":
+                        if pstate.metadata.get("golden_frieza"):
+                            ignore_protection = True
+
+            if "tosen_kill" in sources:
+                ignore_protection = True
+
+            if "kishibe_alert_kill" in sources:
+                ignore_protection = True
+
             # 1. Frieren's Hidden status
             if target_state.metadata.get("hidden_until_night") == night_num and not ignore_protection:
                 continue
@@ -1727,7 +1895,7 @@ class GameEngine:
                 target_faction = target_state.faction
                 for src in sources:
                     src_faction = None
-                    if src in ("mafia_strike", "demon_strike", "upper_moon"):
+                    if src in ("mafia_strike", "frieza_kill", "demon_strike", "upper_moon"):
                         src_faction = RoleFaction.VILLAIN.value
                     elif src in ("levi_kill",):
                         src_faction = RoleFaction.HERO.value
@@ -1790,17 +1958,21 @@ class GameEngine:
                 continue
 
             # Check modular role-specific survival passives (Muzan, Mahoraga)
-            target_role_cls = role_registry.get(target_state.role_key)
-            target_role_inst = target_role_cls()
-            target_ctx = RoleContext(
-                game_id=session.game_handle.game_id,
-                guild_id=session.game_handle.guild_id,
-                user_id=target_id,
-                payload={"session": session},
-                bot=self.bot
-            )
-            if await target_role_inst.resolve_protection(target_ctx, sources):
-                continue
+            if "tosen_kill" in sources:
+                # Tōsen's absolute judgment bypasses all death-evasion passives
+                pass
+            else:
+                target_role_cls = role_registry.get(target_state.role_key)
+                target_role_inst = target_role_cls()
+                target_ctx = RoleContext(
+                    game_id=session.game_handle.game_id,
+                    guild_id=session.game_handle.guild_id,
+                    user_id=target_id,
+                    payload={"session": session},
+                    bot=self.bot
+                )
+                if await target_role_inst.resolve_protection(target_ctx, sources):
+                    continue
 
             # Eliminate player — pick the flavor line for whichever kill source landed
             # (config.DEATH_MESSAGES), so every role's kill gets real variety instead
@@ -1810,6 +1982,37 @@ class GameEngine:
             cause_key = sources[-1] if sources else None
             death_msg = get_death_message(cause_key, target_name)
             await self.eliminate_player(session.game_handle.game_id, target_id, cause_key or "attack", death_message=death_msg)
+
+            # Tōsen execution faction penalty
+            if "tosen_kill" in sources:
+                for tosen_id, tosen_state in session.players.items():
+                    if tosen_state.role_key == "tosen" and tosen_state.alive:
+                        tosen_state.metadata["detained_player_id"] = None
+                        if target_state.faction == RoleFaction.HERO.value:
+                            tosen_state.metadata["lost_execution_ability"] = True
+                            tosen_state.metadata["executions_left"] = 0
+                            async def _notify_tosen_penalty(eng=self, s=session, t_id=tosen_id):
+                                g = eng.bot.get_guild(s.game_handle.guild_id) if eng.bot else None
+                                m = g.get_member(t_id) if g else None
+                                if m:
+                                    try:
+                                        eng.bot.message_queue.send(m, "⚠️ **Judicial Penalty!** You executed a fellow **Vanguard** member. You have permanently lost the ability to execute players.")
+                                    except Exception:
+                                        pass
+                            asyncio.create_task(_notify_tosen_penalty())
+                        else:
+                            execs = tosen_state.metadata.setdefault("executions_left", 3)
+                            tosen_state.metadata["executions_left"] = max(0, execs - 1)
+                            async def _notify_tosen_exec(eng=self, s=session, t_id=tosen_id, ex=max(0, tosen_state.metadata.get("executions_left", 3) - 1)):
+                                g = eng.bot.get_guild(s.game_handle.guild_id) if eng.bot else None
+                                m = g.get_member(t_id) if g else None
+                                if m:
+                                    try:
+                                        eng.bot.message_queue.send(m, f"🌑 **Execution Complete.** Executions remaining: **{ex}/3**.")
+                                    except Exception:
+                                        pass
+                            asyncio.create_task(_notify_tosen_exec())
+                        break
 
         # Check Frieren's Ancient Binding
         ancient_bindings = session.metadata.get("ancient_bindings", {})
@@ -1891,7 +2094,8 @@ class GameEngine:
                 continue
 
             # Roleblocked feedback
-            if actor_state.metadata.get("roleblocked"):
+            is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
+            if is_blocked:
                 try:
                     self.bot.message_queue.send(member, f"{get_emoji('cross')} **Your action failed because you were roleblocked tonight!**")
                 except Exception:
@@ -1921,6 +2125,10 @@ class GameEngine:
                 logger.exception("Failed to get night feedback for user %s", actor_id)
 
         # Clear temp variables
+        for pstate in session.players.values():
+            pstate.metadata.pop("disguised_faction", None)
+            pstate.metadata.pop("disguised_category", None)
+
         session.metadata.pop("pending_kills", None)
         session.metadata.pop("healed_players", None)
         session.metadata.pop("bungee_gum_links", None)
@@ -1997,11 +2205,17 @@ class GameEngine:
     async def _update_channel_mute(self, channel: discord.TextChannel, session: GameSession, mute: bool) -> None:
         """Sets message-sending overrides on `#mafia` text channel using default_role."""
         try:
-            await channel.set_permissions(channel.guild.default_role, read_messages=False, send_messages=False)
-            
             guild = channel.guild
             day_num = session.metadata.get("day_num", 1)
             import config
+            
+            # 1. Update default_role override
+            default_ow = channel.overwrites.get(guild.default_role)
+            target_send = False if mute else True
+            if not default_ow or default_ow.send_messages != target_send or default_ow.read_messages != False:
+                await channel.set_permissions(guild.default_role, read_messages=False, send_messages=target_send)
+
+            # 2. Selectively update player overrides only when necessary
             for pid, pstate in session.players.items():
                 if pstate.alive:
                     member = guild.get_member(pid)
@@ -2011,17 +2225,19 @@ class GameEngine:
                         except discord.NotFound:
                             continue
                     
+                    current_ow = channel.overwrites.get(member)
                     if pid in config.ADMIN_IDS:
-                        await channel.set_permissions(member, read_messages=True, send_messages=True)
-                    elif mute:
-                        await channel.set_permissions(member, read_messages=True, send_messages=False)
+                        if not current_ow or current_ow.send_messages != True:
+                            await channel.set_permissions(member, read_messages=True, send_messages=True)
                     else:
                         is_wounded = pstate.metadata.get("wounded_until_day") == day_num
                         is_exhausted = pstate.metadata.get("exhausted_until_day") == day_num
                         if is_wounded or is_exhausted:
-                            await channel.set_permissions(member, read_messages=True, send_messages=False)
+                            if not current_ow or current_ow.send_messages != False:
+                                await channel.set_permissions(member, read_messages=True, send_messages=False)
                         else:
-                            await channel.set_permissions(member, read_messages=True, send_messages=True)
+                            if current_ow and current_ow.send_messages is not None:
+                                await channel.set_permissions(member, read_messages=True, send_messages=None)
 
             # Non-player admins can also speak
             for admin_id in config.ADMIN_IDS:
@@ -2033,32 +2249,49 @@ class GameEngine:
                         except discord.HTTPException:
                             continue
                     if admin_member:
-                        await channel.set_permissions(admin_member, read_messages=True, send_messages=True)
+                        current_ow = channel.overwrites.get(admin_member)
+                        if not current_ow or current_ow.send_messages != True:
+                            await channel.set_permissions(admin_member, read_messages=True, send_messages=True)
         except Exception:
             logger.exception("Failed to update channel mute overrides.")
 
     async def _update_channel_mute_trial(self, channel: discord.TextChannel, session: GameSession, defendant_id: int) -> None:
         """Mutes everyone except the player currently defending on the stand."""
         try:
-            await channel.set_permissions(channel.guild.default_role, read_messages=False, send_messages=False)
-            
             guild = channel.guild
             day_num = session.metadata.get("day_num", 1)
             import config
-            for pid, pstate in session.players.items():
-                if pid == defendant_id:
-                    continue
-                member = guild.get_member(pid)
-                if not member:
-                    try:
-                        member = await guild.fetch_member(pid)
-                    except discord.NotFound:
-                        continue
-                if pid in config.ADMIN_IDS:
-                    await channel.set_permissions(member, read_messages=True, send_messages=True)
-                else:
-                    await channel.set_permissions(member, read_messages=True, send_messages=False)
             
+            # 1. Mute default_role
+            default_ow = channel.overwrites.get(guild.default_role)
+            if not default_ow or default_ow.send_messages != False or default_ow.read_messages != False:
+                await channel.set_permissions(guild.default_role, read_messages=False, send_messages=False)
+
+            # 2. Setup standard players to inherit from default_role (send_messages=None)
+            for pid, pstate in session.players.items():
+                if pstate.alive and pid != defendant_id:
+                    member = guild.get_member(pid)
+                    if not member:
+                        try:
+                            member = await guild.fetch_member(pid)
+                        except discord.NotFound:
+                            continue
+                    
+                    current_ow = channel.overwrites.get(member)
+                    if pid in config.ADMIN_IDS:
+                        if not current_ow or current_ow.send_messages != True:
+                            await channel.set_permissions(member, read_messages=True, send_messages=True)
+                    else:
+                        is_wounded = pstate.metadata.get("wounded_until_day") == day_num
+                        is_exhausted = pstate.metadata.get("exhausted_until_day") == day_num
+                        if is_wounded or is_exhausted:
+                            if not current_ow or current_ow.send_messages != False:
+                                await channel.set_permissions(member, read_messages=True, send_messages=False)
+                        else:
+                            if current_ow and current_ow.send_messages is not None:
+                                await channel.set_permissions(member, read_messages=True, send_messages=None)
+
+            # 3. Unmute the defendant explicitly
             defendant = guild.get_member(defendant_id)
             if not defendant:
                 try:
@@ -2069,12 +2302,17 @@ class GameEngine:
                 def_state = session.players.get(defendant_id)
                 is_wounded = def_state.metadata.get("wounded_until_day") == day_num if def_state else False
                 is_exhausted = def_state.metadata.get("exhausted_until_day") == day_num if def_state else False
+                
+                current_ow = channel.overwrites.get(defendant)
                 if defendant_id in config.ADMIN_IDS:
-                    await channel.set_permissions(defendant, read_messages=True, send_messages=True)
+                    if not current_ow or current_ow.send_messages != True:
+                        await channel.set_permissions(defendant, read_messages=True, send_messages=True)
                 elif is_wounded or is_exhausted:
-                    await channel.set_permissions(defendant, read_messages=True, send_messages=False)
+                    if not current_ow or current_ow.send_messages != False:
+                        await channel.set_permissions(defendant, read_messages=True, send_messages=False)
                 else:
-                    await channel.set_permissions(defendant, read_messages=True, send_messages=True)
+                    if not current_ow or current_ow.send_messages != True:
+                        await channel.set_permissions(defendant, read_messages=True, send_messages=True)
 
             # Non-player admins can also speak
             for admin_id in config.ADMIN_IDS:
@@ -2086,6 +2324,8 @@ class GameEngine:
                         except discord.HTTPException:
                             continue
                     if admin_member:
-                        await channel.set_permissions(admin_member, read_messages=True, send_messages=True)
+                        current_ow = channel.overwrites.get(admin_member)
+                        if not current_ow or current_ow.send_messages != True:
+                            await channel.set_permissions(admin_member, read_messages=True, send_messages=True)
         except Exception:
             logger.exception("Failed to set trial mute overrides.")

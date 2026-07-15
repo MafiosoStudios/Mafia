@@ -11,79 +11,142 @@ from config import get_emoji
 
 class HisokaWinCondition(WinCondition):
     def __init__(self) -> None:
-        super().__init__("WinCondition 1: Get voted out before Night 5 (revive for 3 days). WinCondition 2: Correctly predict two players visiting one another 3 times using Bungee Gum.")
+        super().__init__("Survive until the end of the game, and successfully use all abilities (Bungee Gum, Texture Surprise, Bloodlust) at least once.")
 
     def check(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
         session = context.payload.get("session")
         if not session:
             return False
         player_state = session.players.get(context.user_id)
-        if not player_state:
+        if not player_state or not player_state.alive:
             return False
         
-        # Win Condition 1: Voted out before/on night 5 and revived
-        if player_state.metadata.get("post_mortem_win"):
-            return True
-            
-        # Win Condition 2: Bungee gum 3 points
-        points = player_state.metadata.get("bungee_points", 0)
-        if points >= 3:
-            player_state.metadata["won_via_bungee"] = True
-            return True
-
-        return False
+        # Must have used all three abilities
+        used_bungee = player_state.metadata.get("bungee_gum_used", False)
+        used_texture = player_state.metadata.get("texture_surprise_used", False)
+        used_bloodlust = player_state.metadata.get("bloodlust_used", False)
+        
+        return used_bungee and used_texture and used_bloodlust
 
 
 class HisokaBungee(NightAction):
     def __init__(self) -> None:
         super().__init__(
             name="Bungee Gum",
-            description="Bungee Gum (Link two players. If one visits the other, gain 1 point. Need 3 points). Or Post-Mortem Nen abilities.",
+            description="Bind two living players together. If either wins while both are alive, the other wins too.",
             priority=4
         )
+        self.num_targets = 2
 
     async def execute(self, context: RoleContext) -> None:
         session = context.payload.get("session")
         if not session:
             return
             
-        player_state = session.players[context.user_id]
-        
-        # Check if Hisoka is revived (Post Mortem Nen active)
-        if player_state.metadata.get("revived"):
-            days_left = player_state.metadata.get("revived_days_left", 0)
-            target_id = context.target_id
-            if not target_id:
-                return
-
-            if days_left == 3:
-                # 1st Night after revival: BM (roleblock)
-                target_player = session.players.get(target_id)
-                if target_player:
-                    target_player.metadata["roleblocked"] = True
-                    context.payload["log"] = f"Hisoka blackmailed/roleblocked <@{target_id}>!"
-            elif days_left == 2:
-                # 2nd Night after revival: Farm (steal/reveal role)
-                target_player = session.players.get(target_id)
-                if target_player:
-                    context.payload["result"] = f"Hisoka farmed <@{target_id}>: Their role is **{target_player.role_key}**."
-            elif days_left == 1:
-                # 3rd Night after revival: Kill
-                kills = session.metadata.setdefault("pending_kills", {})
-                kills[target_id] = kills.get(target_id, []) + ["hisoka_nen_kill"]
-                context.payload["log"] = f"Hisoka unleashed Post-Mortem Nen and attacked <@{target_id}>!"
-            return
-
-        # Normal Bungee Gum Action: Link two players
         target1 = context.target_id
         target2 = context.payload.get("controlled_vote_target")
         if not target1 or not target2:
-            context.payload["error"] = "Must select two players to Bungee Gum."
             return
 
-        links = session.metadata.setdefault("bungee_gum_links", {})
-        links[context.user_id] = (target1, target2)
-        context.payload["log"] = f"Hisoka bungee gummed <@{target1}> and <@{target2}>."
+        # Set the bond
+        session.metadata["bungee_gum_bond"] = (target1, target2)
+        
+        # Mark ability as used
+        hisoka_state = session.players.get(context.user_id)
+        if hisoka_state:
+            hisoka_state.metadata["bungee_gum_used"] = True
+
+        # Send DMs to both linked players in the background
+        import asyncio
+        async def notify_bond(s=session, h_id=context.user_id, t1=target1, t2=target2):
+            if context.bot:
+                guild = context.bot.get_guild(s.game_handle.guild_id)
+                if guild:
+                    m1 = guild.get_member(t1)
+                    m2 = guild.get_member(t2)
+                    t1_name = m1.display_name if m1 else f"User {t1}"
+                    t2_name = m2.display_name if m2 else f"User {t2}"
+                    
+                    msg1 = f"🕸️ **Bound by Bungee Gum!**\nYou have been bound to **{t2_name}** (<@{t2}>) by Bungee Gum. If either of you fulfills their win condition while both are still alive, you both win!"
+                    msg2 = f"🕸️ **Bound by Bungee Gum!**\nYou have been bound to **{t1_name}** (<@{t1}>) by Bungee Gum. If either of you fulfills their win condition while both are still alive, you both win!"
+                    
+                    if m1:
+                        try:
+                            context.bot.message_queue.send(m1, msg1)
+                        except Exception:
+                            pass
+                    if m2:
+                        try:
+                            context.bot.message_queue.send(m2, msg2)
+                        except Exception:
+                            pass
+        asyncio.create_task(notify_bond())
+        context.payload["log"] = f"Hisoka bound <@{target1}> and <@{target2}> with Bungee Gum."
+
+
+class HisokaTextureSurprise(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Texture Surprise",
+            description="Disguise a player's faction and category to alignment/category investigations until morning.",
+            priority=3
+        )
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        uses = player_state.metadata.setdefault("texture_surprise_uses", 2)
+        if uses <= 0:
+            return False, "Texture Surprise has no uses left."
+        return True, None
+
+    async def execute(self, context: RoleContext) -> None:
+        session = context.payload.get("session")
+        if not session or not context.target_id:
+            return
+
+        player_state = session.players.get(context.user_id)
+        if player_state:
+            uses = player_state.metadata.get("texture_surprise_uses", 2)
+            player_state.metadata["texture_surprise_uses"] = max(0, uses - 1)
+            player_state.metadata["texture_surprise_used"] = True
+
+        target_player = session.players.get(context.target_id)
+        if target_player:
+            disg_faction = context.payload.get("disguised_faction", "Hero")
+            disg_category = context.payload.get("disguised_category", "neutral")
+            target_player.metadata["disguised_faction"] = disg_faction
+            target_player.metadata["disguised_category"] = disg_category
+
+        context.payload["log"] = f"Hisoka disguised <@{context.target_id}> using Texture Surprise."
+
+
+class HisokaBloodlust(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Bloodlust",
+            description="Challenge a player. Any active ability they target Hisoka with tonight is turned back onto themselves.",
+            priority=1
+        )
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        uses = player_state.metadata.setdefault("bloodlust_uses", 1)
+        if uses <= 0:
+            return False, "Bloodlust has already been used."
+        return True, None
+
+    async def execute(self, context: RoleContext) -> None:
+        session = context.payload.get("session")
+        if not session or not context.target_id:
+            return
+
+        player_state = session.players.get(context.user_id)
+        if player_state:
+            uses = player_state.metadata.get("bloodlust_uses", 1)
+            player_state.metadata["bloodlust_uses"] = max(0, uses - 1)
+            player_state.metadata["bloodlust_used"] = True
+
+        challenges = session.metadata.setdefault("bloodlust_challenges", {})
+        challenges[context.target_id] = context.user_id
+        context.payload["log"] = f"Hisoka challenged <@{context.target_id}> with Bloodlust."
 
 
 @role_registry.register
@@ -93,23 +156,29 @@ class Hisoka(BaseRole):
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "chaos")
     continues_game_after_win: ClassVar[bool] = True
     cooldown_text: ClassVar[str] = "None"
-    limitations_text: ClassVar[str] = "Bungee Gum requires two targets. Post-Mortem Nen is active for exactly 3 days."
+    limitations_text: ClassVar[str] = "Texture Surprise has 2 uses, Bloodlust has 1 use."
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [HisokaBungee()]
+        self.abilities = [HisokaBungee(), HisokaTextureSurprise(), HisokaBloodlust()]
         self.win_condition_obj = HisokaWinCondition()
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
         target_id = context.payload.get("target_id")
-        player_state = context.payload.get("session").players.get(context.user_id) if context.payload.get("session") else None
+        action_idx = context.payload.get("action_index", 0)
         
-        if player_state and player_state.metadata.get("revived"):
-            days_left = player_state.metadata.get("revived_days_left", 0)
-            if days_left == 3:
-                return f"🃏 **Post-Mortem Nen: You successfully roleblocked <@{target_id}> tonight!**"
-            elif days_left == 1:
-                return f"🃏 **Post-Mortem Nen: You unleashed Bungee Gum and killed <@{target_id}>!**"
+        if action_idx == 0:
+            target2 = context.payload.get("controlled_vote_target")
+            if target_id and target2:
+                return f"🃏 **Bungee Gum:** Linked <@{target_id}> and <@{target2}> successfully!"
+        elif action_idx == 1:
+            if target_id:
+                disg_faction = context.payload.get("disguised_faction", "Hero")
+                disg_category = context.payload.get("disguised_category", "neutral")
+                return f"🃏 **Texture Surprise:** Successfully disguised <@{target_id}> as Faction: **{disg_faction}** and Category: **{disg_category}** tonight!"
+        elif action_idx == 2:
+            if target_id:
+                return f"🃏 **Bloodlust:** Successfully challenged <@{target_id}>! Any active ability they target you with tonight will redirect back onto themselves."
         return None
 
 
@@ -205,7 +274,7 @@ class Gilgamesh(BaseRole):
 
 class ErenWinCondition(WinCondition):
     def __init__(self) -> None:
-        super().__init__("Survive until Night 8 to trigger The Rumbling, then kill everyone until you are the last one standing.")
+        super().__init__("Survive until Night 5 to trigger The Rumbling, then kill everyone until you are the last one standing.")
 
     def check(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
         session = context.payload.get("session")
@@ -216,7 +285,7 @@ class ErenWinCondition(WinCondition):
             return False
             
         current_night = session.metadata.get("night_num", 1)
-        if current_night >= 9:
+        if current_night >= 6:
             alive_players = [pid for pid, pstate in session.players.items() if pstate.alive]
             if len(alive_players) == 1 and alive_players[0] == context.user_id:
                 player_state.metadata["rumbling_win"] = True
@@ -228,7 +297,7 @@ class ErenRumble(NightAction):
     def __init__(self) -> None:
         super().__init__(
             name="Founding Vision / The Rumbling",
-            description="Founding Vision: Learn player faction. The Rumbling (Night 9+): Crush and kill a target.",
+            description="Founding Vision: Learn player faction. The Rumbling (Night 6+): Crush and kill a target.",
             priority=4
         )
 
@@ -244,7 +313,7 @@ class ErenRumble(NightAction):
         current_night = session.metadata.get("night_num", 1)
 
         # Active Rumbling: Kill
-        if current_night >= 9:
+        if current_night >= 6:
             kills = session.metadata.setdefault("pending_kills", {})
             kills[target_id] = kills.get(target_id, []) + ["rumbling"]
             context.payload["log"] = f"Eren Jaeger's Rumbling crushed <@{target_id}>!"
@@ -253,7 +322,8 @@ class ErenRumble(NightAction):
         # Normal Founding Vision: check side
         target_player = session.players.get(target_id)
         if target_player:
-            context.payload["result"] = f"Founding Vision: <@{target_id}> belongs to **{target_player.faction}**."
+            faction = target_player.metadata.get("disguised_faction", target_player.faction)
+            context.payload["result"] = f"Founding Vision: <@{target_id}> belongs to **{faction}**."
 
 
 @role_registry.register
@@ -263,7 +333,7 @@ class ErenJaeger(BaseRole):
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "apocalypse")
     is_hostile_neutral: ClassVar[bool] = True
     cooldown_text: ClassVar[str] = "None"
-    limitations_text: ClassVar[str] = "The Rumbling kills are only active Night 9 onwards."
+    limitations_text: ClassVar[str] = "The Rumbling kills are only active Night 6 onwards."
 
     def __init__(self) -> None:
         super().__init__()
@@ -271,7 +341,7 @@ class ErenJaeger(BaseRole):
         self.win_condition_obj = ErenWinCondition()
 
     def is_active_threat(self, session: Any, player_state: Any) -> bool:
-        return player_state.alive and session.metadata.get("night_num", 1) >= 9
+        return player_state.alive and session.metadata.get("night_num", 1) >= 6
 
 
 # --- Mahoraga ---

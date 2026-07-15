@@ -48,10 +48,10 @@ class AdminCog(commands.Cog):
         game_manager = getattr(self.bot, "game_manager", None)
         removed_game = False
         if game_manager:
-            session = await game_manager.get_game(ctx.guild.id)
-            if session:
+            game_handle = await game_manager.get_game_by_guild(ctx.guild.id)
+            if game_handle:
                 try:
-                    await game_manager.remove_game(ctx.guild.id)
+                    await game_manager.remove_game(game_handle.game_id)
                     removed_game = True
                 except Exception:
                     pass
