@@ -333,6 +333,12 @@ class NightAbilityButtonsView(discord.ui.View):
             if ability.name == "Texture Surprise":
                 select = TextureSurpriseStep1(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
+            elif ability.name == "Brew Potion":
+                select = MaomaoBrewPotionStep1(self.game_id, self.engine, ability, idx, options)
+                view.add_item(select)
+            elif ability.name == "Demon Detection":
+                select = FrierenDemonDetectionStep1(self.game_id, self.engine, ability, idx, options)
+                view.add_item(select)
             elif ability.num_targets == 2:
                 select = TwoTargetSelectStep1(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
@@ -350,6 +356,10 @@ class NightAbilityButtonsView(discord.ui.View):
 
             if ability.name == "Texture Surprise":
                 await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the player to disguise:", view=view)
+            elif ability.name == "Brew Potion":
+                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the potion you want to brew:", view=view)
+            elif ability.name == "Demon Detection":
+                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the first target:", view=view)
             elif ability.num_targets == 2:
                 await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the first target:", view=view)
             else:
@@ -529,6 +539,155 @@ class TextureSurpriseStep3(discord.ui.Select):
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
         await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered. Target <@{self.target_id}> will appear as faction **{self.faction_choice}** and category **{category_choice}** tonight.", view=None)
+
+
+class MaomaoBrewPotionStep1(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target_options: list[discord.SelectOption]) -> None:
+        potion_options = [
+            discord.SelectOption(label="Potion of Truth (Faction)", value="truth", description="Reveals the target's faction"),
+            discord.SelectOption(label="Potion of Invisibility (Untargetable)", value="invisibility", description="Makes target invisible tonight"),
+            discord.SelectOption(label="Potion of Happiness (Roleblock)", value="happiness", description="Distracts (roleblocks) the target"),
+            discord.SelectOption(label="Potion of Revitalization (Cooldown)", value="revitalization", description="Restores target's cooldowns"),
+            discord.SelectOption(label="Potion of Intelligence (+1 Vote)", value="intelligence", description="Gains target +1 vote for tomorrow")
+        ]
+        super().__init__(placeholder="Select a potion to brew...", options=potion_options)
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.target_options = target_options
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        potion_choice = self.values[0]
+        view = discord.ui.View(timeout=120)
+        select2 = MaomaoBrewPotionStep2(self.game_id, self.engine, self.ability, self.action_index, potion_choice, self.target_options)
+        view.add_item(select2)
+        
+        back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
+        async def back_callback(inter: discord.Interaction) -> None:
+            session = await self.engine.get_session(self.game_id)
+            if session:
+                from views.game_ui import NightAbilityButtonsView
+                role_inst = session.players[interaction.user.id].role_inst
+                orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
+                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+        back_btn.callback = back_callback
+        view.add_item(back_btn)
+        
+        potion_label = next(opt.label for opt in self.options if opt.value == potion_choice)
+        await interaction.response.edit_message(content=f"Brewing **{potion_label}**.\nSelect the player to use it on:", view=view)
+
+
+class MaomaoBrewPotionStep2(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, potion_choice: str, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select target player...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.potion_choice = potion_choice
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        target_id = int(self.values[0])
+        payload = {
+            "action_index": self.action_index,
+            "target_id": target_id,
+            "potion_choice": self.potion_choice
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
+        potion_names = {
+            "truth": "Potion of Truth",
+            "invisibility": "Potion of Invisibility",
+            "happiness": "Potion of Happiness",
+            "revitalization": "Potion of Revitalization",
+            "intelligence": "Potion of Intelligence"
+        }
+        potion_name = potion_names.get(self.potion_choice, "Potion")
+        await interaction.response.edit_message(content=f"Successfully queued **{potion_name}** on <@{target_id}>.", view=None)
+
+
+class FrierenDemonDetectionStep1(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select first target...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.target_options = options
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        target1 = int(self.values[0])
+        options2 = [opt for opt in self.target_options if opt.value != str(target1)]
+        view = discord.ui.View(timeout=120)
+        select2 = FrierenDemonDetectionStep2(self.game_id, self.engine, self.ability, self.action_index, target1, options2, self.target_options)
+        view.add_item(select2)
+        
+        back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
+        async def back_callback(inter: discord.Interaction) -> None:
+            session = await self.engine.get_session(self.game_id)
+            if session:
+                from views.game_ui import NightAbilityButtonsView
+                role_inst = session.players[interaction.user.id].role_inst
+                orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
+                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+        back_btn.callback = back_callback
+        view.add_item(back_btn)
+        
+        await interaction.response.edit_message(content=f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:", view=view)
+
+
+class FrierenDemonDetectionStep2(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target1: int, options: list[discord.SelectOption], original_options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select second target...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.target1 = target1
+        self.original_options = original_options
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        target2 = int(self.values[0])
+        options3 = [opt for opt in self.original_options if opt.value != str(self.target1) and opt.value != str(target2)]
+        view = discord.ui.View(timeout=120)
+        select3 = FrierenDemonDetectionStep3(self.game_id, self.engine, self.ability, self.action_index, self.target1, target2, options3)
+        view.add_item(select3)
+        
+        back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
+        async def back_callback(inter: discord.Interaction) -> None:
+            session = await self.engine.get_session(self.game_id)
+            if session:
+                from views.game_ui import NightAbilityButtonsView
+                role_inst = session.players[interaction.user.id].role_inst
+                orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
+                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+        back_btn.callback = back_callback
+        view.add_item(back_btn)
+        
+        await interaction.response.edit_message(content=f"Using **{self.ability.name}**.\nSelect the third target to pair with <@{self.target1}> and <@{target2}>:", view=view)
+
+
+class FrierenDemonDetectionStep3(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target1: int, target2: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select third target...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.target1 = target1
+        self.target2 = target2
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        target3 = int(self.values[0])
+        payload = {
+            "action_index": self.action_index,
+            "target_id": self.target1,
+            "targets": (self.target1, self.target2, target3)
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
+        await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered on <@{self.target1}>, <@{self.target2}>, and <@{target3}>.", view=None)
 
 
 class StandardActionSelect(discord.ui.Select):

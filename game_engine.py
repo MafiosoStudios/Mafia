@@ -290,12 +290,15 @@ class GameEngine:
         cause: str,
         *,
         death_message: str | None = None,
+        killer_id: int | None = None,
     ) -> None:
         async with self._lock:
             session = self._require_session(game_id)
             player = session.players[user_id]
             player.alive = False
             player.metadata["death_cause"] = cause
+            if killer_id:
+                player.metadata["killer_id"] = killer_id
 
             # Clear Bungee Gum bond if one of the linked players dies
             bond = session.metadata.get("bungee_gum_bond")
@@ -884,9 +887,11 @@ class GameEngine:
                 session.night_actions.clear()
                 session.votes.clear()
 
-                # Reset temporary per-night flags
+                # Reset temporary per-night flags and vote weights
                 for pstate in session.players.values():
                     pstate.metadata.pop("roleblocked", None)
+                    pstate.vote_weight = 1
+                session.metadata.pop("geass_target", None)
 
                 # Mute all in #mafia for night
                 await self._update_channel_mute(mafia_channel, session, mute=True)
@@ -980,9 +985,13 @@ class GameEngine:
                 # Unmute alive in #mafia for discussion
                 await self._update_channel_mute(mafia_channel, session, mute=False)
 
-                # Discussion Timer
+                # Discussion Timer (can be interrupted by Lelouch's Rebellion)
                 day_time = settings.get("day_duration", 120)
-                await asyncio.sleep(day_time)
+                session.metadata.pop("rebellion_triggered", None)
+                for _ in range(0, day_time, 2):
+                    if session.metadata.get("rebellion_triggered"):
+                        break
+                    await asyncio.sleep(2)
 
                 # Day Voting Loop (supports returning to voting phase on successful retrial)
                 break_to_voting = False
@@ -1050,8 +1059,13 @@ class GameEngine:
 
                     # Calculate Vote Results
                     tally: dict[int, int] = {}
-                    for target_id in session.votes.values():
-                        tally[target_id] = tally.get(target_id, 0) + 1
+                    geass_target = session.metadata.get("geass_target")
+                    for voter_id, nominated_id in session.votes.items():
+                        voter_state = session.players.get(voter_id)
+                        weight = voter_state.vote_weight if voter_state else 1
+                        if nominated_id == geass_target:
+                            weight *= 2
+                        tally[nominated_id] = tally.get(nominated_id, 0) + weight
 
                     # Skip calculation
                     skip_count = len(session.metadata.get("skip_votes", set()))
@@ -1220,8 +1234,18 @@ class GameEngine:
 
                             # No retrial triggered, process the verdict normally
                             verdict_data = session.metadata.get("verdicts", {})
-                            guilty_count = sum(1 for v in verdict_data.values() if v == "guilty")
-                            inno_count = sum(1 for v in verdict_data.values() if v == "innocent")
+                            geass_target = session.metadata.get("geass_target")
+                            guilty_count = 0
+                            inno_count = 0
+                            for voter_id, decision in verdict_data.items():
+                                voter_state = session.players.get(voter_id)
+                                weight = voter_state.vote_weight if voter_state else 1
+                                if decision == "guilty":
+                                    if target_id == geass_target:
+                                        weight *= 2
+                                    guilty_count += weight
+                                elif decision == "innocent":
+                                    inno_count += weight
 
                             # Verdict results output
                             verdict_report_lines = []
@@ -1263,6 +1287,22 @@ class GameEngine:
                                     break_to_voting = False
                                     break
                                 else:
+                                    # Check Lelouch Zero Requiem lynch trigger
+                                    if def_state.role_key == "lelouch":
+                                        def_state.metadata["lelouch_lynched"] = True
+                                        await self.bot.message_queue.send(
+                                            mafia_channel,
+                                            embed=discord.Embed(
+                                                title=f"👑 Zero Requiem Activated!",
+                                                description=(
+                                                    f"**{defendant_name}** (Lelouch Lamperouge) has been executed by the town!\n\n"
+                                                    f"This was all part of his master plan to focus the world's hatred on himself and die, breaking the cycle of hatred.\n\n"
+                                                    f"🏆 **Lelouch Lamperouge wins the game!**"
+                                                ),
+                                                color=discord.Color.purple()
+                                            )
+                                        )
+
                                     # Check Hisoka Post-Mortem Nen lynch trigger
                                     if def_state.role_key == "hisoka" and night_num <= 5:
                                         def_state.metadata["post_mortem_win"] = True
@@ -1567,7 +1607,7 @@ class GameEngine:
         
         # New modular protection queues
         session.metadata["doctor_heals"] = {}
-        session.metadata["water_walls"] = {}
+        session.metadata["flying_thunder_counters"] = {}
         session.metadata["magical_barriers"] = {}
         session.metadata["life_supports"] = {}
 
@@ -1770,6 +1810,38 @@ class GameEngine:
                         asyncio.create_task(notify_union())
                         continue
 
+            # Invisibility check (Potion of Invisibility)
+            if actor_state.role_key != "maomao":
+                t_id = payload.get("target_id")
+                if t_id:
+                    t_st = session.players.get(t_id)
+                    if t_st and t_st.metadata.get("invisible"):
+                        payload["error"] = "Your target was invisible tonight."
+                        payload["log"] = f"{actor_state.character_name} attempted to target <@{t_id}>, but they were invisible."
+                        if self.bot:
+                            g = self.bot.get_guild(session.game_handle.guild_id)
+                            m = g.get_member(actor_id) if g else None
+                            if m:
+                                try:
+                                    self.bot.message_queue.send(m, f"❌ **Your action tonight failed because your target was invisible!**")
+                                except Exception:
+                                    pass
+                        continue
+                targets_list = payload.get("targets", ())
+                if targets_list:
+                    if any(session.players.get(t) and session.players[t].metadata.get("invisible") for t in targets_list if session.players.get(t)):
+                        payload["error"] = "One of your targets was invisible tonight."
+                        payload["log"] = f"{actor_state.character_name} attempted to target an invisible player."
+                        if self.bot:
+                            g = self.bot.get_guild(session.game_handle.guild_id)
+                            m = g.get_member(actor_id) if g else None
+                            if m:
+                                try:
+                                    self.bot.message_queue.send(m, f"❌ **Your action tonight failed because one of your targets was invisible!**")
+                                except Exception:
+                                    pass
+                        continue
+
             # Tōsen Bankai protection: prevent most players from targeting a detained prisoner
             if actor_state.role_key != "tosen":
                 t_id = payload.get("target_id")
@@ -1904,10 +1976,7 @@ class GameEngine:
             session.metadata.setdefault("healed_players", {})[tid] = doc_id
             session.metadata["healed_players"][tid + 1000000] = doc_id
             
-        water_walls = session.metadata.get("water_walls", {})
-        for tid in water_walls:
-            night_heals[tid] = True
-            
+        # (Water walls replaced by Flying Thunder Counter)
         magical_barriers = session.metadata.get("magical_barriers", {})
         for tid in magical_barriers:
             night_heals[tid] = True
@@ -1922,6 +1991,86 @@ class GameEngine:
             if not target_state or not target_state.alive:
                 continue
 
+            # 0. Tobirama's Flying Thunder Counter
+            flying_thunder_counters = session.metadata.get("flying_thunder_counters", {})
+            if target_id in flying_thunder_counters:
+                tobirama_id = flying_thunder_counters[target_id]
+                
+                # Find all attackers targeting this player tonight
+                attackers = []
+                for pid, action in session.night_actions.items():
+                    if pid == target_id:
+                        continue
+                    pstate = session.players.get(pid)
+                    if not pstate:
+                        continue
+                    t_id = action.get("target_id")
+                    targets = action.get("targets", ())
+                    if t_id == target_id or target_id in targets or action.get("controlled_vote_target") == target_id:
+                        is_attacker = False
+                        if pstate.role_key in ("frieza", "upper_moon", "makima", "light_yagami", "levi_ackerman", "kishibe"):
+                            is_attacker = True
+                        elif pstate.faction in (RoleFaction.VILLAIN.value, RoleFaction.NEUTRAL.value):
+                            is_attacker = True
+                        
+                        if is_attacker and pid not in attackers:
+                            attackers.append(pid)
+                            
+                # Handle unstoppable sources that might not be in night_actions tonight
+                for src in sources:
+                    if src == "devils_pen_kill":
+                        for pid, pstate in session.players.items():
+                            if pstate.role_key == "light_yagami" and pid not in attackers:
+                                attackers.append(pid)
+                    elif src == "gates_of_babylon":
+                        for pid, pstate in session.players.items():
+                            if pstate.role_key == "gilgamesh" and pid not in attackers:
+                                attackers.append(pid)
+                                
+                # Notify Tobirama Senju of the attackers (always runs)
+                if self.bot:
+                    tobirama_member = guild.get_member(tobirama_id) if guild else None
+                    if tobirama_member:
+                        attackers_str = ", ".join([f"<@{atk}>" for atk in attackers]) if attackers else "an unknown force"
+                        msg = (
+                            f"⚡ **Flying Thunder Counter Triggered!**\n"
+                            f"You countered the attack on <@{target_id}>.\n"
+                            f"🕵️‍♂️ **Attacker(s) detected:** {attackers_str}"
+                        )
+                        self.bot.message_queue.send(tobirama_member, msg)
+                        
+                # Determine if there's any unstoppable/ignore-protection attack
+                has_unstoppable = False
+                unpreventable_sources = ("devils_pen_kill", "gates_of_babylon", "bang_kill")
+                if any(src in unpreventable_sources for src in sources):
+                    has_unstoppable = True
+                    
+                if "levi_kill" in sources:
+                    for pid, pstate in session.players.items():
+                        if pstate.role_key == "levi_ackerman" and pstate.metadata.get("levi_precision_active"):
+                            has_unstoppable = True
+                            
+                if "frieza_kill" in sources:
+                    for pid, pstate in session.players.items():
+                        if pstate.role_key == "frieza" and pstate.metadata.get("golden_frieza"):
+                            has_unstoppable = True
+                            
+                if "tosen_kill" in sources or "kishibe_alert_kill" in sources:
+                    has_unstoppable = True
+                    
+                if not has_unstoppable:
+                    # Also notify the target player they were saved
+                    if self.bot:
+                        target_member = guild.get_member(target_id) if guild else None
+                        if target_member:
+                            self.bot.message_queue.send(
+                                target_member,
+                                f"⚡ **Flying Thunder Counter!** You were targeted for an attack tonight, but Tobirama Senju intercepted and nullified it!"
+                            )
+                    # Register the save in heals history and skip further damage processing
+                    session.metadata.setdefault("heals_history", {}).setdefault(night_num, {})[target_id] = True
+                    continue
+
             # Check unpreventable kills (Devils Pen/Apocalypse/Bang)
             unpreventable_sources = ("devils_pen_kill", "gates_of_babylon", "bang_kill")
             if any(src in unpreventable_sources for src in sources):
@@ -1932,7 +2081,17 @@ class GameEngine:
                     death_msg = f"{get_emoji('makima')} **{target_name} was blown to pieces by an invisible force.**"
                 else:
                     death_msg = get_death_message(cause_key, target_name)
-                await self.eliminate_player(session.game_handle.game_id, target_id, "darkness", death_message=death_msg)
+                
+                # Determine killer_id
+                killer_id = None
+                if cause_key == "devils_pen_kill":
+                    killer_id = next((pid for pid, pstate in session.players.items() if pstate.role_key == "light_yagami"), None)
+                elif cause_key == "gates_of_babylon":
+                    killer_id = next((pid for pid, pstate in session.players.items() if pstate.role_key == "gilgamesh"), None)
+                elif cause_key == "bang_kill":
+                    killer_id = next((pid for pid, pstate in session.players.items() if pstate.role_key == "makima"), None)
+                
+                await self.eliminate_player(session.game_handle.game_id, target_id, "darkness", death_message=death_msg, killer_id=killer_id)
                 continue
 
             # Determine if this attack ignores protection (Levi's Precision strike)
@@ -1983,10 +2142,7 @@ class GameEngine:
                 session.metadata.setdefault("heals_history", {}).setdefault(night_num, {})[target_id] = True
                 continue
 
-            # 3. Tobirama's Water Wall
-            if target_id in water_walls and not ignore_protection:
-                session.metadata.setdefault("heals_history", {}).setdefault(night_num, {})[target_id] = True
-                continue
+            # (Water Wall check removed, now handled by Flying Thunder Counter above)
 
             # 4. Doctor Tenma heal protection
             if target_id in healed_players and not ignore_protection:
@@ -2032,6 +2188,9 @@ class GameEngine:
             if "tosen_kill" in sources:
                 # Tōsen's absolute judgment bypasses all death-evasion passives
                 pass
+            elif session.metadata.get("zoltraak_active") and target_state.faction != RoleFaction.HERO.value:
+                # Zoltraak disables passives of all opposing faction members (Villains and Neutrals)
+                pass
             else:
                 target_role_cls = role_registry.get(target_state.role_key)
                 target_role_inst = target_role_cls()
@@ -2052,7 +2211,41 @@ class GameEngine:
             target_name = target_mem.display_name if target_mem else f"User {target_id}"
             cause_key = sources[-1] if sources else None
             death_msg = get_death_message(cause_key, target_name)
-            await self.eliminate_player(session.game_handle.game_id, target_id, cause_key or "attack", death_message=death_msg)
+            
+            # Trace killer_id from cause_key and session.night_actions
+            killer_id = None
+            if cause_key:
+                for pid, action in session.night_actions.items():
+                    if pid == target_id:
+                        continue
+                    t_id = action.get("target_id")
+                    targets = action.get("targets", ())
+                    if t_id == target_id or target_id in targets or action.get("controlled_vote_target") == target_id:
+                        pstate = session.players.get(pid)
+                        if pstate:
+                            match = False
+                            if pstate.role_key == "frieza" and cause_key == "frieza_kill":
+                                match = True
+                            elif pstate.role_key == "upper_moon" and cause_key in ("demon_strike", "upper_moon"):
+                                match = True
+                            elif pstate.role_key == "tosen" and cause_key == "tosen_kill":
+                                match = True
+                            elif pstate.role_key == "levi_ackerman" and cause_key == "levi_kill":
+                                match = True
+                            elif pstate.role_key == "kishibe" and cause_key == "kishibe_alert_kill":
+                                match = True
+                            elif pstate.role_key == "makima" and cause_key == "bang_kill":
+                                match = True
+                            elif pstate.role_key == "light_yagami" and cause_key in ("light_guess", "devils_pen_kill"):
+                                match = True
+                            elif pstate.faction == RoleFaction.VILLAIN.value and cause_key == "mafia_strike":
+                                match = True
+                            
+                            if match:
+                                killer_id = pid
+                                break
+                                
+            await self.eliminate_player(session.game_handle.game_id, target_id, cause_key or "attack", death_message=death_msg, killer_id=killer_id)
 
             # Tōsen execution faction penalty
             if "tosen_kill" in sources:
@@ -2201,11 +2394,13 @@ class GameEngine:
             pstate.metadata.pop("disguised_category", None)
             pstate.metadata.pop("nullified", None)
             pstate.metadata.pop("black_divider_nullified", None)
+            pstate.metadata.pop("invisible", None)
 
         session.metadata.pop("pending_kills", None)
         session.metadata.pop("healed_players", None)
         session.metadata.pop("bungee_gum_links", None)
         session.metadata.pop("devil_union_active", None)
+        session.metadata.pop("zoltraak_active", None)
 
     async def _notify_muzan_conversion(
         self,

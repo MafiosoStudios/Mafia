@@ -111,6 +111,9 @@ class HisokaTextureSurprise(NightAction):
 
         target_player = session.players.get(context.target_id)
         if target_player:
+            if target_player.role_key == "ayanokoji_kiyotaka":
+                context.payload["log"] = "Hisoka attempted to disguise Ayanokoji, but Ayanokoji's Unreadable passive resisted it."
+                return
             disg_faction = context.payload.get("disguised_faction", "Hero")
             disg_category = context.payload.get("disguised_category", "neutral")
             target_player.metadata["disguised_faction"] = disg_faction
@@ -422,3 +425,67 @@ class Mahoraga(BaseRole):
         super().__init__()
         self.passives = [MahoragaAdapt()]
         self.win_condition_obj = MahoragaWinCondition()
+
+
+class LelouchGeass(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Geass",
+            description="Choose a player tonight. All votes towards them tomorrow (both nomination and voting phases) will count double. Cooldown: 1 Night.",
+            priority=5
+        )
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        last_used = player_state.metadata.get("geass_last_used", -1)
+        current_night = session.metadata.get("night_num", 1)
+        if last_used == current_night - 1:
+            return False, "Geass is on cooldown tonight."
+        return True, None
+
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        return [pid for pid, pstate in session.players.items() if pstate.alive and pid != actor_id]
+
+    async def execute(self, context: RoleContext) -> None:
+        target_id = context.target_id
+        session = context.payload.get("session")
+        if not target_id or not session:
+            return
+
+        player_state = session.players[context.user_id]
+        player_state.metadata["geass_last_used"] = session.metadata.get("night_num", 1)
+
+        session.metadata["geass_target"] = target_id
+        context.payload["result"] = f"👁️ **Geass:** You have commanded <@{target_id}>. All votes towards them tomorrow will be doubled."
+
+
+@role_registry.register
+class LelouchLamperouge(BaseRole):
+    role_key: ClassVar[str] = "lelouch"
+    priority: ClassVar[int] = 5
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
+    cooldown_text: ClassVar[str] = "Geass: 1 Night, Black Knight: Once per game"
+    limitations_text: ClassVar[str] = "None"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [LelouchGeass()]
+
+    def win_condition_met(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
+        session = context.payload.get("session")
+        if not session:
+            return False
+
+        # Win Condition 1: All Protagonists (Heroes) are dead
+        alive_heroes = [pid for pid, pstate in session.players.items() if pstate.alive and pstate.faction == RoleFaction.HERO.value]
+        if not alive_heroes:
+            return True
+
+        # Win Condition 2: Lelouch was lynched (Zero Requiem)
+        player_state = session.players.get(context.user_id)
+        if player_state and player_state.metadata.get("lelouch_lynched"):
+            return True
+
+        return False
+
+    async def get_night_feedback(self, context: RoleContext) -> str | None:
+        return context.payload.get("result")

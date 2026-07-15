@@ -89,7 +89,7 @@ class AyanokojiObservation(NightAction):
     def __init__(self) -> None:
         super().__init__(
             name="Observation",
-            description="Observe a player. Learn whether they: Used an ability / Did not use an ability.",
+            description="Observe a player during the Night. Learn who they visited and who visited them.",
             priority=9
         )
 
@@ -102,27 +102,69 @@ class AyanokojiObservation(NightAction):
         if not target_id or not session:
             return
 
-        target_action = session.night_actions.get(target_id)
         target_state = session.players.get(target_id)
+        if not target_state:
+            return
 
-        used_ability = False
-        if target_action and target_state:
-            if not target_state.metadata.get("roleblocked"):
-                used_ability = True
+        # 1. Who they visited (successful actions)
+        visited_ids = []
+        target_action = session.night_actions.get(target_id)
+        if target_action and not target_state.metadata.get("roleblocked") and not target_state.metadata.get("nullified") and not target_state.metadata.get("black_divider_nullified"):
+            t_id = target_action.get("target_id")
+            if t_id:
+                visited_ids.append(t_id)
+            targets = target_action.get("targets", ())
+            for t in targets:
+                if t not in visited_ids:
+                    visited_ids.append(t)
+            ctrl_target = target_action.get("controlled_vote_target")
+            if ctrl_target and ctrl_target not in visited_ids:
+                visited_ids.append(ctrl_target)
 
-        context.payload["result"] = f"🧠 **Observation Result:** <@{target_id}> **{'used' if used_ability else 'did not use'}** an ability tonight."
+        # 2. Who visited them
+        visitors = []
+        for pid, action in session.night_actions.items():
+            pstate = session.players.get(pid)
+            if not pstate or pstate.metadata.get("roleblocked") or pstate.metadata.get("nullified") or pstate.metadata.get("black_divider_nullified"):
+                continue
+            t_id = action.get("target_id")
+            targets = action.get("targets", ())
+            if t_id == target_id or target_id in targets or action.get("controlled_vote_target") == target_id:
+                visitors.append(pid)
+
+        visited_str = ", ".join([f"<@{v}>" for v in visited_ids]) if visited_ids else "nobody"
+        visitors_str = ", ".join([f"<@{v}>" for v in visitors]) if visitors else "nobody"
+
+        context.payload["result"] = (
+            f"🧠 **Observation Result:** <@{target_id}> visited **{visited_str}**.\n"
+            f"🕵️‍♂️ They were visited by: **{visitors_str}**.\n"
+            f'*"People reveal more through their actions than their words."*'
+        )
 
 
-class AyanokojiPsychological(NightAction):
+class AyanokojiPublicReveal(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Psychological Analysis",
-            description="Analyze a player. Learn whether they: Visited another player / Stayed home.",
+            name="Public Reveal",
+            description="Starting from night 4, publicly reveal the role of your target. Cooldown: 4 Days.",
             priority=9
         )
 
     def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
         return [pid for pid in super().get_eligible_targets(session, actor_id) if pid != actor_id]
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        current_night = session.metadata.get("night_num", 1)
+        if current_night < 4:
+            return False, "Public Reveal is locked until Night 4."
+
+        last_used = player_state.metadata.get("ayanokoji_reveal_last_used")
+        if last_used is not None:
+            nights_passed = current_night - last_used
+            if nights_passed < 4:
+                return False, f"Public Reveal is on cooldown. You can use it again in {4 - nights_passed} Nights."
+
+        return True, None
 
     async def execute(self, context: RoleContext) -> None:
         target_id = context.target_id
@@ -130,21 +172,49 @@ class AyanokojiPsychological(NightAction):
         if not target_id or not session:
             return
 
-        target_action = session.night_actions.get(target_id)
-        target_state = session.players.get(target_id)
+        target_player = session.players.get(target_id)
+        if not target_player:
+            return
 
-        visited = False
-        if target_action and target_state:
-            if not target_state.metadata.get("roleblocked"):
-                t_id = target_action.get("target_id")
-                if t_id is not None and t_id != target_id:
-                    visited = True
-                elif target_action.get("controlled_vote_target") is not None:
-                    visited = True
-                elif target_action.get("targets"):
-                    visited = True
+        player_state = session.players[context.user_id]
+        player_state.metadata["ayanokoji_reveal_last_used"] = session.metadata.get("night_num", 1)
 
-        context.payload["result"] = f"🧠 **Psychological Analysis:** <@{target_id}> **{'visited another player' if visited else 'stayed home'}** tonight."
+        role_key = target_player.role_key
+        faction = target_player.faction
+
+        import discord
+        import roles
+        role_meta = roles.ROLES_METADATA.get(role_key, {})
+        role_display = role_meta.get("name", role_key.replace('_', ' ').title())
+
+        faction_display = "Protagonist" if faction == RoleFaction.HERO.value else ("Antagonist" if faction == RoleFaction.VILLAIN.value else "Neutral")
+
+        # Send public reveal message to the mafia channel
+        mafia_ch_id = session.metadata.get("mafia_channel_id")
+        if mafia_ch_id and context.bot:
+            ch = context.bot.get_channel(mafia_ch_id)
+            if not ch:
+                try:
+                    ch = await context.bot.fetch_channel(mafia_ch_id)
+                except Exception:
+                    pass
+            if ch:
+                embed = discord.Embed(
+                    title="👁️ Ayanokoji Kiyotaka — Mastermind Revelation",
+                    description=(
+                        f"Ayanokoji Kiyotaka has analyzed the targets from the shadows and exposed a player's true identity!\n\n"
+                        f"👤 **Player:** <@{target_id}>\n"
+                        f"🎭 **True Role:** **{role_display}**\n"
+                        f"🍏 **Faction:** **{faction_display}**"
+                    ),
+                    color=discord.Color.purple()
+                )
+                footer_img = role_meta.get("image_url")
+                if footer_img:
+                    embed.set_thumbnail(url=footer_img)
+                await context.bot.message_queue.send(ch, embed=embed)
+
+        context.payload["result"] = f"👁️ **Public Reveal:** You have publicly exposed <@{target_id}> as the **{role_display}** ({faction_display})."
 
 
 @role_registry.register
@@ -152,12 +222,12 @@ class AyanokojiKiyotaka(BaseRole):
     role_key: ClassVar[str] = "ayanokoji_kiyotaka"
     priority: ClassVar[int] = 9
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
-    cooldown_text: ClassVar[str] = "None"
-    limitations_text: ClassVar[str] = "None"
+    cooldown_text: ClassVar[str] = "Public Reveal: 4 Days (Available from Night 4)"
+    limitations_text: ClassVar[str] = "Unreadable: Immune to Framing, Forging, Mimicry, and other role/faction deceptions."
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [AyanokojiObservation(), AyanokojiPsychological()]
+        self.abilities = [AyanokojiObservation(), AyanokojiPublicReveal()]
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
         return context.payload.get("result")
@@ -294,18 +364,18 @@ class TobiramaSensory(NightAction):
             context.payload["result"] = f"🌊 **Sensory Technique:** Nobody visited <@{target_id}> tonight."
 
 
-class TobiramaWaterWall(NightAction):
+class TobiramaFlyingThunderCounter(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Water Wall",
-            description="Protect a player from the first basic attack tonight. (2 uses)",
+            name="Flying Thunder Counter",
+            description="Choose a player tonight. If they are attacked, completely nullify that attack even if it's unstoppable, and learn who the attackers were. (2 uses)",
             priority=1
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
-        uses = player_state.metadata.setdefault("tobirama_wall_uses", 2)
+        uses = player_state.metadata.setdefault("tobirama_counter_uses", 2)
         if uses <= 0:
-            return False, "Water Wall has no uses left."
+            return False, "Flying Thunder Counter has no uses left."
         return True, None
 
     async def execute(self, context: RoleContext) -> None:
@@ -315,11 +385,11 @@ class TobiramaWaterWall(NightAction):
             return
 
         player_state = session.players[context.user_id]
-        uses = player_state.metadata.get("tobirama_wall_uses", 2)
-        player_state.metadata["tobirama_wall_uses"] = max(0, uses - 1)
+        uses = player_state.metadata.get("tobirama_counter_uses", 2)
+        player_state.metadata["tobirama_counter_uses"] = max(0, uses - 1)
 
-        session.metadata.setdefault("water_walls", {})[target_id] = context.user_id
-        context.payload["result"] = f"🌊 **Water Wall:** You placed a Water Barrier around <@{target_id}>."
+        session.metadata.setdefault("flying_thunder_counters", {})[target_id] = context.user_id
+        context.payload["result"] = f"⚡ **Flying Thunder Counter:** You have marked <@{target_id}>. You will counter any attacks against them tonight."
 
 
 @role_registry.register
@@ -328,11 +398,11 @@ class TobiramaSenju(BaseRole):
     priority: ClassVar[int] = 1
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
     cooldown_text: ClassVar[str] = "None"
-    limitations_text: ClassVar[str] = "Water Wall: 2 uses"
+    limitations_text: ClassVar[str] = "Flying Thunder Counter: 2 uses"
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [TobiramaSensory(), TobiramaWaterWall()]
+        self.abilities = [TobiramaSensory(), TobiramaFlyingThunderCounter()]
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
         return context.payload.get("result")
@@ -452,22 +522,24 @@ class MaomaoPostmortem(NightAction):
     def __init__(self) -> None:
         super().__init__(
             name="Postmortem Analysis",
-            description="Examine a player who died last night to discover all of their visitors. Cooldown: 1 Night.",
+            description="Examine a corpse to suspect 3 players, one of whom is the killer. Cooldown: 2 Nights.",
             priority=5
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
         last_used = player_state.metadata.get("maomao_postmortem_last_used")
-        if last_used is not None and session.night_num - last_used < 2:
-            return False, f"Postmortem Analysis is on cooldown until Night {last_used + 2}."
+        current_night = session.metadata.get("night_num", 1)
+        if last_used is not None and current_night - last_used < 2:
+            return False, f"Postmortem Analysis is on cooldown. You can use it again in {2 - (current_night - last_used)} Nights."
         
-        dead_list = session.metadata.get("dead_last_night", [])
+        # Check if there is any dead player to analyze
+        dead_list = [pid for pid, pstate in session.players.items() if not pstate.alive]
         if not dead_list:
-            return False, "No players died last night to analyze."
+            return False, "No dead players to analyze."
         return True, None
 
     def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
-        return session.metadata.get("dead_last_night", [])
+        return [pid for pid, pstate in session.players.items() if not pstate.alive]
 
     async def execute(self, context: RoleContext) -> None:
         target_id = context.target_id
@@ -476,60 +548,131 @@ class MaomaoPostmortem(NightAction):
             return
 
         player_state = session.players[context.user_id]
-        player_state.metadata["maomao_postmortem_last_used"] = session.night_num
+        player_state.metadata["maomao_postmortem_last_used"] = session.metadata.get("night_num", 1)
 
-        history = session.metadata.get("night_visits_history", {})
-        prev_night = session.night_num - 1
-        night_visits = history.get(prev_night, {}).get(target_id, [])
+        target_player = session.players.get(target_id)
+        if not target_player:
+            return
 
-        protected = False
-        prev_heals = session.metadata.get("heals_history", {}).get(prev_night, {})
-        if target_id in prev_heals:
-            protected = True
-
-        visitors_str = ", ".join([f"<@{v}>" for v in night_visits]) if night_visits else "Nobody"
-        result_str = f"🧪 **Postmortem Analysis:** The visitors to <@{target_id}> on the night they died were: {visitors_str}."
-        if protected:
-            result_str += "\n🔍 **Keen Observation:** You sensed trace remnants of protection around the body."
+        killer_id = target_player.metadata.get("killer_id")
         
-        context.payload["result"] = result_str
+        # Base pool of candidates: all other alive players excluding Maomao
+        candidates = [pid for pid, pstate in session.players.items() if pid != context.user_id and pstate.alive]
+        
+        # If killer is not tracked or already dead, pick a fallback suspect from candidates
+        if not killer_id or killer_id not in candidates:
+            if candidates:
+                import random
+                killer_id = random.choice(candidates)
+            else:
+                killer_id = context.user_id  # fallback to self if absolutely nobody else
+
+        # Check fresh corpse (killed yesterday/last night)
+        # In game_engine.py, session.metadata["dead_last_night"] holds those killed last night
+        dead_last_night = session.metadata.get("dead_last_night", [])
+        is_fresh = target_id in dead_last_night
+
+        import random
+        guarantee_protagonist = False
+        if is_fresh:
+            if random.random() < 0.40:
+                guarantee_protagonist = True
+
+        other_names = []
+        
+        # Protagonists (alive Heroes/Protagonists excluding the killer)
+        protagonists = [
+            pid for pid in candidates 
+            if pid != killer_id 
+            and session.players[pid].faction == RoleFaction.HERO.value
+        ]
+
+        if guarantee_protagonist and protagonists:
+            protag = random.choice(protagonists)
+            other_names.append(protag)
+
+        remaining_pool = [pid for pid in candidates if pid != killer_id and pid not in other_names]
+        random.shuffle(remaining_pool)
+
+        while len(other_names) < 2 and remaining_pool:
+            other_names.append(remaining_pool.pop())
+
+        final_list = [killer_id] + other_names
+        random.shuffle(final_list)
+
+        names_str = ", ".join([f"**{session.players[pid].character_name}** (<@{pid}>)" for pid in final_list])
+
+        context.payload["result"] = (
+            f"🧪 **Postmortem Analysis:** You analyzed <@{target_id}>'s corpse.\n"
+            f"🔍 **Potential Suspects:** {names_str}\n"
+            f"*(One of these players is the killer. The others are random.)*"
+        )
 
 
-class MaomaoComparative(NightAction):
+class MaomaoBrewPotion(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Comparative Analysis",
-            description="Compare two players to learn if they belong to the same faction. Cooldown: 1 Night.",
-            priority=5
+            name="Brew Potion",
+            description="Brew a potion of your choice tonight. Cooldown: 2 Nights.",
+            priority=1
         )
-        self.num_targets = 2
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
-        last_used = player_state.metadata.get("maomao_comparative_last_used")
-        if last_used is not None and session.night_num - last_used < 2:
-            return False, f"Comparative Analysis is on cooldown until Night {last_used + 2}."
+        last_used = player_state.metadata.get("maomao_potion_last_used")
+        current_night = session.metadata.get("night_num", 1)
+        if last_used is not None and current_night - last_used < 2:
+            return False, f"Brew Potion is on cooldown. You can use it again in {2 - (current_night - last_used)} Nights."
         return True, None
 
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        return [pid for pid, pstate in session.players.items() if pstate.alive]
+
     async def execute(self, context: RoleContext) -> None:
-        targets = context.targets
+        target_id = context.target_id
         session = context.payload.get("session")
-        if len(targets) < 2 or not session:
+        if not target_id or not session:
+            return
+
+        potion_choice = context.payload.get("potion_choice")
+        if not potion_choice:
             return
 
         player_state = session.players[context.user_id]
-        player_state.metadata["maomao_comparative_last_used"] = session.night_num
+        player_state.metadata["maomao_potion_last_used"] = session.metadata.get("night_num", 1)
 
-        t1, t2 = targets[0], targets[1]
-        p1 = session.players.get(t1)
-        p2 = session.players.get(t2)
-        if not p1 or not p2:
+        target_player = session.players.get(target_id)
+        if not target_player:
             return
 
-        f1 = RoleFaction.VILLAIN.value if p1.metadata.get("framed") else p1.metadata.get("disguised_faction", p1.faction)
-        f2 = RoleFaction.VILLAIN.value if p2.metadata.get("framed") else p2.metadata.get("disguised_faction", p2.faction)
+        # Reset any existing visibility flag just in case
+        target_player.metadata.pop("invisible", None)
 
-        same = (f1 == f2)
-        context.payload["result"] = f"🧪 **Comparative Analysis:** <@{t1}> and <@{t2}> belong to **{'the same faction' if same else 'different factions'}**."
+        if potion_choice == "truth":
+            faction = target_player.metadata.get("disguised_faction", target_player.faction)
+            faction_display = "Protagonist" if faction == RoleFaction.HERO.value else ("Antagonist" if faction == RoleFaction.VILLAIN.value else "Neutral")
+            context.payload["result"] = f"🧪 **Potion of Truth:** <@{target_id}>'s faction is **{faction_display}**."
+            
+        elif potion_choice == "invisibility":
+            target_player.metadata["invisible"] = True
+            context.payload["result"] = f"🧪 **Potion of Invisibility:** You made <@{target_id}> invisible. They are immune to all night actions tonight."
+            
+        elif potion_choice == "happiness":
+            target_player.metadata["roleblocked"] = True
+            context.payload["result"] = f"🧪 **Potion of Happiness:** You distracted (roleblocked) <@{target_id}>."
+            
+        elif potion_choice == "revitalization":
+            cooldown_keys = [
+                "last_surgery_night", "last_kamehameha_night", "dazai_nullify_last_used",
+                "asta_divider_last_used", "ayanokoji_reveal_last_used", "maomao_postmortem_last_used",
+                "last_block_night", "maomao_potion_last_used"
+            ]
+            for key in cooldown_keys:
+                target_player.metadata.pop(key, None)
+            context.payload["result"] = f"🧪 **Potion of Revitalization:** Restored all ability cooldowns for <@{target_id}>."
+            
+        elif potion_choice == "intelligence":
+            target_player.vote_weight = 2
+            context.payload["result"] = f"🧪 **Potion of Intelligence:** <@{target_id}> gains +1 vote (total weight: 2) for the next day."
 
 
 @role_registry.register
@@ -537,12 +680,12 @@ class Maomao(BaseRole):
     role_key: ClassVar[str] = "maomao"
     priority: ClassVar[int] = 5
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
-    cooldown_text: ClassVar[str] = "Postmortem Analysis: 1 Night, Comparative Analysis: 1 Night"
+    cooldown_text: ClassVar[str] = "Postmortem Analysis: 2 Nights, Brew Potion: 2 Nights"
     limitations_text: ClassVar[str] = "None"
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [MaomaoPostmortem(), MaomaoComparative()]
+        self.abilities = [MaomaoPostmortem(), MaomaoBrewPotion()]
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
         return context.payload.get("result")
@@ -577,47 +720,62 @@ class FrierenAncientBinding(NightAction):
         context.payload["result"] = f"✨ **Ancient Binding:** You bound <@{targets[0]}> and <@{targets[1]}> together."
 
 
-class FrierenMagicalBarrier(NightAction):
+class FrierenDemonDetection(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Magical Barrier",
-            description="Protect a player from attacks of the opposite faction tonight.",
-            priority=1
+            name="Demon Detection",
+            description="Choose three players. You will learn how many of them belong to the antagonists faction. (No cooldown)",
+            priority=5
         )
+        self.num_targets = 3
+
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        return [pid for pid, pstate in session.players.items() if pstate.alive and pid != actor_id]
 
     async def execute(self, context: RoleContext) -> None:
-        target_id = context.target_id
+        targets = context.targets
         session = context.payload.get("session")
-        if not target_id or not session:
+        if len(targets) < 3 or not session:
             return
 
-        session.metadata.setdefault("magical_barriers", {})[target_id] = context.user_id
-        context.payload["result"] = f"✨ **Magical Barrier:** You placed a magical shield around <@{target_id}>."
+        antag_count = 0
+        for pid in targets:
+            pstate = session.players.get(pid)
+            if pstate:
+                f = RoleFaction.VILLAIN.value if pstate.metadata.get("framed") else pstate.metadata.get("disguised_faction", pstate.faction)
+                if f == RoleFaction.VILLAIN.value:
+                    antag_count += 1
+
+        context.payload["result"] = f"✨ **Demon Detection:** Out of the three chosen players, exactly **{antag_count}** belong to the antagonists."
 
 
-class FrierenAgeOfMagic(NightAction):
+class FrierenZoltraakSpecialist(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Age of Magic",
-            description="Reduce a player's ability cooldowns by 1 Night.",
+            name="Zoltraak Specialist",
+            description="Disable the passives of all opposing faction members (Villains and Neutrals) tonight. Cooldown: 2 Nights.",
             priority=1
         )
+        self.num_targets = 0
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        last_used = player_state.metadata.get("zoltraak_last_used")
+        current_night = session.metadata.get("night_num", 1)
+        if last_used is not None and current_night - last_used < 2:
+            return False, f"Zoltraak Specialist is on cooldown. You can use it again in {2 - (current_night - last_used)} Nights."
+          
+        return True, None
 
     async def execute(self, context: RoleContext) -> None:
-        target_id = context.target_id
         session = context.payload.get("session")
-        if not target_id or not session:
+        if not session:
             return
 
-        target_player = session.players.get(target_id)
-        if target_player:
-            for key in ["tenma_surgery_last_used", "maomao_postmortem_last_used", "maomao_comparative_last_used"]:
-                if key in target_player.metadata:
-                    target_player.metadata[key] -= 1
-            if "frieren_binding_cooldown_until_day" in target_player.metadata:
-                target_player.metadata["frieren_binding_cooldown_until_day"] -= 1
+        player_state = session.players[context.user_id]
+        player_state.metadata["zoltraak_last_used"] = session.metadata.get("night_num", 1)
 
-        context.payload["result"] = f"✨ **Age of Magic:** You reduced <@{target_id}>'s ability cooldowns by 1 Night."
+        session.metadata["zoltraak_active"] = True
+        context.payload["result"] = "✨ **Zoltraak Specialist:** You have activated Zoltraak Specialist. Passives of all antagonists and neutrals are disabled tonight."
 
 
 @role_registry.register
@@ -625,12 +783,12 @@ class Frieren(BaseRole):
     role_key: ClassVar[str] = "frieren"
     priority: ClassVar[int] = 1
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
-    cooldown_text: ClassVar[str] = "Ancient Binding: 2 Days on success"
+    cooldown_text: ClassVar[str] = "Ancient Binding: 2 Days on success, Zoltraak Specialist: 2 Nights"
     limitations_text: ClassVar[str] = "None"
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [FrierenAncientBinding(), FrierenMagicalBarrier(), FrierenAgeOfMagic()]
+        self.abilities = [FrierenAncientBinding(), FrierenDemonDetection(), FrierenZoltraakSpecialist()]
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
         return context.payload.get("result")

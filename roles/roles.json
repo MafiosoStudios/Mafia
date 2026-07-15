@@ -15,11 +15,11 @@
     "faction": "Protagonist",
     "win_condition": "Help the protagonists win.",
     "description": "A mysterious mastermind who rarely reveals his true abilities. With unmatched intelligence and calculated decisions, he quietly manipulates every situation to achieve his goals.",
-    "active_ability": "Observation - Learn whether a player used an ability tonight / Psychological Analysis - Learn whether a player visited another player or stayed home.",
-    "passive_ability": "None",
+    "active_ability": "Observation - Observe a player. Learn who they visited and who visited them / Public Reveal - Starting from Night 4, publicly reveal the role of your target (4 day cooldown).",
+    "passive_ability": "Unreadable - Immune to Framing, Forging, Mimicry, and any deceptions that alter role/faction appearance; investigations are always 100% accurate.",
     "action_prompt": "Select an action to perform:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRB9kkceXEnsK6iJqjjklv5HuFkCzffS69Th7_1Y2iZUJI7j0_2MFQaqTY3&s=10",
-    "footer": "All humans are nothing but tools."
+    "footer": "People reveal more through their actions than their words."
   },
   "l": {
     "name": "L",
@@ -37,7 +37,7 @@
     "faction": "Protagonist",
     "win_condition": "Help the protagonists win.",
     "description": "The Second Hokage, celebrated for his brilliance, discipline, and tactical genius. A master of powerful jutsu and battlefield strategy, he always places the safety of the village above all else.",
-    "active_ability": "Sensory Technique - Learn everyone who visited target player tonight / Water Wall - Protect a player from the first basic attack during the night, Twice per game.",
+    "active_ability": "Sensory Technique - Learn everyone who visited target player tonight / Flying Thunder Counter - Protect a player tonight, completely nullifying any attacks and learning who the attackers were. If the target still dies, the attacker is still revealed (Twice per game).",
     "passive_ability": "Master Sensor - Learn which players visited Tobirama every night.",
     "action_prompt": "Select an action to perform:",
     "image_url": "https://images6.alphacoders.com/944/thumb-1920-944541.png",
@@ -70,8 +70,8 @@
     "faction": "Protagonist",
     "win_condition": "Help the protagonists win.",
     "description": "A sharp-witted apothecary with an insatiable curiosity for medicine, poisons, and mysteries. Her keen observational skills and logical mind allow her to uncover truths that others fail to notice.",
-    "active_ability": "Postmortem Analysis - Learn all visitors of last night's victim, 1 Night cooldown / Comparative Analysis - Compare 2 players' factions, 1 Night cooldown.",
-    "passive_ability": "Keen Observation - Learn if examined victim was protected.",
+    "active_ability": "Postmortem Analysis - Select a dead player. You will receive 3 names, one of whom is the killer (2 day cooldown). / \nBrew Potion - Brew a potion of your choice, each potion has a 2 day cooldown:\n• Potion of Truth - Reveals the target's faction.\n• Potion of Invisibility - Target goes invisible.\n• Potion of Happiness - Distract (roleblock) the target.\n• Potion of Revitalization - Restores target's cooldowns.\n• Potion of Intelligence - Target gains +1 vote for tomorrow.",
+    "passive_ability": "Photographic Memory - If the corpse is fresh (killed last night), the Postmortem Analysis has a 40% chance to guarantee another protagonist name is included among the suspects.",
     "action_prompt": "Select an action to perform:",
     "image_url": "https://images.alphacoders.com/138/1388168.png",
     "footer": "Curiosity killed the cat... but I'm still curious."
@@ -81,7 +81,7 @@
     "faction": "Protagonist",
     "win_condition": "Help the protagonists win.",
     "description": "An ancient elven mage whose quiet demeanor conceals centuries of wisdom and extraordinary magical power. Though she struggles to understand human emotions, her journey teaches her the true value of the bonds forged over a lifetime.",
-    "active_ability": "Ancient Binding - Bind 2 players together, if one dies, the other survivor is hidden for a day / Magical Barrier - Grants magical protection to a player from an opposite faction / Age of Magic - Reduce the targets ability cooldown by 1 Night.",
+    "active_ability": "Ancient Binding - Bind 2 players together, if one dies, the survivor is hidden for a night / Demon Detection - Choose 3 players, you will learn how many of those belong to the antagonists / Zoltraak Specialist - Disable the passives of all antagonists and neutrals tonight this has a 2 day cooldown.",
     "passive_ability": "None",
     "action_prompt": "Select an action to perform:",
     "image_url": "https://www.wallpaperalchemy.com/storage/wallpapers/1777/frieren-anime-character-wallpaper-4k-high-resolution.jpg",
@@ -265,5 +265,16 @@
     "action_prompt": "Select an action to perform:",
     "footer": "My magic is never giving up!",
     "image_url": "https://images.alphacoders.com/139/thumb-1920-1399535.jpg"
+  },
+  "lelouch": {
+    "name": "Lelouch Lamperouge",
+    "faction": "Neutral",
+    "description": "An exiled prince of the Holy Britannian Empire who gains the power of Geass, the power of absolute obedience. Donning the mask of Zero, he leads the Black Knights to tear down the world's corruption and construct a gentler tomorrow.",
+    "active_ability": "Geass - Choose a player. The following day all votes towards that player count double in both nomination and voting phases, 1 Night cooldown. / \nBlack Knight - Once per game, cause a rebellion in the lobby during discussion, ending the day phase immediately to start voting.",
+    "passive_ability": "Zero Requiem - If Lelouch is executed/lynched at any point during the day, the game ends immediately and Lelouch wins the match.",
+    "win_condition": "If all the protagonists are dead.",
+    "action_prompt": "Select an action to perform:",
+    "footer": "The only ones who should kill are those prepared to be killed.",
+    "image_url": "https://images3.alphacoders.com/135/1358482.png"
   }
 }

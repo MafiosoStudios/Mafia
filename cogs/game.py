@@ -119,6 +119,52 @@ class GameCog(commands.Cog):
         await db.update_guild_setting(guild_id, key, parsed_value)
         await send_hybrid_response(ctx, f"{get_emoji('check')} Setting `{key}` successfully updated to `{parsed_value}`.", ephemeral=True)
 
+    @commands.command(name="rebellion", aliases=["rebel"])
+    async def rebellion(self, ctx: commands.Context) -> None:
+        """Cause a rebellion in the entire lobby, ending the discussion phase immediately. (Lelouch Lamperouge, Once per game)"""
+        game_manager = getattr(self.bot, "game_manager", None)
+        game_engine = getattr(self.bot, "game_engine", None)
+        if not game_manager or not game_engine:
+            await ctx.send("Game manager is not ready.")
+            return
+
+        active = await game_manager.get_game_by_guild(ctx.guild.id if ctx.guild is not None else 0)
+        if not active:
+            await ctx.send("No active game in this server.")
+            return
+
+        session = await game_engine.get_session(active.game_id)
+        if not session:
+            await ctx.send("No active game session.")
+            return
+
+        player_state = session.players.get(ctx.author.id)
+        if not player_state or not player_state.alive:
+            await ctx.send("Only living players in this game can use this command.")
+            return
+
+        if player_state.role_key != "lelouch":
+            await ctx.send("Only Lelouch Lamperouge can command the Black Knights!")
+            return
+
+        if player_state.metadata.get("rebellion_used"):
+            await ctx.send("You have already used your Rebellion once this game.")
+            return
+
+        if session.phase != GamePhase.DISCUSSION:
+            await ctx.send("You can only cause a Rebellion during the Discussion Phase.")
+            return
+
+        # Mark as used and trigger rebellion
+        player_state.metadata["rebellion_used"] = True
+        session.metadata["rebellion_triggered"] = True
+        
+        await ctx.send(
+            f"👑 **Lelouch Lamperouge has commanded the Black Knights!**\n"
+            f"📢 *'I, Lelouch vi Britannia, command you: REBEL!'*\n"
+            f"🔥 **The discussion phase is cut short. Skipped directly to the Nomination Phase!**"
+        )
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(GameCog(bot))
