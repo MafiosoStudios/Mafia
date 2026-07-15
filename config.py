@@ -81,7 +81,7 @@ EMOJIS: dict[str, str] = {
     "demon": "👿",
     "lower_moon": "🌙",
     "upper_moon": "💀",
-    "default_villain": "👤",
+    "goon_lord": "👤",
     "tobirama_senju": "🌊",
     "hiromi_higuruma": "⚖️",
     "levi_ackerman": "⚔️",

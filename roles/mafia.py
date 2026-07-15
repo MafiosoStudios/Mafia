@@ -487,12 +487,12 @@ class VillainAssassinate(NightAction):
             
         kills = session.metadata.setdefault("pending_kills", {})
         kills[target_id] = kills.get(target_id, []) + ["mafia_strike"]
-        context.payload["log"] = f"Default Villain attacked <@{target_id}>."
+        context.payload["log"] = f"GoonLord attacked <@{target_id}>."
 
 
 @role_registry.register
-class DefaultVillain(BaseRole):
-    role_key: ClassVar[str] = "default_villain"
+class GoonLord(BaseRole):
+    role_key: ClassVar[str] = "goon_lord"
     priority: ClassVar[int] = 4
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
     is_unique: ClassVar[bool] = False

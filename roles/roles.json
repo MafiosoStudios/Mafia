@@ -184,8 +184,8 @@
     "passive_ability": "None",
     "action_prompt": ""
   },
-  "default_villain": {
-    "name": "Default Villain",
+  "goon_lord": {
+    "name": "GoonLord",
     "faction": "Antagonist",
     "win_condition": "Help the antagonists win.",
     "description": "A standard antagonist who works from the shadows.",

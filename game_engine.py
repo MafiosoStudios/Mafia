@@ -320,7 +320,11 @@ class GameEngine:
                     mafia_channel = guild.get_channel(mafia_channel_id)
                     if member and mafia_channel:
                         try:
-                            await mafia_channel.set_permissions(member, read_messages=True, send_messages=False)
+                            import config
+                            if user_id in config.ADMIN_IDS:
+                                await mafia_channel.set_permissions(member, read_messages=True, send_messages=True)
+                            else:
+                                await mafia_channel.set_permissions(member, read_messages=True, send_messages=False)
                         except Exception:
                             pass
 
@@ -917,12 +921,21 @@ class GameEngine:
                         pass
 
                     # Check if Deadly Sentencing was run
-                    if session.metadata.get("deadly_sentencing_run"):
+                    if session.metadata.get("deadly_sentencing_run") or session.metadata.get("deadly_sentencing_triggered"):
+                        # Wait for the execution drama to completely finish
+                        while session.metadata.get("deadly_sentencing_active"):
+                            await asyncio.sleep(0.5)
+                        
+                        # Add a 3 seconds delay after all messages are completed
+                        await asyncio.sleep(3)
+                        
                         session.metadata.pop("deadly_sentencing_run", None)
                         session.metadata.pop("deadly_sentencing_triggered", None)
+                        session.metadata.pop("deadly_sentencing_active", None)
                         session.metadata.pop("defendant_id", None)
                         session.metadata.pop("verdicts", None)
                         await self.bot.message_queue.send(mafia_channel, f"🏛️ **Deadly Sentencing completed. Skipping normal trial.**")
+                        await asyncio.sleep(2)
                         break
 
                     # Calculate Vote Results
@@ -1333,29 +1346,52 @@ class GameEngine:
         separate embeds (kept apart so each is easy to read on its own)."""
         dead_this_round = session.metadata.pop("dead_this_round", [])
 
-        if dead_this_round:
-            death_lines = []
-            for dpid in dead_this_round:
-                pstate = session.players.get(dpid)
-                msg = pstate.metadata.get("death_message") if pstate else None
-                if not msg:
-                    member = guild.get_member(dpid)
-                    mname = member.display_name if member else f"User {dpid}"
-                    msg = get_death_message(pstate.metadata.get("death_cause") if pstate else None, mname)
-                death_lines.append(f"{get_emoji('death')} {msg}")
-            death_description = "\n".join(death_lines)
+        mafia_deaths = []
+        other_deaths = []
+        MAFIA_DEATH_CAUSES = {"mafia_strike", "demon_strike", "light_guess", "bang_kill"}
+
+        for dpid in dead_this_round:
+            pstate = session.players.get(dpid)
+            cause = pstate.metadata.get("death_cause") if pstate else None
+            msg = pstate.metadata.get("death_message") if pstate else None
+            if not msg:
+                member = guild.get_member(dpid)
+                mname = member.display_name if member else f"User {dpid}"
+                msg = get_death_message(cause, mname)
+            
+            if cause in MAFIA_DEATH_CAUSES:
+                mafia_deaths.append(msg)
+            else:
+                other_deaths.append(msg)
+
+        # 1. Main Mafia Death Report
+        if mafia_deaths:
+            death_description = "\n".join(f"{get_emoji('death')} {msg}" for msg in mafia_deaths)
         else:
-            death_description = f"{get_emoji('day')} No one died tonight. It was a quiet night."
+            death_description = f"{get_emoji('day')} No one was targeted by the Mafia tonight."
 
         death_embed = discord.Embed(
             title=f"{get_emoji('death')} {title} — Death Report",
             description=death_description,
-            color=discord.Color.dark_red() if dead_this_round else discord.Color.gold(),
+            color=discord.Color.dark_red() if mafia_deaths else discord.Color.gold(),
         )
-        death_image = get_event_image("death" if dead_this_round else "day")
+        death_image = get_event_image("death" if mafia_deaths else "day")
         if death_image:
             death_embed.set_image(url=death_image)
         await self.bot.message_queue.send(channel, embed=death_embed)
+
+        # 2. Other Casualties Report
+        if other_deaths:
+            other_description = "\n".join(f"{get_emoji('death')} {msg}" for msg in other_deaths)
+            other_embed = discord.Embed(
+                title=f"{get_emoji('death')} {title} — Other Casualties",
+                description=other_description,
+                color=discord.Color.dark_orange(),
+            )
+            other_image = get_event_image("death")
+            if other_image:
+                other_embed.set_image(url=other_image)
+            await self.bot.message_queue.send(channel, embed=other_embed)
 
         alive_list = []
         dead_list = []
@@ -1773,7 +1809,7 @@ class GameEngine:
             target_name = target_mem.display_name if target_mem else f"User {target_id}"
             cause_key = sources[-1] if sources else None
             death_msg = get_death_message(cause_key, target_name)
-            await self.eliminate_player(session.game_handle.game_id, target_id, "attack", death_message=death_msg)
+            await self.eliminate_player(session.game_handle.game_id, target_id, cause_key or "attack", death_message=death_msg)
 
         # Check Frieren's Ancient Binding
         ancient_bindings = session.metadata.get("ancient_bindings", {})

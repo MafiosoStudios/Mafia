@@ -78,7 +78,7 @@ def _pick_town(count: int) -> list[str]:
 
 
 def _pick_mafia(count: int) -> list[str]:
-    """Guarantees default_villain is always present, then adds support and other
+    """Guarantees goon_lord is always present, then adds support and other
     mafia roles as slots allow."""
     if count <= 0:
         return []
@@ -86,8 +86,8 @@ def _pick_mafia(count: int) -> list[str]:
     picks: list[str] = []
     remaining = count
 
-    # Always guarantee default_villain
-    picks.append("default_villain")
+    # Always guarantee goon_lord
+    picks.append("goon_lord")
     remaining -= 1
 
     if remaining <= 0:
@@ -99,13 +99,13 @@ def _pick_mafia(count: int) -> list[str]:
         support_pool.extend(_roles_with_tag(cat, RoleFaction.VILLAIN))
     support_pool = list(dict.fromkeys(support_pool))
 
-    support_choices = [k for k in support_pool if k != "default_villain"]
+    support_choices = [k for k in support_pool if k != "goon_lord"]
     if support_choices:
         support_choice = random.choice(support_choices)
         picks.append(support_choice)
         remaining -= 1
 
-    # Extra mafia slots: fill with unused unique mafia roles, then pad with default_villain.
+    # Extra mafia slots: fill with unused unique mafia roles, then pad with goon_lord.
     unique_pool = [
         k for k in _all_faction_roles(RoleFaction.VILLAIN, unique_only=True)
         if k not in picks
@@ -115,7 +115,7 @@ def _pick_mafia(count: int) -> list[str]:
         if unique_pool:
             picks.append(unique_pool.pop())
         else:
-            picks.append("default_villain")
+            picks.append("goon_lord")
         remaining -= 1
 
     return picks

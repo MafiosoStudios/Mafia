@@ -688,6 +688,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         async with self.engine._lock:
             player.metadata["deadly_sentencing_uses"] = deadly_uses - 1
             session.metadata["deadly_sentencing_triggered"] = True
+            session.metadata["deadly_sentencing_active"] = True
             session.metadata["deadly_sentencing_run"] = True
 
         target_player = session.players.get(target_id)
@@ -728,6 +729,9 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
                 mafia_channel,
                 f"⚠️ **Wrongful Judgment!** Hiromi Higuruma executed a fellow **Town** member and was executed by the Hangman!"
             )
+
+        async with self.engine._lock:
+            session.metadata["deadly_sentencing_active"] = False
 
         await interaction.edit_original_response(content=f"Deadly Sentencing declared on <@{target_id}>.", view=None)
 
