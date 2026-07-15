@@ -143,9 +143,9 @@ ROLE_IMAGES: dict[str, str] = {
 EVENT_IMAGES: dict[str, str] = {
     # event key -> banner image/gif URL shown in the big phase-transition embeds
     "lobby": "https://64.media.tumblr.com/f2386762aac81419a3decc778f2e297b/a0df0d9c512e5ce7-d8/s1280x1920/6480417570fc98118a1b7ab0ef3b92cf75ac555e.png",
-    "rules": "",
+    "rules": "https://gifdb.com/images/thumbnail/vinland-saga-thorfinn-windy-avx39h7njdsilwic.gif",
     "match_start": "",
-    "night": "",
+    "night": "https://img.magnific.com/premium-photo/nighttime-scene-farm-with-barn-tree_1034062-92937.jpg?semt=ais_test_b&w=740&q=80",
     "day": "",
     "trial": "https://i.pinimg.com/originals/47/56/f5/4756f512ea5c34641e9aa005699f978c.jpg",
     "verdict": "",
