@@ -148,7 +148,7 @@ EVENT_IMAGES: dict[str, str] = {
     "night": "https://img.magnific.com/premium-photo/nighttime-scene-farm-with-barn-tree_1034062-92937.jpg?semt=ais_test_b&w=740&q=80",
     "day": "",
     "trial": "https://i.pinimg.com/originals/47/56/f5/4756f512ea5c34641e9aa005699f978c.jpg",
-    "verdict": "",
+    "verdict": "https://www.voicesinthevoid.com/wp-content/uploads/2026/02/Higuruma-in-the-courtroom-in-Jujutsu-kaisen-Season-3.jpg",
     "death": "https://i.kym-cdn.com/entries/icons/facebook/000/029/198/Dark_Souls_You_Died_Screen_-_Completely_Black_Screen_0-2_screenshot.jpg",
     "victory_hero": "https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyODdzc24ydDAzb2lhY3l0MWhuam4ycm83NDRyY3UxZ295dzlldThkMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nhFvzFSWaoDy4VZm2W/giphy.gif",
     "victory_villain": "",
