@@ -13,46 +13,45 @@ class LobbyCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.hybrid_group(name="lobby", description="Manage anime mafia lobbies", invoke_without_command=True)
+    @commands.hybrid_command(name="lobby", description="View the current lobby status and roster")
     async def lobby(self, ctx: commands.Context) -> None:
-        if ctx.invoked_subcommand is None:
-            lobby_manager = getattr(self.bot, "lobby_manager", None)
-            if lobby_manager is None:
-                await send_hybrid_response(ctx, "Lobby system is not ready yet.", ephemeral=True)
-                return
-            
-            guild_id = ctx.guild.id if ctx.guild is not None else 0
-            lobby = await lobby_manager.get_lobby(guild_id)
-            if lobby is None:
-                await send_hybrid_response(
-                    ctx,
-                    "No active lobby found. Try `lobby create` to create one.",
-                    ephemeral=True,
-                )
-                return
-
-            from utils.embeds import build_lobby_embed
-            guild_name = lobby_manager._guild_name(guild_id)
-            roster_lines = lobby_manager._render_roster(lobby)
-
-            embed = build_lobby_embed(
-                guild_name=guild_name,
-                leader_text=f"<@{lobby.leader_id}>",
-                roster_lines=roster_lines,
-                current_players=len(lobby.players),
-                min_players=lobby.min_players,
-                max_players=lobby.max_players,
-            )
-            view = LobbyView(self.bot, lobby)
-            message = await send_hybrid_response(
+        lobby_manager = getattr(self.bot, "lobby_manager", None)
+        if lobby_manager is None:
+            await send_hybrid_response(ctx, "Lobby system is not ready yet.", ephemeral=True)
+            return
+        
+        guild_id = ctx.guild.id if ctx.guild is not None else 0
+        lobby = await lobby_manager.get_lobby(guild_id)
+        if lobby is None:
+            await send_hybrid_response(
                 ctx,
-                embed=embed,
-                view=view,
+                "No active lobby found. Try `/lobby_create` to create one.",
+                ephemeral=True,
             )
-            if message is not None:
-                await lobby_manager.bind_lobby_message(guild_id, message)
+            return
 
-    @lobby.command(name="create")
+        from utils.embeds import build_lobby_embed
+        guild_name = lobby_manager._guild_name(guild_id)
+        roster_lines = lobby_manager._render_roster(lobby)
+
+        embed = build_lobby_embed(
+            guild_name=guild_name,
+            leader_text=f"<@{lobby.leader_id}>",
+            roster_lines=roster_lines,
+            current_players=len(lobby.players),
+            min_players=lobby.min_players,
+            max_players=lobby.max_players,
+        )
+        view = LobbyView(self.bot, lobby)
+        message = await send_hybrid_response(
+            ctx,
+            embed=embed,
+            view=view,
+        )
+        if message is not None:
+            await lobby_manager.bind_lobby_message(guild_id, message)
+
+    @commands.hybrid_command(name="lobby_create", description="Create a new game lobby")
     async def create_lobby(self, ctx: commands.Context) -> None:
         config: BotConfig = self.bot.config  # type: ignore[assignment]
         lobby_manager = getattr(self.bot, "lobby_manager", None)
@@ -67,19 +66,26 @@ class LobbyCog(commands.Cog):
             max_players=config.max_players,
         )
         view = LobbyView(self.bot, lobby)
+        from utils.embeds import build_lobby_embed
+        guild_name = lobby_manager._guild_name(ctx.guild.id if ctx.guild is not None else 0)
+        roster_lines = lobby_manager._render_roster(lobby)
+        embed = build_lobby_embed(
+            guild_name=guild_name,
+            leader_text=f"<@{lobby.leader_id}>",
+            roster_lines=roster_lines,
+            current_players=len(lobby.players),
+            min_players=lobby.min_players,
+            max_players=lobby.max_players,
+        )
         message = await send_hybrid_response(
             ctx,
-            embed=build_status_embed(
-                "Lobby Online",
-                f"Players: `{len(lobby.players)}/{lobby.max_players}`\n"
-                "Use the buttons below or `lobby join` to enter the server lobby.",
-            ),
+            embed=embed,
             view=view,
         )
         if message is not None:
             await lobby_manager.bind_lobby_message(ctx.guild.id if ctx.guild is not None else 0, message)
 
-    @lobby.command(name="join")
+    @commands.hybrid_command(name="lobby_join", description="Join the active lobby")
     async def join_lobby(self, ctx: commands.Context) -> None:
         lobby_manager = getattr(self.bot, "lobby_manager", None)
         if lobby_manager is None:
@@ -95,7 +101,7 @@ class LobbyCog(commands.Cog):
             return
         await send_hybrid_response(ctx, "Joined the lobby.", ephemeral=True)
 
-    @lobby.command(name="leave")
+    @commands.hybrid_command(name="lobby_leave", description="Leave the active lobby")
     async def leave_lobby(self, ctx: commands.Context) -> None:
         lobby_manager = getattr(self.bot, "lobby_manager", None)
         if lobby_manager is None:
@@ -104,7 +110,7 @@ class LobbyCog(commands.Cog):
         await lobby_manager.leave_lobby(guild_id=ctx.guild.id if ctx.guild is not None else 0, user_id=ctx.author.id)
         await send_hybrid_response(ctx, "Left the lobby.", ephemeral=True)
 
-    @lobby.command(name="start")
+    @commands.hybrid_command(name="lobby_start", description="Start the game match")
     async def start_lobby(self, ctx: commands.Context) -> None:
         lobby_manager = getattr(self.bot, "lobby_manager", None)
         if lobby_manager is None:

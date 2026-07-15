@@ -58,7 +58,7 @@ def build_lobby_embed(
     from config import get_event_image
 
     status_label = "Match in progress" if started else "Lobby waiting for players"
-    color = ANIME_GOLD if started else ANIME_PRIMARY
+    color = discord.Color.from_rgb(255, 255, 255)
     lobby_image = get_event_image("lobby")
     embed = build_embed(f"{guild_name} Lobby", status_label, color=color, image_url=lobby_image)
     embed.add_field(name="Lobby Leader", value=leader_text, inline=True)
