@@ -81,8 +81,9 @@ class ProfileCog(commands.Cog):
                 character_matched = rmeta.get("name", rkey.replace("_", " ").title())
                 break
 
+        from config import get_emoji
         if character_matched is None:
-            await send_hybrid_response(ctx, f"❌ **Invalid Character:** '{character}' is not a valid character in Anime Mafia.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Invalid Character:** '{character}' is not a valid character in Anime Mafia.", ephemeral=True)
             return
 
         profile_record = await database.get_player_profile(ctx.author.id)
@@ -98,7 +99,7 @@ class ProfileCog(commands.Cog):
             profile_record = dataclasses.replace(profile_record, favorite_character=character_matched)
         
         await database.upsert_player_profile(profile_record)
-        await send_hybrid_response(ctx, f"✅ Your favorite character has been set to **{character_matched}**!", ephemeral=True)
+        await send_hybrid_response(ctx, f"{get_emoji('check')} Your favorite character has been set to **{character_matched}**!", ephemeral=True)
 
     @setfavourite.autocomplete("character")
     async def character_autocomplete(self, interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:

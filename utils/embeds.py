@@ -65,7 +65,8 @@ def build_lobby_embed(
     embed.add_field(name="Lobby Leader", value=leader_text, inline=True)
     embed.add_field(name="Players", value=f"{current_players}/{max_players}", inline=True)
     embed.add_field(name="Minimum to Start", value=str(min_players), inline=True)
-    embed.add_field(name="Game Mode", value=f"🕹️ **{gamemode.upper()}**", inline=True)
+    from config import get_emoji
+    embed.add_field(name="Game Mode", value=f"{get_emoji('category_control')} **{gamemode.upper()}**", inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=True)
     roster = "\n".join(roster_lines) if roster_lines else "No players joined yet."

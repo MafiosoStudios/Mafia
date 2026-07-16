@@ -96,9 +96,9 @@ class EventsCog(commands.Cog):
                         except Exception:
                             pass
                     else:
-                        await message.channel.send("❌ Could not send message: Prisoner is not in the server.")
+                        await message.channel.send(f"{get_emoji('cross')} Could not send message: Prisoner is not in the server.")
                 else:
-                    await message.channel.send("❌ You do not have any prisoner detained tonight.")
+                    await message.channel.send(f"{get_emoji('cross')} You do not have any prisoner detained tonight.")
                 return
             
             # Case 2: Prisoner sending to Tōsen
@@ -118,9 +118,9 @@ class EventsCog(commands.Cog):
                         except Exception:
                             pass
                     else:
-                        await message.channel.send("❌ Could not send message: Tōsen is not in the server.")
+                        await message.channel.send(f"{get_emoji('cross')} Could not send message: Tōsen is not in the server.")
                 else:
-                    await message.channel.send("❌ Tōsen is not active or dead.")
+                    await message.channel.send(f"{get_emoji('cross')} Tōsen is not active or dead.")
                 return
 
         # Fallback to Mafia Chat if they belong to Villain faction

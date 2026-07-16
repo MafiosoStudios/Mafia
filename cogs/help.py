@@ -61,7 +61,7 @@ class HelpCog(commands.Cog):
                     break
 
         if character_matched_key is None:
-            await send_hybrid_response(ctx, f"❌ **Role Not Found:** '{character}' could not be matched to any role.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Role Not Found:** '{character}' could not be matched to any role.", ephemeral=True)
             return
 
         name = character_matched_meta.get("name", character_matched_key.replace("_", " ").title())

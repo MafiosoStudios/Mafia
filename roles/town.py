@@ -361,7 +361,7 @@ class TobiramaFlyingThunderCounter(NightAction):
         player_state.metadata["tobirama_counter_uses"] = max(0, uses - 1)
 
         session.metadata.setdefault("flying_thunder_counters", {})[target_id] = context.user_id
-        context.payload["result"] = f"⚡ **Flying Thunder Counter:** You have marked <@{target_id}>. You will counter any attacks against them tonight."
+        context.payload["result"] = f"{get_emoji('zap')} **Flying Thunder Counter:** You have marked <@{target_id}>. You will counter any attacks against them tonight."
 
 
 @role_registry.register
