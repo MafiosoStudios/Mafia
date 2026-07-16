@@ -84,7 +84,7 @@ EMOJIS: dict[str, str] = {
     "frieza": "👽",
     "tobirama_senju": "🌊",
     "hiromi_higuruma": "⚖️",
-    "levi_ackerman": "⚔️",
+    "levi_ackerman": "<:levi:1527168891904856085>",
     "maomao": "🧪",
     "frieren": "✨",
     "kishibe": "🥃",
