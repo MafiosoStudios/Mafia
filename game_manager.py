@@ -46,6 +46,12 @@ class GameManager:
             logger.info("Created game %s for guild %s.", game.game_id, guild_id)
             return game
 
+    async def register_game(self, game: ActiveGameHandle) -> None:
+        async with self._lock:
+            self._games_by_guild[game.guild_id] = game
+            self._games_by_id[game.game_id] = game
+            logger.info("Registered game %s for guild %s via resume.", game.game_id, game.guild_id)
+
     async def get_game_by_guild(self, guild_id: int) -> ActiveGameHandle | None:
         async with self._lock:
             return self._games_by_guild.get(guild_id)

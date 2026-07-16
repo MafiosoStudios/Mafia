@@ -38,6 +38,7 @@ class DatabaseManager:
     def __init__(self) -> None:
         self._client: AsyncIOMotorClient | None = None
         self._db: AsyncIOMotorDatabase | None = None
+        self._global_db: AsyncIOMotorDatabase | None = None
 
     async def initialize(self) -> None:
         uri = os.getenv("MONGODB_URI")
@@ -50,18 +51,20 @@ class DatabaseManager:
 
         self._client = AsyncIOMotorClient(uri)
         self._db = self._client[db_name]
+        self._global_db = self._client[f"{db_name}_global"]
 
         # Fail fast on bad credentials/network instead of failing on first query.
         await self._client.admin.command("ping")
 
         await self._create_indexes()
-        logger.info("Database layer initialized against MongoDB Atlas ('%s').", db_name)
+        logger.info("Database layer initialized against MongoDB Atlas. Local: '%s', Global: '%s_global'", db_name, db_name)
 
     async def close(self) -> None:
         if self._client is not None:
             self._client.close()
             self._client = None
             self._db = None
+            self._global_db = None
 
     @property
     def db(self) -> AsyncIOMotorDatabase:
@@ -69,24 +72,30 @@ class DatabaseManager:
             raise RuntimeError("DatabaseManager.initialize() has not been awaited yet.")
         return self._db
 
+    @property
+    def global_db(self) -> AsyncIOMotorDatabase:
+        if self._global_db is None:
+            raise RuntimeError("DatabaseManager.initialize() has not been awaited yet.")
+        return self._global_db
+
     # ---- Player profiles ---------------------------------------------------
 
     async def upsert_player_profile(self, profile: PlayerProfileRecord) -> None:
-        await self.db.players.update_one(
-            {"user_id": profile.user_id, "guild_id": profile.guild_id},
+        await self.global_db.players.update_one(
+            {"user_id": profile.user_id},
             {"$set": asdict(profile)},
             upsert=True,
         )
 
-    async def get_player_profile(self, user_id: int, guild_id: int) -> PlayerProfileRecord | None:
-        doc = await self.db.players.find_one({"user_id": user_id, "guild_id": guild_id})
+    async def get_player_profile(self, user_id: int, guild_id: int | None = None) -> PlayerProfileRecord | None:
+        doc = await self.global_db.players.find_one({"user_id": user_id})
         return _doc_to_dataclass(PlayerProfileRecord, doc) if doc else None
 
     # ---- Statistics ---------------------------------------------------------
 
     async def upsert_statistics(self, statistics: StatisticsRecord) -> None:
-        await self.db.statistics.update_one(
-            {"user_id": statistics.user_id, "guild_id": statistics.guild_id},
+        await self.global_db.statistics.update_one(
+            {"user_id": statistics.user_id},
             {"$set": asdict(statistics)},
             upsert=True,
         )
@@ -94,25 +103,24 @@ class DatabaseManager:
     async def update_statistics_for_match(
         self,
         user_id: int,
-        guild_id: int,
+        guild_id: int | None,
         player_faction: str | None,
         winner_faction: str | None,
-        has_won: bool = False,
     ) -> StatisticsRecord:
-        current = await self.get_statistics(user_id, guild_id)
-        statistics = current or StatisticsRecord(user_id=user_id, guild_id=guild_id)
+        current = await self.get_statistics(user_id)
+        statistics = current or StatisticsRecord(user_id=user_id)
 
         games_played = statistics.games_played + 1
         if winner_faction is None or winner_faction == "Draw":
             wins, losses, draws = statistics.wins, statistics.losses, statistics.draws + 1
-        elif has_won or player_faction == winner_faction:
+        elif player_faction == winner_faction:
             wins, losses, draws = statistics.wins + 1, statistics.losses, statistics.draws
         else:
             wins, losses, draws = statistics.wins, statistics.losses + 1, statistics.draws
 
         updated = StatisticsRecord(
             user_id=user_id,
-            guild_id=guild_id,
+            guild_id=0,
             games_played=games_played,
             wins=wins,
             losses=losses,
@@ -126,13 +134,13 @@ class DatabaseManager:
         await self.upsert_statistics(updated)
         await self.upsert_leaderboard_entry(
             "wins",
-            LeaderboardEntry(user_id=user_id, guild_id=guild_id, metric="wins", value=updated.wins, rank=0),
+            LeaderboardEntry(user_id=user_id, guild_id=0, metric="wins", value=updated.wins, rank=0),
         )
         await self.upsert_leaderboard_entry(
             "games_played",
             LeaderboardEntry(
                 user_id=user_id,
-                guild_id=guild_id,
+                guild_id=0,
                 metric="games_played",
                 value=updated.games_played,
                 rank=0,
@@ -140,8 +148,8 @@ class DatabaseManager:
         )
         return updated
 
-    async def get_statistics(self, user_id: int, guild_id: int) -> StatisticsRecord | None:
-        doc = await self.db.statistics.find_one({"user_id": user_id, "guild_id": guild_id})
+    async def get_statistics(self, user_id: int, guild_id: int | None = None) -> StatisticsRecord | None:
+        doc = await self.global_db.statistics.find_one({"user_id": user_id})
         return _doc_to_dataclass(StatisticsRecord, doc) if doc else None
 
     # ---- Games ---------------------------------------------------------------
@@ -167,18 +175,11 @@ class DatabaseManager:
         )
 
     async def delete_guild_data(self, guild_id: int) -> None:
-        await self.db.unlocked_achievements.delete_many({"guild_id": guild_id})
-        await self.db.inventory.delete_many({"guild_id": guild_id})
-        await self.db.unlocked_characters.delete_many({"guild_id": guild_id})
-        await self.db.players.delete_many({"guild_id": guild_id})
-
         await self.db.game_players.delete_many({"guild_id": guild_id})
         await self.db.match_history.delete_many({"guild_id": guild_id})
         await self.db.games.delete_many({"guild_id": guild_id})
-
-        await self.db.character_statistics.delete_many({"guild_id": guild_id})
-        await self.db.statistics.delete_many({"guild_id": guild_id})
-        await self.db.leaderboards.delete_many({"guild_id": guild_id})
+        await self.db.settings.delete_many({"guild_id": guild_id})
+        await self.db.custom_role_lists.delete_many({"guild_id": guild_id})
 
     async def save_match_history(self, history: MatchHistoryRecord) -> None:
         # dict keys must be strings in BSON, so int-keyed dicts get stringified
@@ -219,15 +220,15 @@ class DatabaseManager:
     # ---- Achievements ---------------------------------------------------------
 
     async def upsert_achievement(self, achievement: AchievementRecord) -> None:
-        await self.db.achievements.update_one(
+        await self.global_db.achievements.update_one(
             {"achievement_key": achievement.achievement_key},
             {"$set": asdict(achievement)},
             upsert=True,
         )
 
-    async def unlock_achievement(self, user_id: int, guild_id: int, achievement_key: str) -> None:
-        await self.db.unlocked_achievements.update_one(
-            {"user_id": user_id, "guild_id": guild_id, "achievement_key": achievement_key},
+    async def unlock_achievement(self, user_id: int, guild_id: int | None, achievement_key: str) -> None:
+        await self.global_db.unlocked_achievements.update_one(
+            {"user_id": user_id, "achievement_key": achievement_key},
             {"$setOnInsert": {"unlocked_at": datetime.utcnow()}},
             upsert=True,
         )
@@ -235,30 +236,30 @@ class DatabaseManager:
     # ---- Inventory ---------------------------------------------------------
 
     async def add_inventory_item(self, item: InventoryItemRecord) -> None:
-        await self.db.inventory.update_one(
-            {"item_key": item.item_key, "owner_id": item.owner_id, "guild_id": item.guild_id},
+        await self.global_db.inventory.update_one(
+            {"item_key": item.item_key, "owner_id": item.owner_id},
             {"$set": asdict(item)},
             upsert=True,
         )
 
-    async def get_inventory_items(self, owner_id: int, guild_id: int) -> list[InventoryItemRecord]:
-        cursor = self.db.inventory.find({"owner_id": owner_id, "guild_id": guild_id}).sort(
+    async def get_inventory_items(self, owner_id: int, guild_id: int | None = None) -> list[InventoryItemRecord]:
+        cursor = self.global_db.inventory.find({"owner_id": owner_id}).sort(
             "created_at", -1
         )
         return [_doc_to_dataclass(InventoryItemRecord, doc) async for doc in cursor]
 
     # ---- Characters ---------------------------------------------------------
 
-    async def unlock_character(self, user_id: int, guild_id: int, character_key: str) -> None:
-        await self.db.unlocked_characters.update_one(
-            {"user_id": user_id, "guild_id": guild_id, "character_key": character_key},
+    async def unlock_character(self, user_id: int, guild_id: int | None, character_key: str) -> None:
+        await self.global_db.unlocked_characters.update_one(
+            {"user_id": user_id, "character_key": character_key},
             {"$setOnInsert": {"unlocked_at": datetime.utcnow()}},
             upsert=True,
         )
 
-    async def get_unlocked_characters(self, user_id: int, guild_id: int) -> list[str]:
-        cursor = self.db.unlocked_characters.find(
-            {"user_id": user_id, "guild_id": guild_id}
+    async def get_unlocked_characters(self, user_id: int, guild_id: int | None = None) -> list[str]:
+        cursor = self.global_db.unlocked_characters.find(
+            {"user_id": user_id}
         ).sort("unlocked_at", -1)
         return [doc["character_key"] async for doc in cursor]
 
@@ -273,7 +274,7 @@ class DatabaseManager:
         payload: dict[str, Any],
         rarity: str = "Common",
     ) -> None:
-        await self.db.cosmetics.update_one(
+        await self.global_db.cosmetics.update_one(
             {"cosmetic_key": cosmetic_key},
             {
                 "$set": {
@@ -290,7 +291,7 @@ class DatabaseManager:
 
     async def list_cosmetics(self, cosmetic_type: str | None = None) -> list[dict[str, Any]]:
         query = {} if cosmetic_type is None else {"cosmetic_type": cosmetic_type}
-        cursor = self.db.cosmetics.find(query).sort([("rarity", 1), ("name", 1)])
+        cursor = self.global_db.cosmetics.find(query).sort([("rarity", 1), ("name", 1)])
         return [_strip_id(doc) async for doc in cursor]
 
     # ---- Leaderboards ---------------------------------------------------------
@@ -299,13 +300,11 @@ class DatabaseManager:
         self,
         database: str,
         metric: str,
-        guild_id: int,
+        guild_id: int | None = None,
         limit: int = 10,
     ) -> list[LeaderboardEntry]:
-        # `database` is kept only for call-site compatibility -- Atlas uses one
-        # database with purpose-named collections instead of three SQLite files.
         cursor = (
-            self.db.leaderboards.find({"metric": metric, "guild_id": guild_id})
+            self.global_db.leaderboards.find({"metric": metric})
             .sort([("value", -1), ("user_id", 1)])
             .limit(limit)
         )
@@ -314,7 +313,7 @@ class DatabaseManager:
             entries.append(
                 LeaderboardEntry(
                     user_id=doc["user_id"],
-                    guild_id=doc["guild_id"],
+                    guild_id=0,
                     metric=doc["metric"],
                     value=doc["value"],
                     rank=len(entries) + 1,
@@ -323,17 +322,15 @@ class DatabaseManager:
         return entries
 
     async def upsert_leaderboard_entry(self, leaderboard_key: str, entry: LeaderboardEntry) -> None:
-        await self.db.leaderboards.update_one(
+        await self.global_db.leaderboards.update_one(
             {
                 "leaderboard_key": leaderboard_key,
                 "user_id": entry.user_id,
-                "guild_id": entry.guild_id,
             },
             {
                 "$set": {
                     "leaderboard_key": leaderboard_key,
                     "user_id": entry.user_id,
-                    "guild_id": entry.guild_id,
                     "metric": entry.metric,
                     "value": entry.value,
                     "rank": entry.rank,
@@ -346,10 +343,10 @@ class DatabaseManager:
     async def get_guild_settings(self, guild_id: int) -> dict[str, Any]:
         doc = await self.db.settings.find_one({"guild_id": guild_id})
         defaults = {
-            "night_duration": 45,
-            "day_duration": 30,
-            "vote_duration": 30,
-            "plea_duration": 30,
+            "night_duration": 90,
+            "day_duration": 120,
+            "vote_duration": 60,
+            "plea_duration": 60,
             "verdict_duration": 30,
             "anonymous_voting": True,
         }
@@ -364,33 +361,84 @@ class DatabaseManager:
             upsert=True,
         )
 
+    # ---- Active Game Recovery -----------------------------------------------
+
+    async def save_active_game_state(self, game_id: str, state_dict: dict[str, Any]) -> None:
+        await self.db.games.update_one(
+            {"game_id": game_id},
+            {"$set": {"active_state": state_dict}},
+            upsert=True
+        )
+
+    async def load_active_game_state(self, game_id: str) -> dict[str, Any] | None:
+        doc = await self.db.games.find_one({"game_id": game_id})
+        return doc.get("active_state") if doc else None
+
+    async def get_active_game_by_guild(self, guild_id: int) -> dict[str, Any] | None:
+        doc = await self.db.games.find_one({"active_state.game_handle.guild_id": guild_id})
+        return doc.get("active_state") if doc else None
+
+    async def clear_active_game_state(self, game_id: str) -> None:
+        await self.db.games.update_one(
+            {"game_id": game_id},
+            {"$unset": {"active_state": ""}}
+        )
+
+    # ---- Custom Role Lists --------------------------------------------------
+
+    async def save_custom_role_list(self, guild_id: int, name: str, roles: list[str]) -> None:
+        await self.db.custom_role_lists.update_one(
+            {"guild_id": guild_id, "name": name},
+            {"$set": {
+                "guild_id": guild_id,
+                "name": name,
+                "roles": roles,
+                "updated_at": datetime.utcnow()
+            }},
+            upsert=True
+        )
+
+    async def load_custom_role_list(self, guild_id: int, name: str) -> list[str] | None:
+        doc = await self.db.custom_role_lists.find_one({"guild_id": guild_id, "name": name})
+        return doc["roles"] if doc else None
+
+    async def delete_custom_role_list(self, guild_id: int, name: str) -> bool:
+        res = await self.db.custom_role_lists.delete_one({"guild_id": guild_id, "name": name})
+        return res.deleted_count > 0
+
+    async def list_custom_role_lists(self, guild_id: int) -> list[dict[str, Any]]:
+        cursor = self.db.custom_role_lists.find({"guild_id": guild_id}).sort("name", 1)
+        return [{"name": doc["name"], "roles": doc["roles"]} async for doc in cursor]
+
     # ---- Indexes ---------------------------------------------------------
 
     async def _create_indexes(self) -> None:
-        await self.db.players.create_index([("user_id", 1), ("guild_id", 1)], unique=True)
-
-        await self.db.achievements.create_index("achievement_key", unique=True)
-        await self.db.unlocked_achievements.create_index(
-            [("user_id", 1), ("guild_id", 1), ("achievement_key", 1)], unique=True
-        )
-        await self.db.inventory.create_index(
-            [("item_key", 1), ("owner_id", 1), ("guild_id", 1)], unique=True
-        )
-        await self.db.unlocked_characters.create_index(
-            [("user_id", 1), ("guild_id", 1), ("character_key", 1)], unique=True
-        )
-        await self.db.cosmetics.create_index("cosmetic_key", unique=True)
-
+        # Transient DB
         await self.db.games.create_index("game_id", unique=True)
         await self.db.game_players.create_index([("game_id", 1), ("user_id", 1)], unique=True)
         await self.db.match_history.create_index("game_id", unique=True)
+        await self.db.settings.create_index("guild_id", unique=True)
+        await self.db.custom_role_lists.create_index([("guild_id", 1), ("name", 1)], unique=True)
 
-        await self.db.statistics.create_index([("user_id", 1), ("guild_id", 1)], unique=True)
-        await self.db.character_statistics.create_index(
-            [("user_id", 1), ("guild_id", 1), ("character_key", 1)], unique=True
+        # Global DB
+        await self.global_db.players.create_index("user_id", unique=True)
+        await self.global_db.achievements.create_index("achievement_key", unique=True)
+        await self.global_db.unlocked_achievements.create_index(
+            [("user_id", 1), ("achievement_key", 1)], unique=True
         )
-        await self.db.leaderboards.create_index(
-            [("leaderboard_key", 1), ("user_id", 1), ("guild_id", 1)], unique=True
+        await self.global_db.inventory.create_index(
+            [("item_key", 1), ("owner_id", 1)], unique=True
+        )
+        await self.global_db.unlocked_characters.create_index(
+            [("user_id", 1), ("character_key", 1)], unique=True
+        )
+        await self.global_db.cosmetics.create_index("cosmetic_key", unique=True)
+        await self.global_db.statistics.create_index("user_id", unique=True)
+        await self.global_db.character_statistics.create_index(
+            [("user_id", 1), ("character_key", 1)], unique=True
+        )
+        await self.global_db.leaderboards.create_index(
+            [("leaderboard_key", 1), ("user_id", 1)], unique=True
         )
 
 

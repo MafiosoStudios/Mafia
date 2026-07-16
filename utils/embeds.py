@@ -54,6 +54,7 @@ def build_lobby_embed(
     min_players: int,
     max_players: int,
     started: bool = False,
+    gamemode: str = "chaos",
 ) -> discord.Embed:
     from config import get_event_image
 
@@ -64,6 +65,9 @@ def build_lobby_embed(
     embed.add_field(name="Lobby Leader", value=leader_text, inline=True)
     embed.add_field(name="Players", value=f"{current_players}/{max_players}", inline=True)
     embed.add_field(name="Minimum to Start", value=str(min_players), inline=True)
+    embed.add_field(name="Game Mode", value=f"🕹️ **{gamemode.upper()}**", inline=True)
+    embed.add_field(name="\u200b", value="\u200b", inline=True)
+    embed.add_field(name="\u200b", value="\u200b", inline=True)
     roster = "\n".join(roster_lines) if roster_lines else "No players joined yet."
     embed.add_field(name="Current Roster", value=roster, inline=False)
     embed.add_field(

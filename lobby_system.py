@@ -32,6 +32,7 @@ class LobbySession:
     locked: bool = False
     message_id: int | None = None
     notes: dict[str, Any] = field(default_factory=dict)
+    gamemode: str = "chaos"
 
     def can_join(self, user_id: int) -> bool:
         return not self.locked and user_id not in self.players and len(self.players) < self.max_players
@@ -57,6 +58,7 @@ class LobbyManager:
         self._database = database
         self._config = config
         self._lobbies_by_guild: dict[int, LobbySession] = {}
+        self._active_custom_role_lists: dict[int, list[str]] = {}
         self._lock = asyncio.Lock()
 
     async def create_lobby(
@@ -168,12 +170,15 @@ class LobbyManager:
                     created_at=game_handle.created_at,
                 )
             )
-            await self._game_engine.create_session(
+            session = await self._game_engine.create_session(
                 game_handle=game_handle,
                 player_ids=players_snapshot,
                 min_players=min_players,
                 max_players=max_players,
             )
+            session.metadata["gamemode"] = lobby.gamemode
+            session.metadata["custom_role_list"] = self._active_custom_role_lists.get(guild_id)
+
             for player_id in players_snapshot:
                 await self._database.upsert_game_player(
                     GamePlayerRecord(
@@ -242,6 +247,7 @@ class LobbyManager:
                     min_players=lobby.min_players,
                     max_players=lobby.max_players,
                     started=True,
+                    gamemode=lobby.gamemode,
                 ),
                 view=None,
             )
@@ -255,6 +261,7 @@ class LobbyManager:
                 current_players=len(lobby.players),
                 min_players=lobby.min_players,
                 max_players=lobby.max_players,
+                gamemode=lobby.gamemode,
             ),
             view=self._build_lobby_view(lobby),
         )

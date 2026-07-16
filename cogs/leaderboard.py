@@ -18,16 +18,12 @@ class LeaderboardCog(commands.Cog):
 
     @leaderboard.command(name="wins")
     async def wins_leaderboard(self, ctx: commands.Context) -> None:
-        if ctx.guild is None:
-            await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
-            return
-
         database = getattr(self.bot, "db", None)
         if database is None:
             await send_hybrid_response(ctx, "Leaderboard system is not ready yet.", ephemeral=True)
             return
 
-        entries = await database.get_leaderboard("stats", "wins", ctx.guild.id, limit=10)
+        entries = await database.get_leaderboard("stats", "wins", limit=10)
         if not entries:
             await send_hybrid_response(ctx, "No leaderboard data yet.", ephemeral=True)
             return

@@ -14,28 +14,23 @@ class ProfileCog(commands.Cog):
 
     @commands.hybrid_command(name="profile", description="View your anime mafia profile")
     async def profile(self, ctx: commands.Context) -> None:
-        if ctx.guild is None:
-            await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
-            return
-
         database = getattr(self.bot, "db", None)
         if database is None:
             await send_hybrid_response(ctx, "Profile system is not ready yet.", ephemeral=True)
             return
 
-        profile_record = await database.get_player_profile(ctx.author.id, ctx.guild.id)
+        profile_record = await database.get_player_profile(ctx.author.id)
         if profile_record is None:
             profile_record = PlayerProfileRecord(
                 user_id=ctx.author.id,
-                guild_id=ctx.guild.id,
                 username=ctx.author.display_name,
                 discriminator=getattr(ctx.author, "discriminator", "0000"),
             )
             await database.upsert_player_profile(profile_record)
 
-        statistics = await database.get_statistics(ctx.author.id, ctx.guild.id)
+        statistics = await database.get_statistics(ctx.author.id)
         if statistics is None:
-            statistics = StatisticsRecord(user_id=ctx.author.id, guild_id=ctx.guild.id)
+            statistics = StatisticsRecord(user_id=ctx.author.id)
             await database.upsert_statistics(statistics)
 
         total_games = statistics.games_played
@@ -72,10 +67,6 @@ class ProfileCog(commands.Cog):
     @commands.hybrid_command(name="setfavourite", description="Set your favorite anime character on your profile")
     @discord.app_commands.describe(character="Name of the character")
     async def setfavourite(self, ctx: commands.Context, character: str) -> None:
-        if ctx.guild is None:
-            await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
-            return
-
         database = getattr(self.bot, "db", None)
         if database is None:
             await send_hybrid_response(ctx, "Profile system is not ready yet.", ephemeral=True)
@@ -94,11 +85,10 @@ class ProfileCog(commands.Cog):
             await send_hybrid_response(ctx, f"❌ **Invalid Character:** '{character}' is not a valid character in Anime Mafia.", ephemeral=True)
             return
 
-        profile_record = await database.get_player_profile(ctx.author.id, ctx.guild.id)
+        profile_record = await database.get_player_profile(ctx.author.id)
         if profile_record is None:
             profile_record = PlayerProfileRecord(
                 user_id=ctx.author.id,
-                guild_id=ctx.guild.id,
                 username=ctx.author.display_name,
                 discriminator=getattr(ctx.author, "discriminator", "0000"),
                 favorite_character=character_matched

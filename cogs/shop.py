@@ -18,16 +18,12 @@ class ShopCog(commands.Cog):
 
     @shop.command(name="inventory")
     async def inventory(self, ctx: commands.Context) -> None:
-        if ctx.guild is None:
-            await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
-            return
-
         database = getattr(self.bot, "db", None)
         if database is None:
             await send_hybrid_response(ctx, "Shop system is not ready yet.", ephemeral=True)
             return
 
-        items = await database.get_inventory_items(ctx.author.id, ctx.guild.id)
+        items = await database.get_inventory_items(ctx.author.id)
         if not items:
             await send_hybrid_response(ctx, "Your inventory is empty.", ephemeral=True)
             return

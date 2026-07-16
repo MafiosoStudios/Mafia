@@ -8,9 +8,9 @@ from typing import Any
 @dataclass(slots=True, frozen=True)
 class PlayerProfileRecord:
     user_id: int
-    guild_id: int
     username: str
     discriminator: str
+    guild_id: int = 0
     level: int = 1
     xp: int = 0
     coins: int = 0
@@ -76,7 +76,7 @@ class GamePlayerRecord:
 @dataclass(slots=True, frozen=True)
 class StatisticsRecord:
     user_id: int
-    guild_id: int
+    guild_id: int = 0
     games_played: int = 0
     wins: int = 0
     losses: int = 0
@@ -91,8 +91,8 @@ class StatisticsRecord:
 @dataclass(slots=True, frozen=True)
 class CharacterStatisticsRecord:
     user_id: int
-    guild_id: int
     character_key: str
+    guild_id: int = 0
     games_played: int = 0
     wins: int = 0
     losses: int = 0
@@ -115,10 +115,10 @@ class AchievementRecord:
 class InventoryItemRecord:
     item_key: str
     owner_id: int
-    guild_id: int
     item_type: str
     name: str
     description: str
+    guild_id: int = 0
     unlocked: bool = False
     quantity: int = 1
     cosmetic_payload: dict[str, Any] | None = None
@@ -142,7 +142,7 @@ class MatchHistoryRecord:
 @dataclass(slots=True, frozen=True)
 class LeaderboardEntry:
     user_id: int
-    guild_id: int
     metric: str
     value: int
     rank: int
+    guild_id: int = 0

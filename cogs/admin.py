@@ -29,6 +29,87 @@ class AdminCog(commands.Cog):
         synced = await self.bot.tree.sync()
         await send_hybrid_response(ctx, f"Cleaned duplicates and synced {len(synced)} global commands successfully!", ephemeral=True)
 
+    @admin.command(name="wipe", description="Wipe global database user profiles and leaderboards (Bot Admin only)")
+    async def wipe(self, ctx: commands.Context) -> None:
+        import config
+        if ctx.author.id not in config.ADMIN_IDS:
+            await send_hybrid_response(ctx, "❌ **Unauthorized:** Only bot developers can run this command.", ephemeral=True)
+            return
+
+        view = WipeConfirmationView(self.bot, ctx.author.id)
+        await send_hybrid_response(
+            ctx,
+            "⚠️ **CAUTION:** You are about to wipe ALL global database profiles, statistics, achievements, character statistics, inventory, and leaderboards! This action cannot be undone.\n"
+            "An export backup will be automatically generated. Click **Confirm Wipe** to proceed.",
+            view=view,
+            ephemeral=True
+        )
+        await view.wait()
+        if not view.confirmed:
+            return
+
+        import json
+        import os
+        from datetime import datetime
+
+        database = getattr(self.bot, "db", None)
+        if database is None:
+            await ctx.interaction.followup.send("❌ Database connection is not available.", ephemeral=True)
+            return
+
+        global_db = database.global_db
+        collections_to_wipe = [
+            "players",
+            "statistics",
+            "character_statistics",
+            "leaderboards",
+            "unlocked_achievements",
+            "inventory",
+            "unlocked_characters"
+        ]
+
+        backup_data = {}
+        counts = {}
+        for coll_name in collections_to_wipe:
+            cursor = global_db[coll_name].find()
+            docs = []
+            async for doc in cursor:
+                def clean_doc(d):
+                    cleaned = {}
+                    for k, v in d.items():
+                        if k == "_id":
+                            cleaned[k] = str(v)
+                        elif isinstance(v, datetime):
+                            cleaned[k] = v.isoformat()
+                        elif isinstance(v, dict):
+                            cleaned[k] = clean_doc(v)
+                        elif isinstance(v, list):
+                            cleaned[k] = [clean_doc(x) if isinstance(x, dict) else x for x in v]
+                        else:
+                            cleaned[k] = v
+                    return cleaned
+                docs.append(clean_doc(doc))
+            backup_data[coll_name] = docs
+            counts[coll_name] = len(docs)
+
+        os.makedirs("backups", exist_ok=True)
+        backup_filename = f"backups/wipe_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+        with open(backup_filename, "w", encoding="utf-8") as f:
+            json.dump(backup_data, f, indent=4)
+
+        for coll_name in collections_to_wipe:
+            await global_db[coll_name].delete_many({})
+
+        summary_lines = [f"• `{coll}`: **{count}** records cleared" for coll, count in counts.items()]
+        summary_str = "\n".join(summary_lines)
+
+        await ctx.interaction.followup.send(
+            f"✅ **Database Wipe Completed Successfully!**\n"
+            f"Backup written to: `{backup_filename}`\n\n"
+            f"**Wiped Collections Summary:**\n{summary_str}",
+            ephemeral=True
+        )
+
     @commands.hybrid_command(name="reset", description="Reset the bot in the server, cleaning up game channels and status")
     async def reset(self, ctx: commands.Context) -> None:
         import config
@@ -94,18 +175,29 @@ class AdminCog(commands.Cog):
             ephemeral=True
         )
 
-    @commands.hybrid_command(name="dev_restart", description="Restart the bot process (Developer only)")
-    async def dev_restart(self, ctx: commands.Context) -> None:
+    @commands.hybrid_command(name="devrestart", aliases=["dev_restart"], description="Pull latest code from git and restart the bot (Developer only)")
+    async def devrestart(self, ctx: commands.Context) -> None:
         import config
         if ctx.author.id not in config.ADMIN_IDS:
             await send_hybrid_response(ctx, "❌ **Unauthorized:** Only bot developers can run this command.", ephemeral=True)
             return
 
+        # Defer the response since git pull and cleanup can take a second
+        await ctx.defer(ephemeral=False)
+
+        import subprocess
+        try:
+            result = subprocess.run(["git", "pull"], capture_output=True, text=True, check=True)
+            git_output = result.stdout + result.stderr
+        except Exception as e:
+            git_output = f"Git pull failed:\n{e}"
+
+        # Send git output and starting indicator
+        await ctx.send(f"📦 **Git Pull Output:**\n```\n{git_output[:1800]}\n```\n🔄 **Restarting bot process...** Please wait.")
+
         import os
         import sys
 
-        await send_hybrid_response(ctx, "🔄 **Restarting bot process...** Please wait.", ephemeral=True)
-        
         # Clean up database and message queue
         try:
             if hasattr(self.bot, "db"):
@@ -127,6 +219,86 @@ class AdminCog(commands.Cog):
 
         # Restart process and pass the restart channel ID
         os.execv(sys.executable, [sys.executable] + clean_argv + ["--restart-channel", str(ctx.channel.id)])
+
+    @commands.hybrid_command(name="push", description="Stage all, commit, push changes, and print git output (Developer only)")
+    @discord.app_commands.describe(message="The commit message")
+    async def push(self, ctx: commands.Context, message: str) -> None:
+        import config
+        if ctx.author.id not in config.ADMIN_IDS:
+            await send_hybrid_response(ctx, "❌ **Unauthorized:** Only bot developers can run this command.", ephemeral=True)
+            return
+
+        await ctx.defer(ephemeral=False)
+
+        import subprocess
+        outputs = []
+        
+        # 1. git add .
+        try:
+            subprocess.run(["git", "add", "."], capture_output=True, text=True, check=True)
+            outputs.append("✅ Git Add: Success")
+        except Exception as e:
+            outputs.append(f"❌ Git Add Failed:\n{e}")
+            await ctx.send("\n".join(outputs))
+            return
+
+        # 2. git commit -m "..."
+        try:
+            res_commit = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True, check=True)
+            outputs.append(f"✅ Git Commit:\n{res_commit.stdout or res_commit.stderr}")
+        except Exception as e:
+            err_str = str(e)
+            if hasattr(e, "stdout") and e.stdout:
+                err_str += f"\nstdout: {e.stdout}"
+            if hasattr(e, "stderr") and e.stderr:
+                err_str += f"\nstderr: {e.stderr}"
+            outputs.append(f"⚠️ Git Commit Warning/Failure:\n{err_str}")
+            if "nothing to commit" in err_str.lower() or "no changes added to commit" in err_str.lower():
+                pass
+            else:
+                await ctx.send("\n".join(outputs))
+                return
+
+        # 3. git push
+        try:
+            res_push = subprocess.run(["git", "push"], capture_output=True, text=True, check=True)
+            outputs.append(f"✅ Git Push:\n{res_push.stdout or res_push.stderr}")
+        except Exception as e:
+            err_str = str(e)
+            if hasattr(e, "stdout") and e.stdout:
+                err_str += f"\nstdout: {e.stdout}"
+            if hasattr(e, "stderr") and e.stderr:
+                err_str += f"\nstderr: {e.stderr}"
+            outputs.append(f"❌ Git Push Failed:\n{err_str}")
+
+        full_output = "\n\n".join(outputs)
+        await ctx.send(f"📦 **Git Push Summary:**\n```\n{full_output[:1800]}\n```")
+
+
+class WipeConfirmationView(discord.ui.View):
+    def __init__(self, bot: commands.Bot, author_id: int) -> None:
+        super().__init__(timeout=30)
+        self.bot = bot
+        self.author_id = author_id
+        self.confirmed = False
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("❌ You are not authorized to interact with this menu.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Confirm Wipe", style=discord.ButtonStyle.danger, emoji="⚠️")
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.confirmed = True
+        self.stop()
+        await interaction.response.defer(ephemeral=True)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.confirmed = False
+        self.stop()
+        await interaction.response.send_message("❌ Wipe cancelled.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

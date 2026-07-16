@@ -167,7 +167,7 @@ EVENT_IMAGES: dict[str, str] = {
 
 
 def get_role_image(role_key: str) -> str | None:
-    """Returns the configured thumbnail URL for a role, checking roles.json fallback."""
+    """Returns the configured thumbnail URL for a role, checking roles.json/emojis fallback."""
     url = ROLE_IMAGES.get(role_key or "", "")
     if url:
         return url
@@ -179,6 +179,26 @@ def get_role_image(role_key: str) -> str | None:
             return url
     except Exception:
         pass
+
+    # Fallback to EMOJIS conversion
+    emoji = get_emoji(role_key)
+    if emoji:
+        import re
+        # 1. Custom Discord emoji check (<:name:id> or <a:name:id>)
+        custom_match = re.match(r"<(a?):[^:]+:([0-9]+)>", emoji)
+        if custom_match:
+            is_animated = bool(custom_match.group(1))
+            emoji_id = custom_match.group(2)
+            ext = "gif" if is_animated else "png"
+            return f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
+
+        # 2. Unicode emoji check (convert to Twemoji CDN link)
+        # Strip variation selector-16 (fe0f) if present
+        chars = [c for c in emoji if ord(c) != 0xfe0f]
+        if chars:
+            codepoints = "-".join(f"{ord(c):x}" for c in chars)
+            return f"https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/{codepoints}.png"
+
     return None
 
 
