@@ -25,14 +25,14 @@ logger = logging.getLogger(__name__)
 
 def get_rules_text() -> str:
     return (
-        f"**{get_emoji('lobby')} WELCOME TO ANIME MAFIA REMASTERED!**\n\n"
-        f"**{get_emoji('lobby')} THE PROTOCOLS:**\n"
+        f"** WELCOME TO ANIME MAFIA REMASTERED!**\n\n"
+        f"**THE PROTOCOLS:**\n"
         "• Your secret identity has been sent directly to your DMs. Keep it secret, or else...\n"
         f"• The Factions: **Town (Protagonists) {get_emoji('Hero')}**, **Mafia (Villains) {get_emoji('Villain')}**, and **Neutrals (Wildcards) {get_emoji('Neutral')}**.\n"
-        "• We cycle between **Night (Sneaky Phase)** and **Day (Finger-Pointing Phase)**.\n\n"
+        "• We cycle between **Night** phase, where you all can use your abilities, and **Day** phase, where you can discuss and vote a potential antagonist.\n\n"
         f"**{get_emoji('night')} THE NIGHT:**\n"
-        "• Execute your abilities in secret via the action buttons. Plot your schemes.\n"
-        "• The Villains share a collective mind and can discuss plans in their dark corner.\n\n"
+        "• Execute your abilities in secret via the action buttons. Can you pull off a big brain play? Or just be yet another passerby.\n"
+        "• The Villains share a collective mind and can discuss plans in their dark corner where they can communicate with each other.\n\n"
         f"**{get_emoji('day')} THE DAY:**\n"
         "• Point fingers, accuse your friends, and vote to drag someone onto the stand!\n"
         "• The defendant has a brief moment to beg for their life (Plea Phase).\n"
@@ -763,7 +763,7 @@ class GameEngine:
             lobby_channel,
             f"<@{host_id}>",
             embed=discord.Embed(
-                title=f"{get_emoji('lobby')} Setup Complete!",
+                title=f"Setup Complete!",
                 description=(
                     "All roles have been assigned and sent to DMs.\n"
                     "Click **Start Game** below to create the game channel and begin the match!"
@@ -797,6 +797,8 @@ class GameEngine:
 
         # Check if this is a resumption
         resuming_phase = session.phase if session.phase not in (GamePhase.JOINING, GamePhase.CLEANUP) else None
+        if resuming_phase and not session.metadata.get("mafia_channel_id"):
+            resuming_phase = None
 
         if resuming_phase:
             logger.info("Resuming active game loop from phase: %s", resuming_phase)
@@ -890,7 +892,7 @@ class GameEngine:
             rules_embed = discord.Embed(
                 title=f"{get_emoji('lobby')} Anime Mafia Remastered — Game Rules",
                 description=get_rules_text(),
-                color=discord.Color.purple()
+                color=discord.Color.from_rgb(0, 0, 0)
             )
             rules_embed.set_footer(text="Roles have been sent to your DMs. Good luck!")
             rules_image = get_event_image("rules")
@@ -902,9 +904,9 @@ class GameEngine:
             await asyncio.sleep(8)
 
             match_start_embed = discord.Embed(
-                title=f"{get_emoji('lobby')} THE GAME HAS BEGUN!",
-                description="All secret roles are assigned. Keep your eyes open, your friends close, and your knives closer...",
-                color=discord.Color.dark_purple()
+                title=f"THE GAME HAS BEGUN!",
+                description="Every player now wears a mask. Some seek justice, others crave blood, and a few answer only to themselves. From this moment on, every word matters, every vote has consequences..",
+                color=discord.Color.from_rgb(255, 255, 255)
             )
             match_start_image = get_event_image("match_start")
             if match_start_image:
@@ -942,7 +944,7 @@ class GameEngine:
                         # Announce Night
                         night_num = session.metadata["night_num"]
                         night_embed = discord.Embed(
-                            title=f"{get_emoji('night')} Night {night_num} — Silence Falls",
+                            title=f"Night {night_num}",
                             description=(
                                 "Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n"
                                 "Check your DMs or use the buttons below to take your action before sunrise!"
@@ -961,7 +963,7 @@ class GameEngine:
                     prompt_text = (
                         f"{get_emoji('refresh')} **Game Resumed.** {get_emoji('night')} **Night Action Phase**\nClick below to prepare your move. The shadows will hide your secret."
                         if is_resume else
-                        f"{get_emoji('night')} **Night Action Phase**\nClick below to prepare your move. The shadows will hide your secret."
+                        f"**Night Action Phase**\nClick below to use your role's ability."
                     )
                     night_msg = await self.bot.message_queue.send(
                         mafia_channel,
@@ -1074,7 +1076,7 @@ class GameEngine:
                             from views.game_ui import VoteUISelectView
                             vote_view = VoteUISelectView(game_id, self)
                             vote_embed = discord.Embed(
-                                title=f"{get_emoji('vote')} Day {session.metadata['day_num']} — Nomination Phase",
+                                title=f"Day {session.metadata['day_num']} - Nomination Phase",
                                 description=(
                                     "Accusations are flying, friendship is a myth! It's time to choose who gets dragged onto the stand.\n"
                                     "Click the button below to nominate someone to face judgment, or vote to skip today's trial."
@@ -1083,7 +1085,7 @@ class GameEngine:
                             )
                             vote_image = get_event_image("vote")
                             if vote_image:
-                                vote_embed.set_image(url=vote_image)
+                                vote_embed.set_image(url="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTkzVOSwfpSbFQmCQiOFDVQ6HYJZSlaPFTif988sFYfU5mV6F7x3SpsAas&s=10")
 
                             vote_msg = await self.bot.message_queue.send(
                                 mafia_channel,
@@ -1095,7 +1097,7 @@ class GameEngine:
                             from views.game_ui import VoteUISelectView
                             vote_view = VoteUISelectView(game_id, self)
                             vote_embed = discord.Embed(
-                                title=f"🔄 Game Resumed — {get_emoji('vote')} Day {session.metadata['day_num']} — Nomination Phase",
+                                title=f"🔄 Game Resumed — Day {session.metadata['day_num']} - Nomination Phase",
                                 description=(
                                     "Accusations are flying, nomination buttons have been refreshed!\n"
                                     "Click the button below to nominate someone to face judgment, or vote to skip today's trial."
@@ -1211,10 +1213,10 @@ class GameEngine:
                             if not is_resume:
                                 plea_time = settings.get("plea_duration", 60)
                                 plea_embed = discord.Embed(
-                                    title=f"{get_emoji('trial')} Trial: Defendant on the Stand",
+                                    title=f"Trial: Defendant on the Stand",
                                     description=(
                                         f"**{defendant_name}** has been dragged onto the stand by majority vote!\n"
-                                        f"They have {plea_time} seconds to defend themselves before the court decides their fate. Speak, or remain silent forever."
+                                        f"They have {plea_time} seconds to defend themselves before the court decides their fate. Speak, or get voted out."
                                     ),
                                     color=discord.Color.orange()
                                 )
@@ -1258,7 +1260,7 @@ class GameEngine:
                                     verdict_view = VerdictUISelectView(game_id, self)
                                     
                                     verdict_embed = discord.Embed(
-                                        title=f"{get_emoji('trial')} Verdict Phase: Life or Death",
+                                        title=f"Verdict Phase: Life or Death",
                                         description=(
                                             f"Cast your final judgment on defendant **{defendant_name}**.\n"
                                             "Will they walk free, or face the hangman's noose? Choose Guilty or Innocent below."
@@ -1321,7 +1323,7 @@ class GameEngine:
 
                                 # send "WE ARE HAVING A RETRIAL!!!" 3 times delayed by like 1s
                                 for _ in range(3):
-                                    await self.bot.message_queue.send(mafia_channel, f"{get_emoji('trial')} **WE ARE HAVING A RETRIAL!!!**")
+                                    await self.bot.message_queue.send(mafia_channel, f"**WE ARE HAVING A RETRIAL!!!**")
                                     await asyncio.sleep(1)
 
                                 # wait a bit
@@ -1481,7 +1483,7 @@ class GameEngine:
                         else:
                             break
                     else:
-                        await self.bot.message_queue.send(mafia_channel, f"{get_emoji('peace')} Voting skipped. No one is on trial today.")
+                        await self.bot.message_queue.send(mafia_channel, f"Voting skipped. No one is on trial today.")
                         break
 
                 # Check Victory after day phase
@@ -1676,10 +1678,10 @@ class GameEngine:
         if mafia_deaths:
             death_description = "\n".join(f"{get_emoji('death')} {msg}" for msg in mafia_deaths)
         else:
-            death_description = f"{get_emoji('day')} No one was targeted by the Mafia tonight."
+            death_description = f"No one was targeted by the Antagonists tonight.. How weird.."
 
         death_embed = discord.Embed(
-            title=f"{get_emoji('death')} {title} — Death Report",
+            title=f"{title} - Death Report",
             description=death_description,
             color=discord.Color.dark_red() if mafia_deaths else discord.Color.gold(),
         )
@@ -1693,7 +1695,7 @@ class GameEngine:
         if other_deaths:
             other_description = "\n".join(f"{get_emoji('death')} {msg}" for msg in other_deaths)
             other_embed = discord.Embed(
-                title=f"{get_emoji('death')} {title} — Other Casualties",
+                title=f"{title} - Other Casualties",
                 description=other_description,
                 color=discord.Color.dark_orange(),
             )
@@ -1718,11 +1720,12 @@ class GameEngine:
                 dead_list.append(f"• ~~{mname}~~ ({role_emoji_prefix}{role_display})")
 
         status_embed = discord.Embed(
-            title=f"{get_emoji('group')} {title} — Player Status",
+            title=f"{title} - Player Status",
             color=discord.Color.blurple(),
         )
-        status_embed.add_field(name=f"{get_emoji('alive')} Alive Players", value="\n".join(alive_list) if alive_list else "None", inline=True)
-        status_embed.add_field(name=f"{get_emoji('death')} Dead Players", value="\n".join(dead_list) if dead_list else "None", inline=True)
+        status_embed.set_image(url="https://img.magnific.com/free-vector/anime-cloud-blue-heaven-sky-vector-background-summer-abstract-cloudy-air-design-with-gradient-sun-light-with-reflection-beautiful-calm-morning-game-outdoor-panorama-with-sunshine-painting_107791-23777.jpg")
+        status_embed.add_field(name=f"Alive Players", value="\n\n".join(alive_list) if alive_list else "None", inline=True)
+        status_embed.add_field(name=f"Dead Players", value="\n\n".join(dead_list) if dead_list else "None", inline=True)
         await self.bot.message_queue.send(channel, embed=status_embed)
         await asyncio.sleep(2.5)  # Wait 2.5 seconds after player status embed before proceeding
 
@@ -2708,7 +2711,7 @@ class GameEngine:
                             if not current_ow or current_ow.send_messages != False:
                                 await channel.set_permissions(member, read_messages=True, send_messages=False)
                         else:
-                            target_player_send = False if mute else None
+                            target_player_send = False if mute else True
                             if not current_ow or current_ow.send_messages != target_player_send:
                                 await channel.set_permissions(member, read_messages=True, send_messages=target_player_send)
 

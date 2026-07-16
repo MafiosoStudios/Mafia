@@ -54,7 +54,7 @@ class StartGameView(discord.ui.View):
         super().__init__(timeout=300)  # 5 minutes to click
         self.game_id = game_id
         self.engine = engine
-        self.children[0].label = f"{get_emoji('lobby')} Start Game"
+        self.children[0].label = "Start Game"
 
     @discord.ui.button(label="Start Game", style=discord.ButtonStyle.success, custom_id="mafia_start_game_button")
     async def start_game(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
