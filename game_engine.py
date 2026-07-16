@@ -708,7 +708,7 @@ class GameEngine:
                 color=embed_color
             )
             from utils.helpers import get_emoji_url
-            emoji_url = get_emoji_url(role_meta.get("emoji"))
+            emoji_url = get_emoji_url(role_emoji) if role_emoji else None
             if emoji_url:
                 embed.set_thumbnail(url=emoji_url)
 
@@ -739,9 +739,10 @@ class GameEngine:
                 embed.add_field(name="Passive Ability", value=passive_ability, inline=False)
             footer_text = role_meta.get("footer", "Keep your role secret!")
             embed.set_footer(text=footer_text)
-            role_image = get_role_image(pstate.role_key)
-            if role_image:
-                embed.set_image(url=role_image)
+            from config import ROLE_IMAGES
+            big_image = ROLE_IMAGES.get(pstate.role_key) or role_meta.get("image_url")
+            if big_image:
+                embed.set_image(url=big_image)
 
             try:
                 self.bot.message_queue.send(member, embed=embed)

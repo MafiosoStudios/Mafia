@@ -78,13 +78,16 @@ class RoleDropdown(discord.ui.Select):
             color=embed_color
         )
         
-        emoji_url = get_emoji_url(rmeta.get("emoji"))
+        from config import get_emoji
+        emoji = get_emoji(rkey)
+        emoji_url = get_emoji_url(emoji) if emoji else None
         if emoji_url:
             embed.set_thumbnail(url=emoji_url)
 
-        role_image = get_role_image(rkey)
-        if role_image:
-            embed.set_image(url=role_image)
+        from config import ROLE_IMAGES
+        big_image = ROLE_IMAGES.get(rkey) or rmeta.get("image_url")
+        if big_image:
+            embed.set_image(url=big_image)
             
         embed.add_field(name="Faction", value=faction, inline=True)
         embed.add_field(name="Win Condition", value=win_condition, inline=False)
