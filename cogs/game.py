@@ -165,6 +165,54 @@ class GameCog(commands.Cog):
             f"🔥 **The discussion phase is cut short. Skipped directly to the Nomination Phase!**"
         )
 
+    @commands.command(name="newrelease")
+    async def newrelease(self, ctx: commands.Context, image_path: str = None) -> None:
+        """Sends an update release embed for AniMafia. (Owner only)"""
+        # Only accessible to the user with discord user id "744831273406824449"
+        if str(ctx.author.id) != "744831273406824449":
+            await ctx.send("❌ **Unauthorized:** Only the developer can use this command.", delete_after=5)
+            return
+
+        import os
+        import discord
+
+        # If no path provided, check default downloads location
+        if not image_path:
+            default_path = r"C:\MafiosoImgs\VersionUpdate1.0.0.png"
+            if os.path.exists(default_path):
+                image_path = default_path
+
+        embed = discord.Embed(
+            title=f"AniMafia",
+            description=(
+                f"We are thrilled to announce the official release of **AniMafia**, "
+                f"the ultimate anime-themed Mafia Discord bot! Here's a brief overview "
+                f"of what this bot brings to the arena:\n\n"
+                f"**Meet the Protagonists & Antagonists**\n"
+                f"• **Ayanokoji Kiyotaka:** A mysterious mastermind who rarely reveals his true abilities. With unmatched intelligence and calculated decisions, he quietly manipulates every situation to achieve his goals.\n"
+                f"• **Tobirama Senju:** The Second Hokage, celebrated for his brilliance, discipline, and tactical genius. A master of powerful jutsu and battlefield strategy, he always places the safety of the village above all else.\n"
+                f"• **Frieza:** The ruthless emperor of the universe, Frieza rules through fear, overwhelming power, and absolute cruelty. Arrogant yet calculating, he views all life as beneath him and will stop at nothing to dominate those who oppose him.\n"
+                f"• **Blackbeard:** A ruthless pirate driven by boundless ambition and an insatiable desire for power. Cunning, unpredictable, and willing to betray anyone, Blackbeard believes destiny favors those bold enough to seize it.\n\n"
+                f"**Meet the Neutrals**\n"
+                f"• **Lelouch Lamperouge:** An exiled prince of the Holy Britannian Empire who gains the power of Geass, the power of absolute obedience.\n"
+                f"• **Gilgamesh** The King of Heroes, Gilgamesh is a proud and unrivaled monarch who views the world as his rightful domain. Possessing immeasurable power and unwavering confidence, he crushes those he deems unworthy without hesitation.\n\n"
+                f"**How the Game Works**\n"
+                f"• ``lobby`` to jump right into the game, ``lobby_create`` to actually host one, this bot operates just like our traditional mafia bots\n"
+                f"• If you do not understand some roles you can always do ``roleinfo`` for information on every character"
+            ),
+            color=discord.Color.from_rgb(0, 0, 0)
+        )
+        embed.set_footer(text="AniMafia Update • Version 1.0.0")
+        if ctx.guild and ctx.guild.icon:
+            embed.set_thumbnail(url=ctx.guild.icon.url)
+
+        if image_path and os.path.exists(image_path):
+            file = discord.File(image_path, filename="release_image.png")
+            embed.set_image(url="attachment://release_image.png")
+            await ctx.send(file=file, embed=embed)
+        else:
+            await ctx.send(embed=embed)
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(GameCog(bot))
