@@ -91,6 +91,7 @@ EMOJIS: dict[str, str] = {
     "tosen": "<:tosen:1527177472561385572>",
     "dazai": "✋",
     "asta": "🍀",
+    "lelouch": "👑",
 
     # Role categories (used for role-reveal / role-list UI)
     "category_protective": "🩹",

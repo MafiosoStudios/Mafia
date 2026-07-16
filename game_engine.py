@@ -252,6 +252,13 @@ class GameEngine:
                 if action_index is not None and action_index < len(role_inst.abilities):
                     ability = role_inst.abilities[action_index]
                     if isinstance(ability, NightAction):
+                        if actor_p.role_key == "doctor_tenma" and ability.name == "Emergency Surgery":
+                            targets = payload.get("targets")
+                            if targets:
+                                last_pair = actor_p.metadata.get("tenma_last_pair")
+                                if last_pair and set(targets) == set(last_pair):
+                                    raise ValueError("You cannot pick the same 2 people as you did last night.")
+                                    
                         can_use, reason = ability.can_use(session, actor_p)
                         if not can_use:
                             raise ValueError(reason or "This ability is currently unavailable.")
@@ -681,11 +688,17 @@ class GameEngine:
             }
             embed_color = color_map.get(pstate.faction, discord.Color.purple())
 
+            role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
             embed = discord.Embed(
-                title=f"Your Role: {role_meta.get('name', 'Unknown')}",
+                title=f"Your Role: {role_emoji_prefix}{role_meta.get('name', 'Unknown')}",
                 description=role_meta.get('description', ''),
                 color=embed_color
             )
+            from utils.helpers import get_emoji_url
+            emoji_url = get_emoji_url(role_meta.get("emoji"))
+            if emoji_url:
+                embed.set_thumbnail(url=emoji_url)
+
             embed.add_field(name="Faction", value=f"{faction_emoji} **{display_faction}**", inline=True)
             embed.add_field(name="Win Condition", value=role_meta.get('win_condition', ''), inline=False)
             
@@ -1313,12 +1326,14 @@ class GameEngine:
                                     # Perform elimination
                                     role_meta = roles.ROLES_METADATA.get(def_state.role_key, {})
                                     role_display = role_meta.get("name", def_state.role_key or "Unknown")
+                                    role_emoji = get_emoji(def_state.role_key) if def_state.role_key else ""
+                                    role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
                                     await self.eliminate_player(game_id, target_id, "execution")
                                     await self.bot.message_queue.send(
                                         mafia_channel,
                                         embed=discord.Embed(
                                             title=f"{get_emoji('death')} Execution",
-                                            description=f"**{defendant_name}** was executed by the town! Their role was **{role_display}**.",
+                                            description=f"**{defendant_name}** was executed by the town! Their role was **{role_emoji_prefix}{role_display}**.",
                                             color=discord.Color.red()
                                         )
                                     )
@@ -1431,10 +1446,12 @@ class GameEngine:
             name = member.display_name if member else f"User {pid}"
             role_meta = roles.ROLES_METADATA.get(rkey, {})
             role_display = role_meta.get("name", rkey)
+            role_emoji = get_emoji(rkey) if rkey else ""
+            role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
             pstate = session.players.get(pid)
             status = "Alive" if (pstate and pstate.alive) else "Dead"
 
-            player_line = f"• **{name}** — {role_display} ({status})"
+            player_line = f"• **{name}** — {role_emoji_prefix}{role_display} ({status})"
 
             # Determine if this player is a winner
             is_winner = False
@@ -1568,7 +1585,9 @@ class GameEngine:
             else:
                 role_meta = roles.ROLES_METADATA.get(pstate.role_key or "", {})
                 role_display = role_meta.get("name", pstate.role_key or "Unknown")
-                dead_list.append(f"• ~~{mname}~~ ({role_display})")
+                role_emoji = get_emoji(pstate.role_key) if pstate.role_key else ""
+                role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
+                dead_list.append(f"• ~~{mname}~~ ({role_emoji_prefix}{role_display})")
 
         status_embed = discord.Embed(
             title=f"{get_emoji('group')} {title} — Player Status",
@@ -1986,6 +2005,43 @@ class GameEngine:
         healed_players = session.metadata.get("healed_players", {})
         life_supports = session.metadata.get("life_supports", {})
 
+        # Doctor Tenma's Emergency Surgery pair calculation
+        tenma_saved = set()
+        tenma_pair = session.metadata.get("tenma_surgery")
+        if tenma_pair:
+            a, b = tenma_pair
+            
+            def would_die(pid):
+                pstate = session.players.get(pid)
+                if not pstate or not pstate.alive:
+                    return False
+                if pid not in pending_kills:
+                    return False
+                
+                # Check protections
+                sources = pending_kills[pid]
+                ignore_protection = any(src in ["tosen_kill", "light_guess", "bang_kill", "frieza_golden_kill"] or "ignore_protection" in src for src in sources)
+                if ignore_protection:
+                    return True
+                    
+                if pid in healed_players:
+                    return False
+                if pid in session.metadata.get("flying_thunder_counters", {}):
+                    return False
+                if pid in session.metadata.get("magical_barriers", {}):
+                    return False
+                    
+                return True
+
+            a_dies = would_die(a)
+            b_dies = would_die(b)
+            
+            if a_dies != b_dies:
+                if a_dies:
+                    tenma_saved.add(a)
+                if b_dies:
+                    tenma_saved.add(b)
+
         for target_id, sources in list(pending_kills.items()):
             target_state = session.players.get(target_id)
             if not target_state or not target_state.alive:
@@ -2169,19 +2225,36 @@ class GameEngine:
                                         pass
                 continue
 
-            # 5. Doctor Tenma Life Support (prevents death, wounds target)
-            if target_id in life_supports:
-                target_state.metadata["wounded_until_day"] = session.metadata.get("day_num", 1) + 1
-                target_state.metadata["wounded_until_night"] = session.metadata.get("night_num", 1) + 1
-                
+            # 5. Doctor Tenma Emergency Surgery link save (prevents death via medical link)
+            if target_id in tenma_saved:
                 mafia_ch_id = session.metadata.get("mafia_channel_id")
                 if mafia_ch_id:
                     ch = self.bot.get_channel(mafia_ch_id)
                     if ch:
                         self.bot.message_queue.send(
                             ch,
-                            f"🩺 **Life Support Activated!** <@{target_id}> was saved from fatal injuries tonight, but they are now Wounded and cannot speak, vote, or act tomorrow."
+                            f"🩺 **Emergency Surgery Successful!** <@{target_id}> was saved from fatal injuries by Doctor Tenma's medical link!"
                         )
+                # Notify Tenma
+                tenma_id = session.metadata.get("tenma_doctor_id")
+                if tenma_id:
+                    tenma_state = session.players.get(tenma_id)
+                    if tenma_state:
+                        doc_saves = tenma_state.metadata.get("saves_count", 0) + 1
+                        tenma_state.metadata["saves_count"] = doc_saves
+                        
+                        guild = self.bot.get_guild(session.game_handle.guild_id) if (self.bot and session.game_handle) else None
+                        if guild:
+                            tenma_member = guild.get_member(tenma_id)
+                            if tenma_member:
+                                try:
+                                    self.bot.message_queue.send(
+                                        tenma_member,
+                                        f"{get_emoji('shield')} **Compassion Successful!** Your medical link saved <@{target_id}> from death tonight! "
+                                        f"Saves: **{doc_saves}/3**."
+                                    )
+                                except Exception:
+                                    pass
                 continue
 
             # Check modular role-specific survival passives (Muzan, Mahoraga)
@@ -2401,6 +2474,8 @@ class GameEngine:
         session.metadata.pop("bungee_gum_links", None)
         session.metadata.pop("devil_union_active", None)
         session.metadata.pop("zoltraak_active", None)
+        session.metadata.pop("tenma_surgery", None)
+        session.metadata.pop("tenma_doctor_id", None)
 
     async def _notify_muzan_conversion(
         self,

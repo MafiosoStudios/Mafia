@@ -2,9 +2,10 @@
   "doctor_tenma": {
     "name": "Doctor Tenma",
     "faction": "Protagonist",
+    "emoji": "🩺",
     "win_condition": "Help the protagonists win.",
     "description": "A brilliant neurosurgeon driven by an unwavering sense of justice and compassion. Despite being caught in a web of tragedy and moral dilemmas, he remains determined to save lives and uphold his humanity at any cost.",
-    "active_ability": "Emergency Surgery - Protect a player from an attack, cannot be used on the same player twice / Life Support - Prevent target's death, making them Wounded instead, once per game.",
+    "active_ability": "Emergency Surgery - Choose 2 players tonight. If one survives and the other dies, both survive. You cannot pick the same 2 people again next night.",
     "passive_ability": "None",
     "action_prompt": "Select an action to perform:",
     "image_url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiYyDyYCpa4hcpCQVLCgne2EVx5w51gd_eeEbxYd4oDYtCyKJWklApvImdB9Ml4vmjvfePTPn_a7kqJRME6lBGFfyeV__IpHkRDiQlYFL_y9BYk6QhayEAw5UgoITkBV-19gFDgJ4ohAJQ/s1600/monster_tenma2.jpg",
@@ -13,6 +14,7 @@
   "ayanokoji_kiyotaka": {
     "name": "Ayanokoji Kiyotaka",
     "faction": "Protagonist",
+    "emoji": "🧠",
     "win_condition": "Help the protagonists win.",
     "description": "A mysterious mastermind who rarely reveals his true abilities. With unmatched intelligence and calculated decisions, he quietly manipulates every situation to achieve his goals.",
     "active_ability": "Observation - Observe a player. Learn who they visited and who visited them / Public Reveal - Starting from Night 4, publicly reveal the role of your target (4 day cooldown).",
@@ -24,6 +26,7 @@
   "l": {
     "name": "L",
     "faction": "Protagonist",
+    "emoji": "🕵️",
     "win_condition": "Help the protagonists win.",
     "description": "The world's greatest detective, renowned for his extraordinary intellect and unmatched deductive skills. Behind his eccentric demeanor lies a relentless investigator determined to uncover the truth, no matter the cost.",
     "active_ability": "Deduction - Investigate target's alignment, this tells you their faction / Cross Examination - Compare two players' factions, this tells you if they are on the same or different side. Twice per game.",
@@ -35,9 +38,10 @@
   "tobirama_senju": {
     "name": "Tobirama Senju",
     "faction": "Protagonist",
+    "emoji": "🌊",
     "win_condition": "Help the protagonists win.",
     "description": "The Second Hokage, celebrated for his brilliance, discipline, and tactical genius. A master of powerful jutsu and battlefield strategy, he always places the safety of the village above all else.",
-    "active_ability": "Sensory Technique - Learn everyone who visited target player tonight / Flying Thunder Counter - Protect a player tonight, completely nullifying any attacks and learning who the attackers were. If the target still dies, the attacker is still revealed (Twice per game).",
+    "active_ability": "Sensory Technique - Learn everyone who visited target player tonight / Flying Thunder Counter - Protect a player tonight, completely nullifying any attacks and learning who the attackers were. If the target dies, the attacker is still revealed (Twice per game).",
     "passive_ability": "Master Sensor - Learn which players visited Tobirama every night.",
     "action_prompt": "Select an action to perform:",
     "image_url": "https://images6.alphacoders.com/944/thumb-1920-944541.png",
@@ -46,6 +50,7 @@
   "hiromi_higuruma": {
     "name": "Hiromi Higuruma",
     "faction": "Protagonist",
+    "emoji": "⚖️",
     "win_condition": "Help the protagonists win.",
     "description": "A former defense attorney who wields justice as both a weapon and a burden. Guided by an unshakable moral compass, he exposes wrongdoing and forces others to face the consequences of their actions.",
     "active_ability": "Deadly Sentencing - Instantly execute a player during Nomination phase, twice per game / Retrial - Acquit defendant during trial, twice per game.",
@@ -57,6 +62,7 @@
   "levi_ackerman": {
     "name": "Levi Ackerman",
     "faction": "Protagonist",
+    "emoji": "⚔️",
     "win_condition": "Help the protagonists win.",
     "description": "Humanity's strongest soldier, feared for his unmatched combat skills and unwavering resolve. Calm under pressure and fiercely loyal to his comrades, Levi never hesitates to make the difficult choices for the greater good.",
     "active_ability": "ODM Execution - Attack a player, 3 uses / Precision Strike - ODM Execution ignores protection tonight, 1 use.",
@@ -68,6 +74,7 @@
   "maomao": {
     "name": "Maomao",
     "faction": "Protagonist",
+    "emoji": "🧪",
     "win_condition": "Help the protagonists win.",
     "description": "A sharp-witted apothecary with an insatiable curiosity for medicine, poisons, and mysteries. Her keen observational skills and logical mind allow her to uncover truths that others fail to notice.",
     "active_ability": "Postmortem Analysis - Select a dead player. You will receive 3 names, one of whom is the killer (2 day cooldown). / \nBrew Potion - Brew a potion of your choice, each potion has a 2 day cooldown:\n• Potion of Truth - Reveals the target's faction.\n• Potion of Invisibility - Target goes invisible.\n• Potion of Happiness - Distract (roleblock) the target.\n• Potion of Revitalization - Restores target's cooldowns.\n• Potion of Intelligence - Target gains +1 vote for tomorrow.",
@@ -79,6 +86,7 @@
   "frieren": {
     "name": "Frieren",
     "faction": "Protagonist",
+    "emoji": "✨",
     "win_condition": "Help the protagonists win.",
     "description": "An ancient elven mage whose quiet demeanor conceals centuries of wisdom and extraordinary magical power. Though she struggles to understand human emotions, her journey teaches her the true value of the bonds forged over a lifetime.",
     "active_ability": "Ancient Binding - Bind 2 players together, if one dies, the survivor is hidden for a night / Demon Detection - Choose 3 players, you will learn how many of those belong to the antagonists / Zoltraak Specialist - Disable the passives of all antagonists and neutrals tonight this has a 2 day cooldown.",
@@ -90,6 +98,7 @@
   "blackbeard": {
     "name": "Blackbeard",
     "faction": "Antagonist",
+    "emoji": "🌋",
     "win_condition": "Help the antagonists win.",
     "description": "A ruthless pirate driven by boundless ambition and an insatiable desire for power. Cunning, unpredictable, and willing to betray anyone, Blackbeard believes destiny favors those bold enough to seize it.",
     "active_ability": "Darkness Logia - Roleblock a player, the player with the Roleblock status effect cannot use their ability that day / Tremor Fruit - Once per game, roleblock every single neutral and protagonist player for that night.",
@@ -101,6 +110,7 @@
   "light_yagami": {
     "name": "Light Yagami",
     "faction": "Antagonist",
+    "emoji": "📓",
     "win_condition": "Help the antagonists win.",
     "description": "A brilliant student whose unwavering belief in his own sense of justice drives him to reshape the world. Armed with exceptional intellect and relentless determination, he orchestrates every move with chilling precision.",
     "active_ability": "Death Note - Choose a player and guess their role, if correct, they die that night. / The Devil's Pen - Write a player's name in the Death Note, they die unpreventably after 3 nights, 3 night cooldown.",
@@ -112,6 +122,7 @@
   "muzan_kibutsuji": {
     "name": "Muzan Kibutsuji",
     "faction": "Antagonist",
+    "emoji": "👹",
     "win_condition": "Help the antagonists win.",
     "description": "The first and most powerful demon, feared for his overwhelming strength and ruthless pursuit of perfection. Cold, manipulative, and merciless, Muzan commands absolute loyalty while eliminating anyone who threatens his reign.",
     "active_ability": "Blood Demon Art - Every 3rd night, starting Night 3, transform a Protagonist player with 85% chance to become a demon with no powers, 10% chance to become a Lower Moon Demon with the ability to Roleblock, and a 5% chance to become an Upper Moon Demon with the ability to kill.",
@@ -123,6 +134,7 @@
   "makima": {
     "name": "Makima",
     "faction": "Antagonist",
+    "emoji": "👁️",
     "win_condition": "Help the antagonists win.",
     "description": "A mysterious Public Safety officer who exudes calm authority and unmatched composure. Beneath her gentle demeanor lies a master manipulator capable of bending both allies and enemies to her will.",
     "active_ability": "Control - Choose a player, redirect target's night action to any other player of choosing. / Bang - Deals unstoppable attack once per game after contract is activated and 2 unique redirects succeed.",
@@ -134,6 +146,7 @@
   "hisoka": {
     "name": "Hisoka Morow",
     "faction": "Neutral",
+    "emoji": "🃏",
     "win_condition": "Survive until the end of the game, and successfully use all of your abilities (Bungee Gum, Texture Surprise, Bloodlust) at least once during the game.",
     "description": "Hisoka has no interest in justice or domination. He lives for excitement, manipulating others and turning the game into his own personal playground.",
     "active_ability": "Bungee Gum - Link two players. If either wins while both are alive, they both win / Texture Surprise - Twice per game, disguise a players faction alignment / Bloodlust - Once per game, redirect any ability targeted at Hisoka back to the attacker.",
@@ -145,6 +158,7 @@
   "gilgamesh": {
     "name": "Gilgamesh",
     "faction": "Neutral",
+    "emoji": "🔱",
     "win_condition": "Find all of your swords to become the Horseman of Apocalypse, then survive for 1 day to trigger The Gate's of Babylon.",
     "description": "The King of Heroes, Gilgamesh is a proud and unrivaled monarch who views the world as his rightful domain. Possessing immeasurable power and unwavering confidence, he crushes those he deems unworthy without hesitation.",
     "active_ability": "Gate of Babylon - Visit a player to search for your sword. If found, you retrieve it. The number of swords needed to be collected depends on the lobby size, 3 for small ones, 5 for larger ones.",
@@ -156,6 +170,7 @@
   "eren_jaeger": {
     "name": "Eren Jaeger",
     "faction": "Neutral",
+    "emoji": "🕊️",
     "win_condition": "Survive until Night 5 to trigger The Rumbling, then kill everyone until you are the last one standing.",
     "description": "A determined soldier whose unyielding desire for freedom drives him to challenge the fate of the world itself. Fiercely passionate and willing to sacrifice everything for his convictions, Eren's choices forever reshape history.",
     "active_ability": "Founding Vision - Select a player every night and learn their faction / The Rumbling - From Night 5 onwards, Eren transforms and gains the ability to kill a player every day. Eren cannot be lynched after the Rumbling begins.",
@@ -167,6 +182,7 @@
   "mahoraga": {
     "name": "Eight-Handled Sword Divergent Sila Divine General Mahoraga",
     "faction": "Neutral",
+    "emoji": "🌀",
     "win_condition": "Survive an attack and eliminate at least 1 player who tried to kill you.",
     "description": "The ultimate adapted shikigami.The ultimate shikigami of the Ten Shadows Technique, Mahoraga is an unstoppable force that continuously adapts to any attack or ability it endures. Once summoned, its relentless evolution makes it one of the most terrifying entities to face in battle.",
     "active_ability": "The Eight-Handled Wheel - Kill the player who attacked you.",
@@ -178,6 +194,7 @@
   "villager": {
     "name": "Default Villager",
     "faction": "Protagonist",
+    "emoji": "🧑",
     "win_condition": "Help the protagonists win. (Wins with Protagonists)",
     "description": "A normal citizen of the anime world.",
     "active_ability": "None",
@@ -187,6 +204,7 @@
   "frieza": {
     "name": "Frieza",
     "faction": "Antagonist",
+    "emoji": "👽",
     "win_condition": "Help the antagonists win.",
     "description": "The ruthless emperor of the universe, Frieza rules through fear, overwhelming power, and absolute cruelty. Arrogant yet calculating, he views all life as beneath him and will stop at nothing to dominate those who oppose him.",
     "active_ability": "Death Beam - Choose a player to eliminate every night.",
@@ -198,6 +216,7 @@
   "demon": {
     "name": "Demon",
     "faction": "Antagonist",
+    "emoji": "👿",
     "win_condition": "Help the antagonists win.",
     "description": "A human turned demon by Muzan Kibutsuji.",
     "active_ability": "None",
@@ -207,6 +226,7 @@
   "lower_moon": {
     "name": "Lower Moon Demon",
     "faction": "Antagonist",
+    "emoji": "🌙",
     "win_condition": "Help the antagonists win.",
     "description": "A powerful demon who serves Muzan Kibutsuji.",
     "active_ability": "Distract (Roleblock a player).",
@@ -216,6 +236,7 @@
   "upper_moon": {
     "name": "Upper Moon Demon",
     "faction": "Antagonist",
+    "emoji": "💀",
     "win_condition": "Help the antagonists win.",
     "description": "A lethal demon with supreme power.",
     "active_ability": "Demon Strike (Kill a player).",
@@ -225,6 +246,7 @@
   "kishibe": {
     "name": "Kishibe",
     "faction": "Protagonist",
+    "emoji": "🥃",
     "description": "A grizzled, battle worn hunter who survived countless encounters with devils. Kishibe has no illusions about humanity, he fights because he has nothing left to lose. Taciturn and ruthless, he is considered one of the strongest humans alive.",
     "active_ability": "Veteran's Instinct (Alert) - Go on Alert, anyone who visits you is attacked with a Powerful Attack, 3 charges / Broken Screw - Once per game, Choose a player, if they visit you tonight, your Alert charge is saved.",
     "passive_ability": "Battle-Hardened - The first time someone attempts to roleblock, control, or redirect Kishibe, the effect fails and the visitor is notified that their target resisted them.",
@@ -236,6 +258,7 @@
   "tosen": {
     "name": "Kaname Tosen",
     "faction": "Protagonist",
+    "emoji": "<:tosen:1527177472561385572>",
     "description": "The Blind Judge who seeks a path of least bloodshed. Tosen wields the most terrifying Bankai - Suzumushi Tsuishiki: Enma Korogi - which erases all senses of those trapped within it. His absolute judgment cannot be defied.",
     "active_ability": "Bankai: Enma Korogi - Every night, detain a player inside your Bankai. They cannot act, cannot be targeted, and may only communicate privately with Tosen. On the following night, choose to release them or execute them (max 3 executions). Executing a protagonist permanently removes your execution ability.",
     "passive_ability": "Suzumushi - Players detained inside Enma Korogi cannot activate any abilities that trigger upon death, while dying, or after death. Roles that passively evade death will not be activated. His judgment is absolute.",
@@ -247,6 +270,7 @@
   "dazai": {
     "name": "Osamu Dazai",
     "faction": "Protagonist",
+    "emoji": "✋",
     "description": "A member of the Armed Detective Agency, Dazai possesses the ability to nullify any supernatural power with a single touch. Beneath his eccentric, suicidal exterior lies a mind of unmatched strategic genius.",
     "active_ability": "No Longer Human - Select a player every night, nullify the target's abilities for the night, they cannot use active abilities, their passive is suppressed, and visits are cancelled. The cooldown is 1 night.",
     "passive_ability": "Unpredictable - Dazai is immune to redirects, control, or forced visits. His chosen action will always proceed.",
@@ -258,6 +282,7 @@
   "asta": {
     "name": "Asta",
     "faction": "Protagonist",
+    "emoji": "🍀",
     "description": "An orphan who received a five-leaf clover grimoire and wields Anti-Magic swords. Despite having zero mana, his sheer physical strength, determination, and anti-magic make him one of the most formidable magic knights.",
     "active_ability": "Demon Destroyer Sword - Select a player every night to cleanse all negative status effects from them. / Black Divider - Choose a player every other night and nullify their abilities for that day. / Devil Union - Once per game, Asta can merge with his devil and nullify EVERY hostile ability to protect the town",
     "passive_ability": "Anti-Magic - Immune to all negative non-physical abilities (Roleblocks, frames, hexes, silences, curses, redirects). Not immune to direct kills or lynching.",
@@ -269,6 +294,7 @@
   "lelouch": {
     "name": "Lelouch Lamperouge",
     "faction": "Neutral",
+    "emoji": "👑",
     "description": "An exiled prince of the Holy Britannian Empire who gains the power of Geass, the power of absolute obedience. Donning the mask of Zero, he leads the Black Knights to tear down the world's corruption and construct a gentler tomorrow.",
     "active_ability": "Geass - Choose a player. The following day all votes towards that player count double in both nomination and voting phases, 1 Night cooldown. / \nBlack Knight - Once per game, cause a rebellion in the lobby during discussion, ending the day phase immediately to start voting.",
     "passive_ability": "Zero Requiem - If Lelouch is executed/lynched at any point during the day, the game ends immediately and Lelouch wins the match.",

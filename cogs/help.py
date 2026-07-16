@@ -91,6 +91,11 @@ class HelpCog(commands.Cog):
             description=description,
             color=embed_color
         )
+        from utils.helpers import get_emoji_url
+        emoji_url = get_emoji_url(character_matched_meta.get("emoji"))
+        if emoji_url:
+            embed.set_thumbnail(url=emoji_url)
+
         from config import get_role_image
         role_image = get_role_image(character_matched_key)
         if role_image:

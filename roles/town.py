@@ -14,55 +14,27 @@ class TenmaEmergencySurgery(NightAction):
     def __init__(self) -> None:
         super().__init__(
             name="Emergency Surgery",
-            description="Heal/protect a player from attacks. Cooldown: 1 Night.",
+            description="Choose 2 players tonight. If one survives and the other dies, both survive. You cannot pick the same 2 people again next night.",
             priority=1
         )
+        self.num_targets = 2
 
-    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
-        last_used = player_state.metadata.get("tenma_surgery_last_used")
-        if last_used is not None and session.night_num - last_used < 2:
-            return False, f"Emergency Surgery is on cooldown until Night {last_used + 2}."
-        return True, None
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        return [pid for pid, pstate in session.players.items() if pstate.alive and pid != actor_id]
 
     async def execute(self, context: RoleContext) -> None:
-        target_id = context.target_id
+        targets = context.targets
         session = context.payload.get("session")
-        if not target_id or not session:
+        if len(targets) < 2 or not session:
             return
 
         player_state = session.players[context.user_id]
-        player_state.metadata["tenma_surgery_last_used"] = session.night_num
+        player_state.metadata["tenma_last_pair"] = list(targets)
 
-        session.metadata.setdefault("doctor_heals", {})[target_id] = context.user_id
-        context.payload["result"] = f"🩺 **Emergency Surgery:** You prepared to protect <@{target_id}> tonight."
+        session.metadata["tenma_surgery"] = list(targets)
+        session.metadata["tenma_doctor_id"] = context.user_id
 
-
-class TenmaLifeSupport(NightAction):
-    def __init__(self) -> None:
-        super().__init__(
-            name="Life Support",
-            description="Connect a player to life support. If they would die tonight, they survive but become Wounded. (1 use)",
-            priority=1
-        )
-
-    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
-        uses = player_state.metadata.setdefault("tenma_life_support_uses", 1)
-        if uses <= 0:
-            return False, "Life Support has no uses left."
-        return True, None
-
-    async def execute(self, context: RoleContext) -> None:
-        target_id = context.target_id
-        session = context.payload.get("session")
-        if not target_id or not session:
-            return
-
-        player_state = session.players[context.user_id]
-        uses = player_state.metadata.get("tenma_life_support_uses", 1)
-        player_state.metadata["tenma_life_support_uses"] = max(0, uses - 1)
-
-        session.metadata.setdefault("life_supports", {})[target_id] = context.user_id
-        context.payload["result"] = f"🩺 **Life Support:** You connected <@{target_id}> to life support tonight."
+        context.payload["result"] = f"🩺 **Emergency Surgery:** You established a medical link between <@{targets[0]}> and <@{targets[1]}>."
 
 
 @role_registry.register
@@ -70,12 +42,12 @@ class DoctorTenma(BaseRole):
     role_key: ClassVar[str] = "doctor_tenma"
     priority: ClassVar[int] = 1
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.PROTECTIVE,)
-    cooldown_text: ClassVar[str] = "Emergency Surgery: 1 Night"
-    limitations_text: ClassVar[str] = "Life Support: 1 use per game"
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "Cannot select the same 2 players on consecutive nights"
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [TenmaEmergencySurgery(), TenmaLifeSupport()]
+        self.abilities = [TenmaEmergencySurgery()]
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
         return context.payload.get("result")

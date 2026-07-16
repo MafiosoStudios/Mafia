@@ -43,7 +43,16 @@ class GameCog(commands.Cog):
             await send_hybrid_response(ctx, embed=embed, view=VoteView(), ephemeral=True)
             return
 
-        player_lines = [f"<@{user_id}>: {state.role_key or 'Unassigned'}" for user_id, state in session.players.items()]
+        import roles
+        player_lines = []
+        for user_id, state in session.players.items():
+            if state.role_key:
+                role_emoji = get_emoji(state.role_key)
+                role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
+                role_name = roles.ROLES_METADATA.get(state.role_key, {}).get("name", state.role_key)
+                player_lines.append(f"<@{user_id}>: {role_emoji_prefix}{role_name}")
+            else:
+                player_lines.append(f"<@{user_id}>: Unassigned")
         embed = build_status_embed(
             f"Game {active.game_id}",
             "\n".join(player_lines) if player_lines else "No players registered.",

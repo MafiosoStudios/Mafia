@@ -36,7 +36,10 @@ HELP_TOPICS: tuple[HelpTopic, ...] = (
         label="Game",
         description="Check game state and access match tools.",
         title="Game Commands",
-        body="`game status` - view the current match state",
+        body=(
+            "`game status` - view the current match state\n"
+            "`rebellion` (or `rebel`) - cause a rebellion during discussion (Lelouch only)"
+        ),
         color=discord.Color.from_rgb(110, 58, 190),
     ),
     HelpTopic(
@@ -71,7 +74,10 @@ HELP_TOPICS: tuple[HelpTopic, ...] = (
         label="Admin",
         description="Moderator controls and maintenance tools.",
         title="Admin Commands",
-        body="`admin sync` - sync application commands",
+        body=(
+            "`admin sync` - sync application commands\n"
+            "`newrelease` - post new bot release update (Developer only)"
+        ),
         color=discord.Color.from_rgb(201, 72, 72),
     ),
 )
@@ -81,7 +87,7 @@ class HelpSelect(discord.ui.Select):
     def __init__(self, view: "HelpView") -> None:
         self.view_ref = view
         super().__init__(
-            placeholder="Choose a command category...",
+            placeholder="Choose a command category..",
             min_values=1,
             max_values=1,
             options=[
@@ -109,12 +115,12 @@ class HelpView(discord.ui.View):
     @staticmethod
     def build_index_embed(prefix: str) -> discord.Embed:
         lines = [
-            f"`{prefix}lobby` - lobby management",
-            f"`{prefix}game` - active match controls",
-            f"`{prefix}profile` - player stats",
-            f"`{prefix}shop` - cosmetics and inventory",
-            f"`{prefix}leaderboard` - server rankings",
-            f"`{prefix}admin` - moderator tools",
+            f"`{prefix}lobby` - Lobby Management",
+            f"`{prefix}game` - Active Match Controls",
+            f"`{prefix}profile` - Player Stats",
+            f"`{prefix}shop` - Cosmetics and Inventory",
+            f"`{prefix}leaderboard` - Server Rankings",
+            f"`{prefix}admin` - Moderator Tools",
         ]
         embed = build_status_embed("Anime Mafia Help", "\n".join(lines))
         embed.add_field(name="How to use", value="Pick a category from the menu below to see a short explanation.", inline=False)

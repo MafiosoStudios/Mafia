@@ -47,3 +47,32 @@ async def send_hybrid_response(
             return await ctx.interaction.original_response()
 
     return await ctx.send(**message_kwargs)
+
+
+def get_emoji_url(emoji_str: str) -> str | None:
+    if not emoji_str:
+        return None
+    emoji_str = emoji_str.strip()
+    
+    # Check if it's a custom Discord emoji: <:name:id> or <a:name:id>
+    if emoji_str.startswith("<") and emoji_str.endswith(">"):
+        parts = emoji_str.split(":")
+        if len(parts) >= 3:
+            emoji_id = parts[-1].rstrip(">")
+            is_animated = emoji_str.startswith("<a:")
+            ext = "gif" if is_animated else "png"
+            return f"https://cdn.discordapp.com/emojis/{emoji_id}.{ext}"
+            
+    # Otherwise, assume it's a standard unicode emoji and get its Twemoji URL
+    try:
+        codepoints = []
+        for char in emoji_str:
+            cp = f"{ord(char):x}"
+            if cp != "fe0f":
+                codepoints.append(cp)
+        if not codepoints:
+            return None
+        hex_str = "-".join(codepoints)
+        return f"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{hex_str}.png"
+    except Exception:
+        return None
