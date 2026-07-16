@@ -235,7 +235,7 @@ class AdminCog(commands.Cog):
 
     @commands.hybrid_command(name="push", description="Stage all, commit, push changes, and print git output (Developer only)")
     @discord.app_commands.describe(message="The commit message")
-    async def push(self, ctx: commands.Context, message: str) -> None:
+    async def push(self, ctx: commands.Context, *, message: str) -> None:
         import config
         if ctx.author.id not in config.ADMIN_IDS:
             await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** Only bot developers can run this command.", ephemeral=True)
