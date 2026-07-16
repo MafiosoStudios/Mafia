@@ -59,11 +59,11 @@ def _parse_int_tuple(value: str) -> tuple[int, ...]:
 # =============================================================================
 EMOJIS: dict[str, str] = {
     # Factions
-    "Hero": "🛡️",
-    "Villain": "🩸",
-    "Protagonist": "🛡️",
-    "Antagonist": "🩸",
-    "Neutral": "🎭",
+    "Hero": "<:protagonist:1527264556697780304>",
+    "Villain": "<:antagonist:1527264705838846105>",
+    "Protagonist": "<:protagonist:1527264556697780304>",
+    "Antagonist": "<:antagonist:1527264705838846105>",
+    "Neutral": "<:neutral:1527264748217962637>",
 
     # Roles
     "doctor_tenma": "🩺",
