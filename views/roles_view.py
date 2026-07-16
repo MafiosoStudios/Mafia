@@ -7,8 +7,9 @@ from utils.helpers import get_emoji_url
 
 
 class RoleDropdown(discord.ui.Select):
-    def __init__(self, view_ref: RolesView) -> None:
+    def __init__(self, view_ref: RolesView, faction_group: str) -> None:
         self.view_ref = view_ref
+        self.faction_group = faction_group
         options = []
         
         # Sort roles by name
@@ -18,6 +19,14 @@ class RoleDropdown(discord.ui.Select):
         )
         
         for rkey, rmeta in sorted_roles:
+            faction = rmeta.get("faction", "Unknown")
+            is_town = faction in ("Hero", "Town", "Protagonist")
+            
+            if faction_group == "town" and not is_town:
+                continue
+            if faction_group == "mafia_neutral" and is_town:
+                continue
+                
             name = rmeta.get("name", rkey.replace("_", " ").title())
             emoji = get_emoji(rkey)
             select_emoji = None
@@ -40,8 +49,9 @@ class RoleDropdown(discord.ui.Select):
                 )
             )
             
+        placeholder = "Select a Town Character..." if faction_group == "town" else "Select a Mafia / Neutral Character..."
         super().__init__(
-            placeholder="Select a character to view info...",
+            placeholder=placeholder,
             min_values=1,
             max_values=1,
             options=options
@@ -118,7 +128,8 @@ class RoleDropdown(discord.ui.Select):
             embed.set_footer(text=footer_text)
 
         new_view = discord.ui.View(timeout=180)
-        new_view.add_item(RoleDropdown(self.view_ref))
+        new_view.add_item(RoleDropdown(self.view_ref, "town"))
+        new_view.add_item(RoleDropdown(self.view_ref, "mafia_neutral"))
         new_view.add_item(BackButton(self.view_ref))
         
         await interaction.response.edit_message(embed=embed, view=new_view)
@@ -136,14 +147,16 @@ class BackButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction) -> None:
         embed = self.view_ref.build_index_embed()
         new_view = discord.ui.View(timeout=180)
-        new_view.add_item(RoleDropdown(self.view_ref))
+        new_view.add_item(RoleDropdown(self.view_ref, "town"))
+        new_view.add_item(RoleDropdown(self.view_ref, "mafia_neutral"))
         await interaction.response.edit_message(embed=embed, view=new_view)
 
 
 class RolesView(discord.ui.View):
     def __init__(self) -> None:
         super().__init__(timeout=180)
-        self.add_item(RoleDropdown(self))
+        self.add_item(RoleDropdown(self, "town"))
+        self.add_item(RoleDropdown(self, "mafia_neutral"))
 
     @staticmethod
     def build_index_embed() -> discord.Embed:
@@ -167,7 +180,7 @@ class RolesView(discord.ui.View):
 
         embed = discord.Embed(
             title="🎭 The AniMafia Roster",
-            description="Select any character from the dropdown menu below to view their active/passive abilities, win conditions, and strategic role mechanics.",
+            description="Select any character from the dropdown menus below to view their active/passive abilities, win conditions, and strategic role mechanics.",
             color=discord.Color.dark_purple()
         )
         
