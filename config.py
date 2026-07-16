@@ -68,7 +68,7 @@ EMOJIS: dict[str, str] = {
     # Roles
     "doctor_tenma": "🩺",
     "ayanokoji_kiyotaka": "🧠",
-    "l": "🕵️",
+    "l": "<:L_:1527176987473477774>",
     "blackbeard": "🌋",
     "light_yagami": "📓",
     "muzan_kibutsuji": "👹",
