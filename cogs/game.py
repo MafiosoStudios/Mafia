@@ -293,6 +293,56 @@ class GameCog(commands.Cog):
         embed = TutorialView.build_index_embed()
         await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=True)
 
+    @commands.hybrid_command(name="roles", description="View the interactive directory of every role in the game")
+    async def roles(self, ctx: commands.Context) -> None:
+        from views.roles_view import RolesView
+        view = RolesView()
+        embed = RolesView.build_index_embed()
+        await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=True)
+
+    @commands.hybrid_command(name="invite", description="Generate the bot's invite link with calculated permissions")
+    async def invite(self, ctx: commands.Context) -> None:
+        # Programmatic permissions calculation based on required bot operations
+        perms = discord.Permissions()
+        perms.view_channel = True
+        perms.send_messages = True
+        perms.embed_links = True
+        perms.attach_files = True
+        perms.manage_channels = True
+        perms.manage_messages = True
+        perms.add_reactions = True
+        perms.use_external_emojis = True
+        perms.read_message_history = True
+        
+        # Scopes: bot and applications.commands
+        client_id = self.bot.user.id if self.bot.user else 0
+        invite_url = discord.utils.oauth_url(
+            client_id=client_id,
+            permissions=perms,
+            scopes=("bot", "applications.commands")
+        )
+
+        embed = discord.Embed(
+            title="🔗 Summon AniMafia",
+            description=(
+                "Invoke the ultimate anime-themed social deduction bot to your server!\n"
+                "Unleash characters like Frieza, Lelouch, and Ayanokoji in intense faction battles."
+            ),
+            color=discord.Color.purple()
+        )
+        if self.bot.user and self.bot.user.avatar:
+            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(
+            label="Invite Bot",
+            url=invite_url,
+            style=discord.ButtonStyle.link,
+            emoji="🎮"
+        ))
+        
+        await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=True)
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(GameCog(bot))
