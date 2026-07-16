@@ -98,16 +98,16 @@ class SpectateView(discord.ui.View):
     async def spectate(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         session = await self.engine.get_session(self.game_id)
         if not session:
-            await interaction.response.send_message("❌ This game is no longer active.", ephemeral=True)
+            await interaction.response.send_message(f"{get_emoji('cross')} This game is no longer active.", ephemeral=True)
             return
 
         if interaction.user.id in session.player_ids:
-            await interaction.response.send_message("❌ You are a player in this game! You cannot spectate.", ephemeral=True)
+            await interaction.response.send_message(f"{get_emoji('cross')} You are a player in this game! You cannot spectate.", ephemeral=True)
             return
 
         mafia_ch_id = session.metadata.get("mafia_channel_id")
         if not mafia_ch_id:
-            await interaction.response.send_message("❌ Match channel not found.", ephemeral=True)
+            await interaction.response.send_message(f"{get_emoji('cross')} Match channel not found.", ephemeral=True)
             return
 
         guild = interaction.guild
@@ -115,10 +115,10 @@ class SpectateView(discord.ui.View):
             ch = guild.get_channel(mafia_ch_id)
             if ch:
                 await ch.set_permissions(interaction.user, read_messages=True, send_messages=False)
-                await interaction.response.send_message(f"✅ You are now spectating! Check out <#{mafia_ch_id}>.", ephemeral=True)
+                await interaction.response.send_message(f"{get_emoji('check')} You are now spectating! Check out <#{mafia_ch_id}>.", ephemeral=True)
                 return
 
-        await interaction.response.send_message("❌ Failed to add spectator permissions.", ephemeral=True)
+        await interaction.response.send_message(f"{get_emoji('cross')} Failed to add spectator permissions.", ephemeral=True)
 
 
 class NightActionView(discord.ui.View):
@@ -206,9 +206,9 @@ class NightActionView(discord.ui.View):
                     if inter.user.id in session.night_actions:
                         session.night_actions.pop(inter.user.id, None)
                         player.night_actions_used = max(0, player.night_actions_used - 1)
-                        await inter.response.edit_message(content="✅ **Your night action has been cancelled.**", view=None)
+                        await inter.response.edit_message(content=f"{get_emoji('check')} **Your night action has been cancelled.**", view=None)
                         return
-                await inter.response.send_message("❌ You have not submitted any night actions yet tonight.", ephemeral=True)
+                await inter.response.send_message(f"{get_emoji('cross')} You have not submitted any night actions yet tonight.", ephemeral=True)
             cancel_btn.callback = ly_cancel_callback
             view.add_item(cancel_btn)
             
@@ -286,9 +286,9 @@ class NightAbilityButtonsView(discord.ui.View):
                         player_state.night_actions_used = max(0, player_state.night_actions_used - 1)
                         removed = True
                 
-                msg = f"❌ **You cannot use {ability.name} yet.**\nReason: {reason or 'Not available.'}"
+                msg = f"{get_emoji('cross')} **You cannot use {ability.name} yet.**\nReason: {reason or 'Not available.'}"
                 if removed:
-                    msg += "\n⚠️ **Your previously registered night action target has been cleared.**"
+                    msg += f"\n{get_emoji('warning')} **Your previously registered night action target has been cleared.**"
                 await interaction.response.send_message(msg, ephemeral=True)
                 return
 
@@ -381,10 +381,10 @@ class NightAbilityButtonsView(discord.ui.View):
             if self.player_id in session.night_actions:
                 session.night_actions.pop(self.player_id, None)
                 player_state.night_actions_used = max(0, player_state.night_actions_used - 1)
-                await interaction.response.edit_message(content="✅ **Your night action has been cancelled.**\nFeel free to select a new target at any time tonight.", view=None)
+                await interaction.response.edit_message(content=f"{get_emoji('check')} **Your night action has been cancelled.**\nFeel free to select a new target at any time tonight.", view=None)
                 return
         
-        await interaction.response.send_message("❌ You have not submitted any night actions yet tonight.", ephemeral=True)
+        await interaction.response.send_message(f"{get_emoji('cross')} You have not submitted any night actions yet tonight.", ephemeral=True)
 
 
 class AbilityTargetSelect(discord.ui.Select):
@@ -995,7 +995,7 @@ class VoteUISelectView(discord.ui.View):
                     v = discord.ui.View(timeout=60)
                     select = HiromiDeadlySentencingSelect(self.game_id, self.engine, deadly_targets)
                     v.add_item(select)
-                    await inter.response.send_message("⚖️ **Deadly Sentencing:** Select a player to instantly execute:", view=v, ephemeral=True)
+                    await inter.response.send_message(f"{get_emoji('trial')} **Deadly Sentencing:** Select a player to instantly execute:", view=v, ephemeral=True)
 
                 btn_normal.callback = normal_cb
                 btn_deadly.callback = deadly_cb
@@ -1051,7 +1051,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         mafia_channel = interaction.channel
         await self.engine.bot.message_queue.send(
             mafia_channel,
-            f"🏛️ **Hiromi Higuruma has declared Deadly Sentencing!**\n"
+            f"{get_emoji('court')} **Hiromi Higuruma has declared Deadly Sentencing!**\n"
             f"Hiromi Higuruma decided to put <@{target_id}> on the stand!"
         )
 
@@ -1065,7 +1065,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
 
         await self.engine.bot.message_queue.send(
             mafia_channel,
-            f"⚖️ The defendant <@{target_id}> was aligned with the **{faction_display}** faction!"
+            f"{get_emoji('trial')} The defendant <@{target_id}> was aligned with the **{faction_display}** faction!"
         )
 
         await asyncio.sleep(3)
@@ -1073,7 +1073,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         await self.engine.eliminate_player(self.game_id, target_id, "deadly_sentencing")
         await self.engine.bot.message_queue.send(
             mafia_channel,
-            f"⚡ Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
+            f"{get_emoji('zap')} Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
         )
 
         if target_faction == RoleFaction.HERO.value:
@@ -1081,7 +1081,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
             await self.engine.eliminate_player(self.game_id, interaction.user.id, "wrongful_judgment")
             await self.engine.bot.message_queue.send(
                 mafia_channel,
-                f"⚠️ **Wrongful Judgment!** Hiromi Higuruma executed a fellow **Town** member and was executed by the Hangman!"
+                f"{get_emoji('warning')} **Wrongful Judgment!** Hiromi Higuruma executed a fellow **Town** member and was executed by the Hangman!"
             )
 
         async with self.engine._lock:
@@ -1194,9 +1194,9 @@ class VerdictUISelectView(discord.ui.View):
                     mafia_channel = inter.channel
                     await self.engine.bot.message_queue.send(
                         mafia_channel,
-                        f"⚖️ <@{inter.user.id}> (Hiromi Higuruma) has activated **Retrial** for this case!"
+                        f"{get_emoji('trial')} <@{inter.user.id}> (Hiromi Higuruma) has activated **Retrial** for this case!"
                     )
-                    await inter.response.edit_message(content="⚖️ **Retrial Activated!**", view=None)
+                    await inter.response.edit_message(content=f"{get_emoji('trial')} **Retrial Activated!**", view=None)
 
                 btn_normal.callback = normal_cb
                 btn_retrial.callback = retrial_cb

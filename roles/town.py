@@ -109,7 +109,7 @@ class AyanokojiObservation(NightAction):
 
         context.payload["result"] = (
             f"🧠 **Observation Result:** <@{target_id}> visited **{visited_str}**.\n"
-            f"🕵️‍♂️ They were visited by: **{visitors_str}**.\n"
+            f"{get_emoji('detective')} They were visited by: **{visitors_str}**.\n"
             f'*"People reveal more through their actions than their words."*'
         )
 
@@ -172,7 +172,7 @@ class AyanokojiPublicReveal(NightAction):
                     pass
             if ch:
                 embed = discord.Embed(
-                    title="👁️ Ayanokoji Kiyotaka — Mastermind Revelation",
+                    title=f"{get_emoji('ayanokoji')} Ayanokoji Kiyotaka — Mastermind Revelation",
                     description=(
                         f"Ayanokoji Kiyotaka has analyzed the targets from the shadows and exposed a player's true identity!\n\n"
                         f"👤 **Player:** <@{target_id}>\n"
@@ -186,7 +186,7 @@ class AyanokojiPublicReveal(NightAction):
                     embed.set_thumbnail(url=footer_img)
                 await context.bot.message_queue.send(ch, embed=embed)
 
-        context.payload["result"] = f"👁️ **Public Reveal:** You have publicly exposed <@{target_id}> as the **{role_display}** ({faction_display})."
+        context.payload["result"] = f"{get_emoji('ayanokoji')} **Public Reveal:** You have publicly exposed <@{target_id}> as the **{role_display}** ({faction_display})."
 
 
 @role_registry.register
@@ -241,10 +241,10 @@ class LDeduction(NightAction):
 
         if scan_count >= 2:
             role_display = target_player.role_key.replace('_', ' ').title()
-            context.payload["result"] = f"🕵️ **Deduction (Scan {scan_count}):** <@{target_id}>'s exact role is **{role_display}**."
+            context.payload["result"] = f"{get_emoji('detective')} **Deduction (Scan {scan_count}):** <@{target_id}>'s exact role is **{role_display}**."
         else:
-            align_emoji = "🍏 Protagonist" if faction == RoleFaction.HERO.value else ("🍎 Antagonist" if faction == RoleFaction.VILLAIN.value else "🟡 Neutral")
-            context.payload["result"] = f"🕵️ **Deduction (Scan 1):** <@{target_id}>'s alignment is **{align_emoji}**."
+            align_emoji = f"{get_emoji('hero')} Protagonist" if faction == RoleFaction.HERO.value else (f"{get_emoji('villain')} Antagonist" if faction == RoleFaction.VILLAIN.value else f"{get_emoji('neutral')} Neutral")
+            context.payload["result"] = f"{get_emoji('detective')} **Deduction (Scan 1):** <@{target_id}>'s alignment is **{align_emoji}**."
 
 
 class LCrossExamination(NightAction):
@@ -282,7 +282,7 @@ class LCrossExamination(NightAction):
         f2 = RoleFaction.VILLAIN.value if p2.metadata.get("framed") else p2.metadata.get("disguised_faction", p2.faction)
 
         same = (f1 == f2)
-        context.payload["result"] = f"🕵️ **Cross Examination:** <@{t1}> and <@{t2}> belong to **{'the same faction' if same else 'different factions'}**."
+        context.payload["result"] = f"{get_emoji('detective')} **Cross Examination:** <@{t1}> and <@{t2}> belong to **{'the same faction' if same else 'different factions'}**."
 
 
 @role_registry.register
@@ -439,7 +439,7 @@ class LeviODMExecution(NightAction):
 
         pending_kills = session.metadata.setdefault("pending_kills", {})
         pending_kills[target_id] = pending_kills.get(target_id, []) + ["levi_kill"]
-        context.payload["result"] = f"⚔️ **ODM Execution:** You launched a strike against <@{target_id}> (Precision strike active: **{precision}**)."
+        context.payload["result"] = f"{get_emoji('sword')} **ODM Execution:** You launched a strike against <@{target_id}> (Precision strike active: **{precision}**)."
 
 
 class LeviPrecisionStrike(NightAction):
@@ -467,7 +467,7 @@ class LeviPrecisionStrike(NightAction):
         uses = player_state.metadata.get("levi_precision_uses", 1)
         player_state.metadata["levi_precision_uses"] = max(0, uses - 1)
         player_state.metadata["levi_precision_active"] = True
-        context.payload["result"] = "⚔️ **Precision Strike:** Your ODM Execution tonight will bypass standard protections."
+        context.payload["result"] = f"{get_emoji('sword')} **Precision Strike:** Your ODM Execution tonight will bypass standard protections."
 
 
 @role_registry.register
@@ -1056,7 +1056,7 @@ class DazaiNoLongerHuman(NightAction):
                     member = guild.get_member(t_id) if guild else None
                     if member:
                         try:
-                            bot.message_queue.send(member, "❌ **Your abilities were nullified tonight.**")
+                            bot.message_queue.send(member, f"{get_emoji('cross')} **Your abilities were nullified tonight.**")
                         except Exception:
                             pass
             asyncio.create_task(notify_nullified())
@@ -1109,7 +1109,7 @@ class AstaDemonDestroyer(NightAction):
                     cleansed.append(key)
 
             context.payload["log"] = f"Asta cleansed <@{target_id}> of negative effects: {', '.join(cleansed) if cleansed else 'none'}."
-            context.payload["result"] = f"⚔️ **Demon Destroyer Sword!** You have cleansed <@{target_id}> of all negative status effects."
+            context.payload["result"] = f"{get_emoji('sword')} **Demon Destroyer Sword!** You have cleansed <@{target_id}> of all negative status effects."
 
             # Notify target
             if cleansed:
@@ -1120,7 +1120,7 @@ class AstaDemonDestroyer(NightAction):
                         member = guild.get_member(t_id) if guild else None
                         if member:
                             try:
-                                bot.message_queue.send(member, "⚔️ **Asta's Demon Destroyer Sword has cleansed you of all negative effects!**")
+                                bot.message_queue.send(member, f"{get_emoji('sword')} **Asta's Demon Destroyer Sword has cleansed you of all negative effects!**")
                             except Exception:
                                 pass
                 asyncio.create_task(notify_cleansed())
@@ -1159,7 +1159,7 @@ class AstaBlackDivider(NightAction):
         if target_state:
             target_state.metadata["black_divider_nullified"] = True
             context.payload["log"] = f"Asta targeted <@{target_id}> with Black Divider."
-            context.payload["result"] = f"⚔️ **Black Divider Active!** If <@{target_id}> attempts to use an ability tonight, it will be nullified."
+            context.payload["result"] = f"{get_emoji('sword')} **Black Divider Active!** If <@{target_id}> attempts to use an ability tonight, it will be nullified."
 
     async def get_night_feedback(self, context):
         return context.payload.get("result")

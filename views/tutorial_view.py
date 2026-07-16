@@ -21,13 +21,13 @@ TUTORIAL_TOPICS: tuple[TutorialTopic, ...] = (
         value="overview",
         label="General Overview",
         description="Learn the base factions, objectives, and win conditions.",
-        title="📖 Tutorial: The Anime Arena of Shadow & Deception",
+        title=f"{get_emoji('book')} Tutorial: The Anime Arena of Shadow & Deception",
         body=(
             "Welcome to the battlefield. Here, you are cast into a deadly game of secrets, social deduction, and anime-themed abilities.\n\n"
-            f"🎭 **The Factions:**\n"
-            f"• **Protagonists (Town) {get_emoji('Hero') or '🛡️'}:** The majority. You do not know who your allies are, but you must find and eliminate the Villains through voting and deductive abilities.\n"
-            f"• **Villains (Mafia) {get_emoji('Villain') or '🔪'}:** The informed minority. You know your teammates and share a private conspiracy channel. Plot in the dark and eliminate the Protagonists until you match or exceed their numbers.\n"
-            f"• **Neutrals (Wildcards) {get_emoji('Neutral') or '🃏'}:** Solitary agents with unique, game-bending win conditions (e.g., Lelouch, Gilgamesh)."
+            f"{get_emoji('roster')} **The Factions:**\n"
+            f"• **Protagonists (Town) {get_emoji('Protagonist')}:** The majority. You do not know who your allies are, but you must find and eliminate the Villains through voting and deductive abilities.\n"
+            f"• **Villains (Mafia) {get_emoji('Antagonist')}:** The informed minority. You know your teammates and share a private conspiracy channel. Plot in the dark and eliminate the Protagonists until you match or exceed their numbers.\n"
+            f"• **Neutrals (Wildcards) {get_emoji('Neutral')}:** Solitary agents with unique, game-bending win conditions (e.g., Lelouch, Gilgamesh)."
         ),
         color=discord.Color.purple(),
         image_key="rules",
@@ -36,17 +36,17 @@ TUTORIAL_TOPICS: tuple[TutorialTopic, ...] = (
         value="phases",
         label="Game Phases",
         description="Understand the day/night cycle, trial, and verdicts.",
-        title="🌙 Tutorial: The Cycle of Day & Night",
+        title=f"{get_emoji('night')} Tutorial: The Cycle of Day & Night",
         body=(
             "Time in the arena is structured in distinct, repeating cycles. Master the phases to dominate:\n\n"
-            f"🌌 **1. Night Phase (Sneaky Phase):**\n"
+            f"{get_emoji('milky_way')} **1. Night Phase (Sneaky Phase):**\n"
             "• Silence falls upon the main channel. No player can send messages.\n"
             "• Everyone checks their DMs or uses the buttons in the main channel to submit secret abilities.\n"
             "• Villains discuss in their private corner and nominate a target to eliminate.\n\n"
-            f"☀️ **2. Day Discussion:**\n"
+            f"{get_emoji('sun')} **2. Day Discussion:**\n"
             "• Sunrise! The channel is unmuted. Dead players are announced, and their secret roles are revealed.\n"
             "• Discuss evidence, form alliances, and spot contradictions.\n\n"
-            f"⚖️ **3. Nomination & Trial:**\n"
+            f"{get_emoji('trial')} **3. Nomination & Trial:**\n"
             "• Nominate players to stand trial. Once a player receives a majority of nominations, they are dragged onto the stand.\n"
             "• The defendant has a brief **Plea Phase** to defend themselves.\n"
             "• Finally, everyone votes **Guilty** or **Innocent**."
@@ -58,13 +58,13 @@ TUTORIAL_TOPICS: tuple[TutorialTopic, ...] = (
         value="roles",
         label="Roles & Factions",
         description="Discover active/passive abilities and power roles.",
-        title="⚔️ Tutorial: Unique Characters & Faction Wars",
+        title=f"{get_emoji('sword')} Tutorial: Unique Characters & Faction Wars",
         body=(
             "Every player is assigned a unique character role with specialized actions:\n\n"
-            "🧬 **Abilities:**\n"
+            f"{get_emoji('dna')} **Abilities:**\n"
             "• **Active Abilities:** Actions you manually queue during the Night (e.g., healing, roleblocking, investigating, killing).\n"
             "• **Passive Abilities:** Automatic effects that trigger under specific conditions (e.g., death immunity, redirection immunity, revenge tags).\n\n"
-            "🔥 **Power Roles:**\n"
+            f"{get_emoji('fire')} **Power Roles:**\n"
             "• **Ayanokoji:** Absolute manipulation, scanning factions, and altering vote weight.\n"
             "• **Frieza:** Absolute villainy, building up kills to become **Golden Frieza**.\n"
             "• **Gilgamesh:** Accumulating swords from dead players to trigger the **Apocalypse**.\n"
@@ -77,14 +77,14 @@ TUTORIAL_TOPICS: tuple[TutorialTopic, ...] = (
         value="commands",
         label="Commands Quickstart",
         description="Quick guide to lobby, profile, shop, and ranks.",
-        title="🎮 Tutorial: Commands & Interface Guide",
+        title=f"{get_emoji('lobby')} Tutorial: Commands & Interface Guide",
         body=(
             "Navigate the arena and manage your progression using these core commands:\n\n"
-            "📌 **Lobby & Matches:**\n"
+            f"{get_emoji('pushpin')} **Lobby & Matches:**\n"
             "• `/lobby` - View active lobby status, join/leave a lobby.\n"
             "• `/lobby_create` - Create a new match lobby.\n"
             "• `/game status` - View the active match's player list and alive status.\n\n"
-            "💰 **Economy & Shop:**\n"
+            f"{get_emoji('moneybag')} **Economy & Shop:**\n"
             "• `/profile` - View your global level, XP, coins, favorite character, and stats.\n"
             "• `/shop` - Spend your coins to buy character cards, icons, and cosmetics.\n"
             "• `/inventory` - View and equip your purchased characters and cosmetics.\n"
@@ -120,7 +120,16 @@ class TutorialSelect(discord.ui.Select):
             img = get_event_image(topic.image_key)
             if img:
                 embed.set_image(url=img)
-        await interaction.response.edit_message(embed=embed, view=self.view_ref)
+        try:
+            await interaction.response.edit_message(embed=embed, view=self.view_ref)
+        except (discord.NotFound, discord.InteractionResponded):
+            try:
+                if interaction.message:
+                    await interaction.followup.edit_message(message_id=interaction.message.id, embed=embed, view=self.view_ref)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
 
 class TutorialView(discord.ui.View):
@@ -131,7 +140,7 @@ class TutorialView(discord.ui.View):
     @staticmethod
     def build_index_embed() -> discord.Embed:
         embed = discord.Embed(
-            title="📖 Anime Mafia Remastered Tutorial",
+            title=f"{get_emoji('book')} Anime Mafia Remastered Tutorial",
             description=(
                 "Welcome to the **AniMafia Interactive Walkthrough**!\n\n"
                 "Use the dropdown select menu below to explore different guides:\n"

@@ -67,8 +67,8 @@ class HisokaBungee(NightAction):
                     t1_name = m1.display_name if m1 else f"User {t1}"
                     t2_name = m2.display_name if m2 else f"User {t2}"
                     
-                    msg1 = f"🕸️ **Bound by Bungee Gum!**\nYou have been bound to **{t2_name}** (<@{t2}>) by Bungee Gum. If either of you fulfills their win condition while both are still alive, you both win!"
-                    msg2 = f"🕸️ **Bound by Bungee Gum!**\nYou have been bound to **{t1_name}** (<@{t1}>) by Bungee Gum. If either of you fulfills their win condition while both are still alive, you both win!"
+                    msg1 = f"{get_emoji('web')} **Bound by Bungee Gum!**\nYou have been bound to **{t2_name}** (<@{t2}>) by Bungee Gum. If either of you fulfills their win condition while both are still alive, you both win!"
+                    msg2 = f"{get_emoji('web')} **Bound by Bungee Gum!**\nYou have been bound to **{t1_name}** (<@{t1}>) by Bungee Gum. If either of you fulfills their win condition while both are still alive, you both win!"
                     
                     if m1:
                         try:
@@ -173,15 +173,15 @@ class Hisoka(BaseRole):
         if action_idx == 0:
             target2 = context.payload.get("controlled_vote_target")
             if target_id and target2:
-                return f"🃏 **Bungee Gum:** Linked <@{target_id}> and <@{target2}> successfully!"
+                return f"{get_emoji('hisoka')} **Bungee Gum:** Linked <@{target_id}> and <@{target2}> successfully!"
         elif action_idx == 1:
             if target_id:
                 disg_faction = context.payload.get("disguised_faction", "Hero")
                 disg_category = context.payload.get("disguised_category", "neutral")
-                return f"🃏 **Texture Surprise:** Successfully disguised <@{target_id}> as Faction: **{disg_faction}** and Category: **{disg_category}** tonight!"
+                return f"{get_emoji('hisoka')} **Texture Surprise:** Successfully disguised <@{target_id}> as Faction: **{disg_faction}** and Category: **{disg_category}** tonight!"
         elif action_idx == 2:
             if target_id:
-                return f"🃏 **Bloodlust:** Successfully challenged <@{target_id}>! Any active ability they target you with tonight will redirect back onto themselves."
+                return f"{get_emoji('hisoka')} **Bloodlust:** Successfully challenged <@{target_id}>! Any active ability they target you with tonight will redirect back onto themselves."
         return None
 
 
@@ -455,7 +455,7 @@ class LelouchGeass(NightAction):
         player_state.metadata["geass_last_used"] = session.metadata.get("night_num", 1)
 
         session.metadata["geass_target"] = target_id
-        context.payload["result"] = f"👁️ **Geass:** You have commanded <@{target_id}>. All votes towards them tomorrow will be doubled."
+        context.payload["result"] = f"{get_emoji('lelouch')} **Geass:** You have commanded <@{target_id}>. All votes towards them tomorrow will be doubled."
 
 
 @role_registry.register

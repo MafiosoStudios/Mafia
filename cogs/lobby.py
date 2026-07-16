@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 from discord.ext import commands
 
-from config import BotConfig
+from config import BotConfig, get_emoji
 from utils.embeds import build_status_embed
 from utils.helpers import send_hybrid_response
 from views.lobby_view import LobbyView
@@ -143,7 +143,7 @@ class LobbyCog(commands.Cog):
 
         lobby = await lobby_manager.get_lobby(ctx.guild.id)
         if lobby is None:
-            await send_hybrid_response(ctx, "❌ **No active lobby** to configure.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **No active lobby** to configure.", ephemeral=True)
             return
 
         import config
@@ -154,14 +154,14 @@ class LobbyCog(commands.Cog):
         if not (is_bot_admin or is_server_admin or is_lobby_leader):
             await send_hybrid_response(
                 ctx, 
-                "❌ *\"Know your place, weakling. Only the lobby leader or an administrator holds the power to reshape this reality.\"*", 
+                f"{get_emoji('cross')} *\"Know your place, weakling. Only the lobby leader or an administrator holds the power to reshape this reality.\"*", 
                 ephemeral=True
             )
             return
 
         mode_clean = mode.lower().strip()
         if mode_clean not in ("chaos", "custom"):
-            await send_hybrid_response(ctx, "❌ **Invalid Gamemode:** Choose either `chaos` or `custom`.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Invalid Gamemode:** Choose either `chaos` or `custom`.", ephemeral=True)
             return
 
         lobby.gamemode = mode_clean
@@ -169,7 +169,7 @@ class LobbyCog(commands.Cog):
         if mode_clean == "custom":
             active_list = lobby_manager._active_custom_role_lists.get(ctx.guild.id)
             if not active_list:
-                warning = "\n⚠️ *Note: No custom role list is currently loaded. Use `/customrolelist load <name>` to load one, or the bot will fallback to chaos behavior.*"
+                warning = f"\n{get_emoji('warning')} *Note: No custom role list is currently loaded. Use `/customrolelist load <name>` to load one, or the bot will fallback to chaos behavior.*"
 
         await lobby_manager.refresh_lobby_message(ctx.guild.id)
         await send_hybrid_response(ctx, f"🔮 **Reality has shifted.** Game mode set to **{mode_clean.upper()}** for this lobby.{warning}")
@@ -188,7 +188,7 @@ class LobbyCog(commands.Cog):
 
         lobby = await lobby_manager.get_lobby(ctx.guild.id)
         if lobby is None:
-            await send_hybrid_response(ctx, "❌ **No active lobby** found to kick players from.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **No active lobby** found to kick players from.", ephemeral=True)
             return
 
         import config
@@ -199,17 +199,17 @@ class LobbyCog(commands.Cog):
         if not (is_bot_admin or is_server_admin or is_lobby_leader):
             await send_hybrid_response(
                 ctx, 
-                "❌ *\"You lack the authority to banish anyone from this circle.\"*", 
+                f"{get_emoji('cross')} *\"You lack the authority to banish anyone from this circle.\"*", 
                 ephemeral=True
             )
             return
 
         if player.id not in lobby.players:
-            await send_hybrid_response(ctx, f"❌ **{player.display_name}** is not in the lobby roster.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **{player.display_name}** is not in the lobby roster.", ephemeral=True)
             return
 
         if player.id == lobby.leader_id:
-            await send_hybrid_response(ctx, "❌ You cannot kick the lobby leader.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} You cannot kick the lobby leader.", ephemeral=True)
             return
 
         await lobby_manager.leave_lobby(ctx.guild.id, player.id)
@@ -239,7 +239,7 @@ class LobbyCog(commands.Cog):
         is_lobby_leader = lobby is not None and ctx.author.id == lobby.leader_id
 
         if not (is_bot_admin or is_server_admin or is_lobby_leader):
-            await send_hybrid_response(ctx, "❌ *\"Only the lobby leader or an administrator can draft custom rules.\"*", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} *\"Only the lobby leader or an administrator can draft custom rules.\"*", ephemeral=True)
             return
 
         name_clean = name.strip()
@@ -267,7 +267,7 @@ class LobbyCog(commands.Cog):
         is_lobby_leader = lobby is not None and ctx.author.id == lobby.leader_id
 
         if not (is_bot_admin or is_server_admin or is_lobby_leader):
-            await send_hybrid_response(ctx, "❌ *\"Only the lobby leader or an administrator can draft custom rules.\"*", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} *\"Only the lobby leader or an administrator can draft custom rules.\"*", ephemeral=True)
             return
 
         if not hasattr(lobby_manager, "_custom_role_drafts"):
@@ -275,7 +275,7 @@ class LobbyCog(commands.Cog):
 
         draft = lobby_manager._custom_role_drafts.get(ctx.guild.id)
         if not draft:
-            await send_hybrid_response(ctx, "❌ No active draft. Start one first with `/customrolelist create <name>`.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} No active draft. Start one first with `/customrolelist create <name>`.", ephemeral=True)
             return
 
         import roles
@@ -289,16 +289,16 @@ class LobbyCog(commands.Cog):
             if found_key:
                 role_key = found_key
             else:
-                await send_hybrid_response(ctx, f"❌ **Invalid Role:** '{role}' does not exist in the role registry.", ephemeral=True)
+                await send_hybrid_response(ctx, f"{get_emoji('cross')} **Invalid Role:** '{role}' does not exist in the role registry.", ephemeral=True)
                 return
 
         role_name = roles.ROLES_METADATA[role_key].get("name", role_key.replace("_", " ").title())
         if role_key in draft["roles"]:
-            await send_hybrid_response(ctx, f"⚠️ **{role_name}** is already in the draft list '{draft['name']}'.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('warning')} **{role_name}** is already in the draft list '{draft['name']}'.", ephemeral=True)
             return
 
         draft["roles"].append(role_key)
-        await send_hybrid_response(ctx, f"➕ Added **{role_name}** to draft list '{draft['name']}' (Total roles: **{len(draft['roles'])}**).")
+        await send_hybrid_response(ctx, f"{get_emoji('join')} Added **{role_name}** to draft list '{draft['name']}' (Total roles: **{len(draft['roles'])}**).")
 
     @customrolelist.command(name="remove", description="Remove a role from the active custom role list draft")
     @discord.app_commands.describe(role="The role to remove")
@@ -319,7 +319,7 @@ class LobbyCog(commands.Cog):
         is_lobby_leader = lobby is not None and ctx.author.id == lobby.leader_id
 
         if not (is_bot_admin or is_server_admin or is_lobby_leader):
-            await send_hybrid_response(ctx, "❌ *\"Only the lobby leader or an administrator can draft custom rules.\"*", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} *\"Only the lobby leader or an administrator can draft custom rules.\"*", ephemeral=True)
             return
 
         if not hasattr(lobby_manager, "_custom_role_drafts"):
@@ -327,7 +327,7 @@ class LobbyCog(commands.Cog):
 
         draft = lobby_manager._custom_role_drafts.get(ctx.guild.id)
         if not draft:
-            await send_hybrid_response(ctx, "❌ No active draft. Start one first with `/customrolelist create <name>`.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} No active draft. Start one first with `/customrolelist create <name>`.", ephemeral=True)
             return
 
         import roles
@@ -342,12 +342,12 @@ class LobbyCog(commands.Cog):
             if found_key:
                 role_key = found_key
             else:
-                await send_hybrid_response(ctx, f"❌ **Role not in list:** '{role}' is not in draft list '{draft['name']}'.", ephemeral=True)
+                await send_hybrid_response(ctx, f"{get_emoji('cross')} **Role not in list:** '{role}' is not in draft list '{draft['name']}'.", ephemeral=True)
                 return
 
         draft["roles"].remove(role_key)
         role_name = roles.ROLES_METADATA[role_key].get("name", role_key.replace("_", " ").title())
-        await send_hybrid_response(ctx, f"➖ Removed **{role_name}** from draft list '{draft['name']}' (Total roles: **{len(draft['roles'])}**).")
+        await send_hybrid_response(ctx, f"{get_emoji('leave')} Removed **{role_name}** from draft list '{draft['name']}' (Total roles: **{len(draft['roles'])}**).")
 
     @customrolelist.command(name="save", description="Save the active custom role list draft to database")
     async def save_list(self, ctx: commands.Context) -> None:
@@ -368,7 +368,7 @@ class LobbyCog(commands.Cog):
         is_lobby_leader = lobby is not None and ctx.author.id == lobby.leader_id
 
         if not (is_bot_admin or is_server_admin or is_lobby_leader):
-            await send_hybrid_response(ctx, "❌ *\"Only the lobby leader or an administrator can draft custom rules.\"*", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} *\"Only the lobby leader or an administrator can draft custom rules.\"*", ephemeral=True)
             return
 
         if not hasattr(lobby_manager, "_custom_role_drafts"):
@@ -376,15 +376,15 @@ class LobbyCog(commands.Cog):
 
         draft = lobby_manager._custom_role_drafts.get(ctx.guild.id)
         if not draft:
-            await send_hybrid_response(ctx, "❌ No active draft. Create one first with `/customrolelist create <name>`.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} No active draft. Create one first with `/customrolelist create <name>`.", ephemeral=True)
             return
 
         if not draft["roles"]:
-            await send_hybrid_response(ctx, "❌ Cannot save an empty list. Add some roles first with `/customrolelist add`.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} Cannot save an empty list. Add some roles first with `/customrolelist add`.", ephemeral=True)
             return
 
         await database.save_custom_role_list(ctx.guild.id, draft["name"], draft["roles"])
-        await send_hybrid_response(ctx, f"💾 **Role list saved successfully!** '{draft['name']}' containing **{len(draft['roles'])}** roles.")
+        await send_hybrid_response(ctx, f"{get_emoji('save')} **Role list saved successfully!** '{draft['name']}' containing **{len(draft['roles'])}** roles.")
 
     @customrolelist.command(name="load", description="Load a saved custom role list and set it as active")
     @discord.app_commands.describe(name="Name of the saved list")
@@ -406,13 +406,13 @@ class LobbyCog(commands.Cog):
         is_lobby_leader = lobby is not None and ctx.author.id == lobby.leader_id
 
         if not (is_bot_admin or is_server_admin or is_lobby_leader):
-            await send_hybrid_response(ctx, "❌ *\"Only the lobby leader or an administrator can load custom rules.\"*", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} *\"Only the lobby leader or an administrator can load custom rules.\"*", ephemeral=True)
             return
 
         name_clean = name.strip()
         roles_list = await database.load_custom_role_list(ctx.guild.id, name_clean)
         if not roles_list:
-            await send_hybrid_response(ctx, f"❌ **Not Found:** No saved list named '{name_clean}' exists in this server.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Not Found:** No saved list named '{name_clean}' exists in this server.", ephemeral=True)
             return
 
         if not hasattr(lobby_manager, "_custom_role_drafts"):
@@ -429,7 +429,7 @@ class LobbyCog(commands.Cog):
 
         await send_hybrid_response(
             ctx, 
-            f"📥 **Loaded list:** '{name_clean}' containing **{len(roles_list)}** roles is now the active draft.{lobby_msg}"
+            f"{get_emoji('download')} **Loaded list:** '{name_clean}' containing **{len(roles_list)}** roles is now the active draft.{lobby_msg}"
         )
 
     @customrolelist.command(name="delete", description="Delete a saved custom role list")
@@ -452,16 +452,16 @@ class LobbyCog(commands.Cog):
         is_lobby_leader = lobby is not None and ctx.author.id == lobby.leader_id
 
         if not (is_bot_admin or is_server_admin or is_lobby_leader):
-            await send_hybrid_response(ctx, "❌ *\"Only the lobby leader or an administrator can delete custom rules.\"*", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} *\"Only the lobby leader or an administrator can delete custom rules.\"*", ephemeral=True)
             return
 
         name_clean = name.strip()
         deleted = await database.delete_custom_role_list(ctx.guild.id, name_clean)
         if not deleted:
-            await send_hybrid_response(ctx, f"❌ **Not Found:** No saved list named '{name_clean}' exists in this server.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Not Found:** No saved list named '{name_clean}' exists in this server.", ephemeral=True)
             return
 
-        await send_hybrid_response(ctx, f"🗑️ **Deleted list:** '{name_clean}' has been permanently removed.")
+        await send_hybrid_response(ctx, f"{get_emoji('trash')} **Deleted list:** '{name_clean}' has been permanently removed.")
 
     @customrolelist.command(name="list", description="List all saved custom role lists for this server")
     async def list_lists(self, ctx: commands.Context) -> None:
@@ -476,7 +476,7 @@ class LobbyCog(commands.Cog):
 
         saved_lists = await database.list_custom_role_lists(ctx.guild.id)
         if not saved_lists:
-            await send_hybrid_response(ctx, "📭 **No saved custom role lists** in this server yet.")
+            await send_hybrid_response(ctx, f"{get_emoji('empty')} **No saved custom role lists** in this server yet.")
             return
 
         import roles

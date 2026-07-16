@@ -356,8 +356,8 @@ class GameEngine:
                                         msg = (
                                             "🌟 **Frieza Has Transformed!**\n"
                                             "Frieza has personally eliminated 3 players and evolved into **Golden Frieza**!\n"
-                                            "☄️ *Death Beam now ignores Basic Protection.*\n"
-                                            "🛡️ *Frieza is immune to Roleblocks and cannot be redirected.*"
+                                            f"{get_emoji('meteor')} *Death Beam now ignores Basic Protection.*\n"
+                                            f"{get_emoji('shield')} *Frieza is immune to Roleblocks and cannot be redirected.*"
                                         )
                                         for mid in mafia_ids:
                                             member = guild.get_member(mid)
@@ -959,7 +959,7 @@ class GameEngine:
                     from views.game_ui import NightActionView
                     action_view = NightActionView(game_id, self)
                     prompt_text = (
-                        f"🔄 **Game Resumed.** {get_emoji('night')} **Night Action Phase**\nClick below to prepare your move. The shadows will hide your secret."
+                        f"{get_emoji('refresh')} **Game Resumed.** {get_emoji('night')} **Night Action Phase**\nClick below to prepare your move. The shadows will hide your secret."
                         if is_resume else
                         f"{get_emoji('night')} **Night Action Phase**\nClick below to prepare your move. The shadows will hide your secret."
                     )
@@ -1044,7 +1044,7 @@ class GameEngine:
 
                     if is_resume:
                         await self._update_channel_mute(mafia_channel, session, mute=False)
-                        await self.bot.message_queue.send(mafia_channel, "🔄 **Game Resumed.** Discussion phase is active.")
+                        await self.bot.message_queue.send(mafia_channel, f"{get_emoji('refresh')} **Game Resumed.** Discussion phase is active.")
 
                     # Discussion Timer
                     if not is_resume:
@@ -1143,7 +1143,7 @@ class GameEngine:
                             session.metadata.pop("deadly_sentencing_active", None)
                             session.metadata.pop("defendant_id", None)
                             session.metadata.pop("verdicts", None)
-                            await self.bot.message_queue.send(mafia_channel, f"🏛️ **Deadly Sentencing completed. Skipping normal trial.**")
+                            await self.bot.message_queue.send(mafia_channel, f"{get_emoji('court')} **Deadly Sentencing completed. Skipping normal trial.**")
                             await asyncio.sleep(2)
                             break
 
@@ -1228,7 +1228,7 @@ class GameEngine:
                             else:
                                 await self.bot.message_queue.send(
                                     mafia_channel,
-                                    f"🔄 **Game Resumed.** **{defendant_name}** is on the stand. Please speak in your defense."
+                                    f"{get_emoji('refresh')} **Game Resumed.** **{defendant_name}** is on the stand. Please speak in your defense."
                                 )
 
                             # Plea Timer
@@ -1321,7 +1321,7 @@ class GameEngine:
 
                                 # send "WE ARE HAVING A RETRIAL!!!" 3 times delayed by like 1s
                                 for _ in range(3):
-                                    await self.bot.message_queue.send(mafia_channel, "⚖️ **WE ARE HAVING A RETRIAL!!!**")
+                                    await self.bot.message_queue.send(mafia_channel, f"{get_emoji('trial')} **WE ARE HAVING A RETRIAL!!!**")
                                     await asyncio.sleep(1)
 
                                 # wait a bit
@@ -1333,7 +1333,7 @@ class GameEngine:
                                     await self.bot.message_queue.send(
                                         mafia_channel,
                                         embed=discord.Embed(
-                                            title="⚖️ RETRIAL: SUCCESSFUL ACQUITTAL",
+                                            title=f"{get_emoji('trial')} RETRIAL: SUCCESSFUL ACQUITTAL",
                                             description=(
                                                 f"Defendant <@{retrial_defendant}> has been proven beyond a reasonable doubt to be a **Protagonist**!\n"
                                                 f"Their execution is canceled. The court has released them.\n\n"
@@ -1360,7 +1360,7 @@ class GameEngine:
                                     await self.bot.message_queue.send(
                                         mafia_channel,
                                         embed=discord.Embed(
-                                            title="⚖️ RETRIAL: JUDGMENT CONFIRMED",
+                                            title=f"{get_emoji('trial')} RETRIAL: JUDGMENT CONFIRMED",
                                             description=(
                                                 f"An attempt to acquit <@{retrial_defendant}> failed! They are **not a Protagonist**.\n"
                                                 f"• The defendant's true identity is revealed as **{def_role_display}**.\n\n"
@@ -1419,7 +1419,7 @@ class GameEngine:
                                     def_state.metadata["pm_contract_activated"] = True
                                     await self.bot.message_queue.send(
                                         mafia_channel,
-                                        f"⚖️ **Prime Minister's Contract Triggered!**\n"
+                                        f"{get_emoji('trial')} **Prime Minister's Contract Triggered!**\n"
                                         f"An invisible force has prevented the execution! The defendant survives.\n"
                                         f"The Day ends immediately with no execution."
                                     )
@@ -1434,11 +1434,11 @@ class GameEngine:
                                         await self.bot.message_queue.send(
                                             mafia_channel,
                                             embed=discord.Embed(
-                                                title=f"👑 Zero Requiem Activated!",
+                                                title=f"{get_emoji('crown')} Zero Requiem Activated!",
                                                 description=(
                                                     f"**{defendant_name}** (Lelouch Lamperouge) has been executed by the town!\n\n"
                                                     f"This was all part of his master plan to focus the world's hatred on himself and die, breaking the cycle of hatred.\n\n"
-                                                    f"🏆 **Lelouch Lamperouge wins the game!**"
+                                                    f"{get_emoji('victory')} **Lelouch Lamperouge wins the game!**"
                                                 ),
                                                 color=discord.Color.purple()
                                             )
@@ -1922,7 +1922,7 @@ class GameEngine:
                         member = guild.get_member(a_id) if guild else None
                         if member:
                             try:
-                                bot.message_queue.send(member, "❌ **Your ability was nullified tonight.**")
+                                bot.message_queue.send(member, f"{get_emoji('cross')} **Your ability was nullified tonight.**")
                             except Exception:
                                 pass
                 asyncio.create_task(notify_null())
@@ -1951,7 +1951,7 @@ class GameEngine:
                                 member = guild.get_member(a_id) if guild else None
                                 if member:
                                     try:
-                                        bot.message_queue.send(member, "❌ **Your action failed due to Asta's Devil Union!**")
+                                        bot.message_queue.send(member, f"{get_emoji('cross')} **Your action failed due to Asta's Devil Union!**")
                                     except Exception:
                                         pass
                         asyncio.create_task(notify_union())
@@ -1970,7 +1970,7 @@ class GameEngine:
                             m = g.get_member(actor_id) if g else None
                             if m:
                                 try:
-                                    self.bot.message_queue.send(m, f"❌ **Your action tonight failed because your target was invisible!**")
+                                    self.bot.message_queue.send(m, f"{get_emoji('cross')} **Your action tonight failed because your target was invisible!**")
                                 except Exception:
                                     pass
                         continue
@@ -1984,7 +1984,7 @@ class GameEngine:
                             m = g.get_member(actor_id) if g else None
                             if m:
                                 try:
-                                    self.bot.message_queue.send(m, f"❌ **Your action tonight failed because one of your targets was invisible!**")
+                                    self.bot.message_queue.send(m, f"{get_emoji('cross')} **Your action tonight failed because one of your targets was invisible!**")
                                 except Exception:
                                     pass
                         continue
@@ -2217,9 +2217,9 @@ class GameEngine:
                     if tobirama_member:
                         attackers_str = ", ".join([f"<@{atk}>" for atk in attackers]) if attackers else "an unknown force"
                         msg = (
-                            f"⚡ **Flying Thunder Counter Triggered!**\n"
+                            f"{get_emoji('zap')} **Flying Thunder Counter Triggered!**\n"
                             f"You countered the attack on <@{target_id}>.\n"
-                            f"🕵️‍♂️ **Attacker(s) detected:** {attackers_str}"
+                            f"{get_emoji('detective')} **Attacker(s) detected:** {attackers_str}"
                         )
                         self.bot.message_queue.send(tobirama_member, msg)
                         
@@ -2249,7 +2249,7 @@ class GameEngine:
                         if target_member:
                             self.bot.message_queue.send(
                                 target_member,
-                                f"⚡ **Flying Thunder Counter!** You were targeted for an attack tonight, but Tobirama Senju intercepted and nullified it!"
+                                f"{get_emoji('zap')} **Flying Thunder Counter!** You were targeted for an attack tonight, but Tobirama Senju intercepted and nullified it!"
                             )
                     # Register the save in heals history and skip further damage processing
                     session.metadata.setdefault("heals_history", {}).setdefault(night_num, {})[target_id] = True
@@ -2461,7 +2461,7 @@ class GameEngine:
                                 m = g.get_member(t_id) if g else None
                                 if m:
                                     try:
-                                        eng.bot.message_queue.send(m, "⚠️ **Judicial Penalty!** You executed a fellow **Vanguard** member. You have permanently lost the ability to execute players.")
+                                        eng.bot.message_queue.send(m, f"{get_emoji('warning')} **Judicial Penalty!** You executed a fellow **Vanguard** member. You have permanently lost the ability to execute players.")
                                     except Exception:
                                         pass
                             asyncio.create_task(_notify_tosen_penalty())
@@ -2517,7 +2517,7 @@ class GameEngine:
                                 if ch:
                                     self.bot.message_queue.send(
                                         ch,
-                                        f"⚔️ **Survivor's Guilt!** Levi Ackerman (<@{pid}>) killed a Town member and is now Exhausted. They cannot speak or vote tomorrow."
+                                        f"{get_emoji('sword')} **Survivor's Guilt!** Levi Ackerman (<@{pid}>) killed a Town member and is now Exhausted. They cannot speak or vote tomorrow."
                                     )
 
         # Tobirama's Master Sensor passive feedback
@@ -2526,9 +2526,9 @@ class GameEngine:
                 tobirama_visits = night_visits.get(pid, [])
                 if tobirama_visits:
                     visitors_str = ", ".join([f"<@{v}>" for v in tobirama_visits])
-                    msg = f"🌊 **Master Sensor:** You sensed chakra from the following players visiting you tonight: {visitors_str}."
+                    msg = f"{get_emoji('wave')} **Master Sensor:** You sensed chakra from the following players visiting you tonight: {visitors_str}."
                 else:
-                    msg = "🌊 **Master Sensor:** You did not sense anyone visiting you tonight."
+                    msg = f"{get_emoji('wave')} **Master Sensor:** You did not sense anyone visiting you tonight."
                 member = guild.get_member(pid) if guild else None
                 if member:
                     self.bot.message_queue.send(member, msg)

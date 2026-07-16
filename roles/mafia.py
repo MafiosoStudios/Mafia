@@ -86,7 +86,7 @@ class BlackbeardTremorFruit(NightAction):
                             member = guild.get_member(bb_id) if guild else None
                             if member:
                                 try:
-                                    context.bot.message_queue.send(member, f"⚠️ **Your Tremor Fruit was resisted by <@{k_id}>!**")
+                                    context.bot.message_queue.send(member, f"{get_emoji('warning')} **Your Tremor Fruit was resisted by <@{k_id}>!**")
                                 except Exception:
                                     pass
                     asyncio.create_task(notify_bb())
@@ -206,7 +206,7 @@ class LightYagamiKill(NightAction):
                         description=(
                             f"**{ly_name}** (<@{context.user_id}>) wrote **{target_name}**'s (<@{target_id}>) name "
                             f"in the Death Note, guessing they were **{guessed_display}**.\n\n"
-                            f"❌ **The guess was wrong.** The Death Note is powerless and now everyone knows who Kira is."
+                            f"{get_emoji('cross')} **The guess was wrong.** The Death Note is powerless and now everyone knows who Kira is."
                         ),
                         color=_discord.Color.red()
                     )

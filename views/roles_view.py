@@ -140,7 +140,7 @@ class BackButton(discord.ui.Button):
         super().__init__(
             label="Back to Roster",
             style=discord.ButtonStyle.secondary,
-            emoji="◀️"
+            emoji=get_emoji("back")
         )
         self.view_ref = view_ref
 
@@ -179,23 +179,23 @@ class RolesView(discord.ui.View):
                 neutral_roles.append(line)
 
         embed = discord.Embed(
-            title="🎭 The AniMafia Roster",
+            title=f"{get_emoji('roster')} The AniMafia Roster",
             description="Select any character from the dropdown menus below to view their active/passive abilities, win conditions, and strategic role mechanics.",
             color=discord.Color.dark_purple()
         )
         
         embed.add_field(
-            name=f"🛡️ Protagonists (Town) — {len(town_roles)}",
+            name=f"{get_emoji('Protagonist')} Protagonists (Town) — {len(town_roles)}",
             value="\n".join(town_roles) if town_roles else "None",
             inline=True
         )
         embed.add_field(
-            name=f"🔪 Antagonists (Mafia) — {len(mafia_roles)}",
+            name=f"{get_emoji('Antagonist')} Antagonists (Mafia) — {len(mafia_roles)}",
             value="\n".join(mafia_roles) if mafia_roles else "None",
             inline=True
         )
         embed.add_field(
-            name=f"🃏 Neutrals — {len(neutral_roles)}",
+            name=f"{get_emoji('Neutral')} Neutrals — {len(neutral_roles)}",
             value="\n".join(neutral_roles) if neutral_roles else "None",
             inline=False
         )

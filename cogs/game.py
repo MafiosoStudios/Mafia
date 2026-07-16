@@ -69,7 +69,7 @@ class GameCog(commands.Cog):
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
         if not has_perm:
-            await send_hybrid_response(ctx, "❌ **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
             return
         if ctx.invoked_subcommand is None:
             await send_hybrid_response(ctx, "Try `/settings list` or `/settings set <key> <value>`.", ephemeral=True)
@@ -79,7 +79,7 @@ class GameCog(commands.Cog):
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
         if not has_perm:
-            await send_hybrid_response(ctx, "❌ **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
             return
         guild_id = ctx.guild.id if ctx.guild else 0
         db = getattr(self.bot, "db", None)
@@ -106,7 +106,7 @@ class GameCog(commands.Cog):
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
         if not has_perm:
-            await send_hybrid_response(ctx, "❌ **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
             return
         guild_id = ctx.guild.id if ctx.guild else 0
         db = getattr(self.bot, "db", None)
@@ -169,9 +169,9 @@ class GameCog(commands.Cog):
         session.metadata["rebellion_triggered"] = True
         
         await ctx.send(
-            f"👑 **Lelouch Lamperouge has commanded the Black Knights!**\n"
+            f"{get_emoji('crown')} **Lelouch Lamperouge has commanded the Black Knights!**\n"
             f"📢 *'I, Lelouch vi Britannia, command you: REBEL!'*\n"
-            f"🔥 **The discussion phase is cut short. Skipped directly to the Nomination Phase!**"
+            f"{get_emoji('fire')} **The discussion phase is cut short. Skipped directly to the Nomination Phase!**"
         )
 
     @commands.command(name="newrelease")
@@ -179,7 +179,7 @@ class GameCog(commands.Cog):
         """Sends an update release embed for AniMafia. (Owner only)"""
         # Only accessible to the user with discord user id "744831273406824449"
         if str(ctx.author.id) != "744831273406824449":
-            await ctx.send("❌ **Unauthorized:** Only the developer can use this command.", delete_after=5)
+            await ctx.send(f"{get_emoji('cross')} **Unauthorized:** Only the developer can use this command.", delete_after=5)
             return
 
         import os
@@ -229,7 +229,7 @@ class GameCog(commands.Cog):
         logger = logging.getLogger(__name__)
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
         if not has_perm:
-            await send_hybrid_response(ctx, "❌ **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
             return
 
         guild_id = ctx.guild.id if ctx.guild else 0
@@ -252,7 +252,7 @@ class GameCog(commands.Cog):
             if session:
                 await send_hybrid_response(
                     ctx,
-                    f"⚠️ There is already a live active game session (`{existing_handle.game_id}`) running in this server.",
+                    f"{get_emoji('warning')} There is already a live active game session (`{existing_handle.game_id}`) running in this server.",
                     ephemeral=True
                 )
                 return
@@ -260,7 +260,7 @@ class GameCog(commands.Cog):
         # Load active state dictionary from database
         state_dict = await db.get_active_game_by_guild(guild_id)
         if not state_dict:
-            await send_hybrid_response(ctx, "❌ No saved active game state found for this server.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} No saved active game state found for this server.", ephemeral=True)
             return
 
         try:
@@ -279,12 +279,12 @@ class GameCog(commands.Cog):
             
             await send_hybrid_response(
                 ctx,
-                f"🔄 **Success:** Active game (`{session.game_handle.game_id}`) has been successfully resumed from state `{session.phase.value}`!",
+                f"{get_emoji('refresh')} **Success:** Active game (`{session.game_handle.game_id}`) has been successfully resumed from state `{session.phase.value}`!",
                 ephemeral=False
             )
         except Exception:
             logger.exception("Failed to deserialize and resume game.")
-            await send_hybrid_response(ctx, "❌ Failed to resume game. Check bot logs for details.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} Failed to resume game. Check bot logs for details.", ephemeral=True)
 
     @commands.hybrid_command(name="tutorial", description="Open the interactive anime mafia tutorial guide")
     async def tutorial(self, ctx: commands.Context) -> None:
@@ -323,7 +323,7 @@ class GameCog(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="🔗 Summon AniMafia",
+            title=f"{get_emoji('link')} Summon AniMafia",
             description=(
                 "Invoke the ultimate anime-themed social deduction bot to your server!\n"
                 "Unleash characters like Frieza, Lelouch, and Ayanokoji in intense faction battles."
@@ -338,7 +338,7 @@ class GameCog(commands.Cog):
             label="Invite Bot",
             url=invite_url,
             style=discord.ButtonStyle.link,
-            emoji="🎮"
+            emoji=get_emoji("lobby")
         ))
         
         await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=True)
