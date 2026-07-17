@@ -123,6 +123,10 @@ class AdminCog(commands.Cog):
                 ephemeral=True
             )
 
+    @commands.hybrid_command()
+    async def ping(self, ctx:commands.Context):
+        return await send_hybrid_response(ctx, "pong")
+        
     @commands.hybrid_command(name="reset", description="Reset the bot in the server, cleaning up game channels and status")
     async def reset(self, ctx: commands.Context) -> None:
         import config
