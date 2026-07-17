@@ -11,7 +11,7 @@ class LeaderboardCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.hybrid_group(name="leaderboard", description="View anime mafia leaderboards")
+    @commands.hybrid_group(name="leaderboard", description="View Mafioso leaderboards")
     async def leaderboard(self, ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
             await send_hybrid_response(ctx, "Try `leaderboard wins`.", ephemeral=True)

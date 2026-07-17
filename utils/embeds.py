@@ -21,7 +21,7 @@ def build_embed(
     thumbnail_url: str | None = None,
 ) -> discord.Embed:
     embed = discord.Embed(title=title, description=description, color=color)
-    embed.set_footer(text="Anime Mafia")
+    embed.set_footer(text="Mafioso")
     if image_url:
         embed.set_image(url=image_url)
     if thumbnail_url:

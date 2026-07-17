@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 def get_rules_text() -> str:
     return (
-        f"** WELCOME TO ANIME MAFIA REMASTERED!**\n\n"
+        f"** WELCOME TO MAFIOSO REMASTERED!**\n\n"
         f"**THE PROTOCOLS:**\n"
         "• Your secret identity has been sent directly to your DMs. Keep it secret, or else...\n"
         f"• The Factions: **Town (Protagonists) {get_emoji('Hero')}**, **Mafia (Villains) {get_emoji('Villain')}**, and **Neutrals (Wildcards) {get_emoji('Neutral')}**.\n"
@@ -875,7 +875,7 @@ class GameEngine:
                 from views.game_ui import SpectateView
                 view = SpectateView(game_id, self)
                 embed = discord.Embed(
-                    title=f"👀 Spectate Anime Mafia",
+                    title=f"👀 Spectate Mafioso",
                     description=(
                         "A new match has started!\n"
                         f"Click the button below to spectate the match channel <#{mafia_channel.id}>."
@@ -890,7 +890,7 @@ class GameEngine:
 
             # 3. Send rules embed
             rules_embed = discord.Embed(
-                title=f"{get_emoji('lobby')} Anime Mafia Remastered — Game Rules",
+                title=f"{get_emoji('lobby')} Mafioso Remastered — Game Rules",
                 description=get_rules_text(),
                 color=discord.Color.from_rgb(0, 0, 0)
             )

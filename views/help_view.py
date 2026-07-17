@@ -47,7 +47,7 @@ HELP_TOPICS: tuple[HelpTopic, ...] = (
         label="Profile",
         description="View your stats and player profile.",
         title="Profile Commands",
-        body="`profile` - open your anime mafia profile",
+        body="`profile` - open your Mafioso profile",
         color=discord.Color.from_rgb(110, 58, 190),
     ),
     HelpTopic(
@@ -122,6 +122,6 @@ class HelpView(discord.ui.View):
             f"`{prefix}leaderboard` - Server Rankings",
             f"`{prefix}admin` - Moderator Tools",
         ]
-        embed = build_status_embed("Anime Mafia Help", "\n".join(lines))
+        embed = build_status_embed("Mafioso Help", "\n".join(lines))
         embed.add_field(name="How to use", value="Pick a category from the menu below to see a short explanation.", inline=False)
         return embed

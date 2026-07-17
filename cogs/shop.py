@@ -11,7 +11,7 @@ class ShopCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.hybrid_group(name="shop", description="Browse anime mafia cosmetics and inventory")
+    @commands.hybrid_group(name="shop", description="Browse Mafioso cosmetics and inventory")
     async def shop(self, ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
             await send_hybrid_response(ctx, "Try `shop inventory` or `shop cosmetics`.", ephemeral=True)

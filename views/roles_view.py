@@ -179,7 +179,7 @@ class RolesView(discord.ui.View):
                 neutral_roles.append(line)
 
         embed = discord.Embed(
-            title=f"{get_emoji('roster')} The AniMafia Roster",
+            title=f"{get_emoji('roster')} The Mafioso Roster",
             description="Select any character from the dropdown menus below to view their active/passive abilities, win conditions, and strategic role mechanics.",
             color=discord.Color.dark_purple()
         )

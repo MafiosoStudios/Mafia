@@ -11,7 +11,7 @@ class AdminCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.hybrid_group(name="admin", description="Administrative controls for anime mafia")
+    @commands.hybrid_group(name="admin", description="Administrative controls for Mafioso")
     async def admin(self, ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
             await send_hybrid_response(ctx, "Try `admin sync`.", ephemeral=True)
@@ -174,7 +174,7 @@ class AdminCog(commands.Cog):
 
         # 3. Refresh presence/status
         try:
-            await self.bot.change_presence(activity=discord.Game(name="Anime Mafia"), status=discord.Status.online)
+            await self.bot.change_presence(activity=discord.Game(name="Mafioso"), status=discord.Status.online)
         except Exception:
             pass
 

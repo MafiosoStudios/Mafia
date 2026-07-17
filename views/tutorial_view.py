@@ -140,9 +140,9 @@ class TutorialView(discord.ui.View):
     @staticmethod
     def build_index_embed() -> discord.Embed:
         embed = discord.Embed(
-            title=f"{get_emoji('book')} Anime Mafia Remastered Tutorial",
+            title=f"{get_emoji('book')} Mafioso Remastered Tutorial",
             description=(
-                "Welcome to the **AniMafia Interactive Walkthrough**!\n\n"
+                "Welcome to the **Mafioso Interactive Walkthrough**!\n\n"
                 "Use the dropdown select menu below to explore different guides:\n"
                 "• **General Overview:** Objective, Factions (Town, Mafia, Neutral).\n"
                 "• **Game Phases:** Day/Night cycle, discussion, trial, voting.\n"

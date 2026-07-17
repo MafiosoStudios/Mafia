@@ -1,6 +1,6 @@
-# Adding, Modifying, and Removing Anime Mafia Roles
+# Adding, Modifying, and Removing Mafioso Roles
 
-This guide explains how to easily customize the roles in the Anime Mafia Bot. 
+This guide explains how to easily customize the roles in the Mafioso Bot. 
 
 ---
 

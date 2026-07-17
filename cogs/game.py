@@ -176,7 +176,7 @@ class GameCog(commands.Cog):
 
     @commands.command(name="newrelease")
     async def newrelease(self, ctx: commands.Context, image_path: str = None) -> None:
-        """Sends an update release embed for AniMafia. (Owner only)"""
+        """Sends an update release embed for Mafioso. (Owner only)"""
         # Only accessible to the user with discord user id "744831273406824449"
         if str(ctx.author.id) != "744831273406824449":
             await ctx.send(f"{get_emoji('cross')} **Unauthorized:** Only the developer can use this command.", delete_after=5)
@@ -196,24 +196,24 @@ class GameCog(commands.Cog):
                     image_path = default_path
 
         embed = discord.Embed(
-            title=f"AniMafia",
+            title=f"Mafioso",
             description=(
                 f"We are thrilled to announce the official release of **Mafioso**, "
                 f"the ultimate anime-themed Mafia Discord bot! Here's a brief overview "
                 f"of what this bot brings to the arena:\n\n"
-                f"**Meet the Protagonists & Antagonists**\n"
-                f"• **Ayanokoji Kiyotaka:** A mysterious mastermind who rarely reveals his true abilities. With unmatched intelligence and calculated decisions, he quietly manipulates every situation to achieve his goals.\n"
-                f"• **Frieza:** The ruthless emperor of the universe, Frieza rules through fear, overwhelming power, and absolute cruelty. Arrogant yet calculating, he views all life as beneath him and will stop at nothing to dominate those who oppose him.\n"
-                f"• **Lelouch Lamperouge:** An exiled prince of the Holy Britannian Empire who gains the power of Geass, the power of absolute obedience.\n"
+                f"**What Makes Mafioso Different?**\n"
+                f"• **Unique Anime Roles** — Play as characters from across anime, each designed around their actual powers and personalities.\n\n"
+                f"• **Powerful Abilities** — Manipulate votes, investigate players, deceive the town, protect allies, assassinate enemies, and completely turn the game around.\n\n"
+                f"• **No Two Games Are the Same** — Different roles, players, strategies, and interactions make every lobby unpredictable.\n\n\n"
                 f"**How the Game Works**\n"
-                f"• Players are assigned roles, each with unique abilities and objectives. The game progresses through day and night phases, where players discuss, vote, and execute their strategies.\n"
-                f"• You can do ``help`` for a list of available commands or ``tutorial`` for a detailed guide of course.\n"
-                f"• ``lobby`` to jump right into the game, ``lobby_create`` to actually host one, this bot operates just like our traditional mafia bots\n"
+                f"• Players are assigned roles, each with unique abilities and objectives. The game progresses through day and night phases, where players discuss, vote, and execute their strategies.\n\n"
+                f"• You can do ``help`` for a list of available commands or ``tutorial`` for a detailed guide of course.\n\n"
+                f"• ``lobby`` to jump right into the game, ``lobby_create`` to actually host one, this bot operates just like our traditional mafia bots\n\n"
                 f"• If you do not understand some roles you can always do ``roleinfo`` for information on every character"
             ),
             color=discord.Color.from_rgb(0, 0, 0)
         )
-        embed.set_footer(text="AniMafia Update • Version 1.0.0")
+        embed.set_footer(text="Mafioso Patch Note • Version 1.0.0")
         if ctx.guild and ctx.guild.icon:
             embed.set_thumbnail(url=ctx.guild.icon.url)
 
@@ -288,7 +288,7 @@ class GameCog(commands.Cog):
             logger.exception("Failed to deserialize and resume game.")
             await send_hybrid_response(ctx, f"{get_emoji('cross')} Failed to resume game. Check bot logs for details.", ephemeral=True)
 
-    @commands.hybrid_command(name="tutorial", description="Open the interactive anime mafia tutorial guide")
+    @commands.hybrid_command(name="tutorial", description="Open the interactive Mafioso tutorial guide")
     async def tutorial(self, ctx: commands.Context) -> None:
         from views.tutorial_view import TutorialView
         view = TutorialView()
@@ -325,7 +325,7 @@ class GameCog(commands.Cog):
         )
 
         embed = discord.Embed(
-            title=f"{get_emoji('link')} Summon AniMafia",
+            title=f"{get_emoji('link')} Summon Mafioso",
             description=(
                 "Invoke the ultimate anime-themed social deduction bot to your server!\n"
                 "Unleash characters like Frieza, Lelouch, and Ayanokoji in intense faction battles."

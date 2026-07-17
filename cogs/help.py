@@ -25,11 +25,11 @@ class HelpCog(commands.Cog):
         else:
             await interaction_or_ctx.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    @commands.command(name="help", help="Show the anime mafia command guide")
+    @commands.command(name="help", help="Show the Mafioso command guide")
     async def help_prefix(self, ctx: commands.Context) -> None:
         await self._send_help(ctx)
 
-    @discord.app_commands.command(name="help", description="Show the anime mafia command guide")
+    @discord.app_commands.command(name="help", description="Show the Mafioso command guide")
     async def help_app(self, interaction: discord.Interaction) -> None:
         await self._send_help(interaction)
 

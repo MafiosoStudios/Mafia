@@ -1,4 +1,4 @@
-# Anime Mafia
+# Mafioso
 
 Anime-themed Discord Mafia bot built with Python 3.13, discord.py 2.x, SQLite, and aiosqlite.
 

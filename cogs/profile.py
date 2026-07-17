@@ -12,7 +12,7 @@ class ProfileCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.hybrid_command(name="profile", description="View your anime mafia profile")
+    @commands.hybrid_command(name="profile", description="View your Mafioso profile")
     async def profile(self, ctx: commands.Context) -> None:
         database = getattr(self.bot, "db", None)
         if database is None:
@@ -83,7 +83,7 @@ class ProfileCog(commands.Cog):
 
         from config import get_emoji
         if character_matched is None:
-            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Invalid Character:** '{character}' is not a valid character in Anime Mafia.", ephemeral=True)
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Invalid Character:** '{character}' is not a valid character in Mafioso.", ephemeral=True)
             return
 
         profile_record = await database.get_player_profile(ctx.author.id)
