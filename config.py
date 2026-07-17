@@ -89,7 +89,7 @@ EMOJIS: dict[str, str] = {
     "frieren": "<:frieren:1527177319171625081>",
     "kishibe": "<:kishibe:1527177158571855902>",
     "tosen": "<:tosen:1527177472561385572>",
-    "dazai": "✋",
+    "dazai": "<:osamu:1527178345484259338>",
     "asta": "<:asta:1527177095292129352>",
     "lelouch": "<:lelouch:1527266110339285093>",
 
