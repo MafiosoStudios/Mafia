@@ -185,27 +185,29 @@ class GameCog(commands.Cog):
         import os
         import discord
 
-        # If no path provided, check default downloads location
+        # If no path provided, check project root or default downloads location
         if not image_path:
-            default_path = r"C:\MafiosoImgs\VersionUpdate1.0.0.png"
-            if os.path.exists(default_path):
-                image_path = default_path
+            root_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "VersionUpdate1.0.0.png")
+            if os.path.exists(root_path):
+                image_path = root_path
+            else:
+                default_path = r"C:\MafiosoImgs\VersionUpdate1.0.0.png"
+                if os.path.exists(default_path):
+                    image_path = default_path
 
         embed = discord.Embed(
             title=f"AniMafia",
             description=(
-                f"We are thrilled to announce the official release of **AniMafia**, "
+                f"We are thrilled to announce the official release of **Mafioso**, "
                 f"the ultimate anime-themed Mafia Discord bot! Here's a brief overview "
                 f"of what this bot brings to the arena:\n\n"
                 f"**Meet the Protagonists & Antagonists**\n"
                 f"• **Ayanokoji Kiyotaka:** A mysterious mastermind who rarely reveals his true abilities. With unmatched intelligence and calculated decisions, he quietly manipulates every situation to achieve his goals.\n"
-                f"• **Tobirama Senju:** The Second Hokage, celebrated for his brilliance, discipline, and tactical genius. A master of powerful jutsu and battlefield strategy, he always places the safety of the village above all else.\n"
                 f"• **Frieza:** The ruthless emperor of the universe, Frieza rules through fear, overwhelming power, and absolute cruelty. Arrogant yet calculating, he views all life as beneath him and will stop at nothing to dominate those who oppose him.\n"
-                f"• **Blackbeard:** A ruthless pirate driven by boundless ambition and an insatiable desire for power. Cunning, unpredictable, and willing to betray anyone, Blackbeard believes destiny favors those bold enough to seize it.\n\n"
-                f"**Meet the Neutrals**\n"
                 f"• **Lelouch Lamperouge:** An exiled prince of the Holy Britannian Empire who gains the power of Geass, the power of absolute obedience.\n"
-                f"• **Gilgamesh** The King of Heroes, Gilgamesh is a proud and unrivaled monarch who views the world as his rightful domain. Possessing immeasurable power and unwavering confidence, he crushes those he deems unworthy without hesitation.\n\n"
                 f"**How the Game Works**\n"
+                f"• Players are assigned roles, each with unique abilities and objectives. The game progresses through day and night phases, where players discuss, vote, and execute their strategies.\n"
+                f"• You can do ``help`` for a list of available commands or ``tutorial`` for a detailed guide of course.\n"
                 f"• ``lobby`` to jump right into the game, ``lobby_create`` to actually host one, this bot operates just like our traditional mafia bots\n"
                 f"• If you do not understand some roles you can always do ``roleinfo`` for information on every character"
             ),
