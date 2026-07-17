@@ -4,7 +4,81 @@ import discord
 from discord.ext import commands
 from config import get_emoji
 
+import roles
+from roles.balance import SPAWN_ONLY_ROLES
 from utils.helpers import send_hybrid_response
+
+
+def _role_faction_group(role_key: str) -> str:
+    faction = roles.ROLES_METADATA.get(role_key, {}).get("faction", "Unknown")
+    return "town" if faction in ("Hero", "Town", "Protagonist") else "mafia_neutral"
+
+
+class _RoleSelect(discord.ui.Select):
+    def __init__(self, view_ref: "RoleToggleView", role_keys: list[str], placeholder: str) -> None:
+        self.view_ref = view_ref
+        options = []
+        for rkey in sorted(role_keys, key=lambda k: roles.ROLES_METADATA.get(k, {}).get("name", k)):
+            meta = roles.ROLES_METADATA.get(rkey, {})
+            name = meta.get("name", rkey.replace("_", " ").title())
+            emoji = get_emoji(rkey)
+            select_emoji = None
+            if emoji:
+                if emoji.startswith("<"):
+                    try:
+                        select_emoji = discord.PartialEmoji.from_str(emoji)
+                    except Exception:
+                        pass
+                else:
+                    select_emoji = emoji
+            options.append(discord.SelectOption(label=name, value=rkey, emoji=select_emoji))
+
+        super().__init__(placeholder=placeholder, min_values=1, max_values=len(options), options=options)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        database = getattr(self.view_ref.bot, "db", None)
+        if database is None:
+            await interaction.response.send_message(f"{get_emoji('cross')} Database connection is not available.", ephemeral=True)
+            return
+
+        changed = []
+        for role_key in self.values:
+            await database.set_role_disabled(self.view_ref.guild_id, role_key, self.view_ref.disable)
+            changed.append(roles.ROLES_METADATA.get(role_key, {}).get("name", role_key))
+
+        verb = "Disabled" if self.view_ref.disable else "Enabled"
+        await interaction.response.send_message(
+            f"{get_emoji('check')} **{verb}:** " + ", ".join(f"`{n}`" for n in changed),
+            ephemeral=True,
+        )
+
+
+class RoleToggleView(discord.ui.View):
+    """Lets an admin pick one or more roles to disable/enable for this server."""
+
+    def __init__(self, bot: commands.Bot, guild_id: int, author_id: int, disable: bool, eligible_roles: list[str]) -> None:
+        super().__init__(timeout=120)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.author_id = author_id
+        self.disable = disable  # True = disabling roles, False = re-enabling roles
+
+        town_roles = [rk for rk in eligible_roles if _role_faction_group(rk) == "town"]
+        other_roles = [rk for rk in eligible_roles if _role_faction_group(rk) == "mafia_neutral"]
+
+        verb = "disable" if disable else "enable"
+        if town_roles:
+            self.add_item(_RoleSelect(self, town_roles, f"Select Town character(s) to {verb}..."))
+        if other_roles:
+            self.add_item(_RoleSelect(self, other_roles, f"Select Mafia/Neutral character(s) to {verb}..."))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                f"{get_emoji('cross')} You are not authorized to interact with this menu.", ephemeral=True
+            )
+            return False
+        return True
 
 
 class AdminCog(commands.Cog):
@@ -169,7 +243,8 @@ class AdminCog(commands.Cog):
                     pass
 
         for channel in list(ctx.guild.text_channels):
-            if channel.name.lower().startswith("mafia-"):
+            name = channel.name.lower()
+            if name == "mafia" or name.startswith("mafia-"):
                 try:
                     await channel.delete(reason="Mafia bot reset command.")
                     deleted_channels += 1
@@ -190,6 +265,69 @@ class AdminCog(commands.Cog):
             f"• Deleted channels: **{deleted_channels}**\n"
             f"• Bot status refreshed.",
             ephemeral=True
+        )
+
+    @commands.hybrid_command(name="roledisable", description="Disable one or more characters from appearing in future games (Admin only)")
+    async def roledisable(self, ctx: commands.Context) -> None:
+        import config
+        has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
+        if not has_perm:
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            return
+        if ctx.guild is None:
+            await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
+            return
+
+        database = getattr(self.bot, "db", None)
+        if database is None:
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} Database connection is not available.", ephemeral=True)
+            return
+
+        disabled_now = set(await database.get_disabled_roles(ctx.guild.id))
+        all_roles = [rk for rk in roles.ROLES_METADATA if rk not in SPAWN_ONLY_ROLES]
+        enabled_roles = [rk for rk in all_roles if rk not in disabled_now]
+
+        if not enabled_roles:
+            await send_hybrid_response(ctx, f"{get_emoji('warning')} Every character is already disabled on this server.", ephemeral=True)
+            return
+
+        view = RoleToggleView(self.bot, ctx.guild.id, ctx.author.id, disable=True, eligible_roles=enabled_roles)
+        await send_hybrid_response(
+            ctx,
+            f"{get_emoji('roster')} **Disable Characters**\nPick any character(s) below to remove them from the random role pool for this server. This does not affect games already in progress.",
+            view=view,
+            ephemeral=True,
+        )
+
+    @commands.hybrid_command(name="roleenable", description="Re-enable one or more previously disabled characters (Admin only)")
+    async def roleenable(self, ctx: commands.Context) -> None:
+        import config
+        has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
+        if not has_perm:
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
+            return
+        if ctx.guild is None:
+            await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
+            return
+
+        database = getattr(self.bot, "db", None)
+        if database is None:
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} Database connection is not available.", ephemeral=True)
+            return
+
+        disabled_roles = await database.get_disabled_roles(ctx.guild.id)
+        disabled_roles = [rk for rk in disabled_roles if rk in roles.ROLES_METADATA]
+
+        if not disabled_roles:
+            await send_hybrid_response(ctx, f"{get_emoji('warning')} No characters are currently disabled on this server.", ephemeral=True)
+            return
+
+        view = RoleToggleView(self.bot, ctx.guild.id, ctx.author.id, disable=False, eligible_roles=disabled_roles)
+        await send_hybrid_response(
+            ctx,
+            f"{get_emoji('roster')} **Enable Characters**\nPick any character(s) below to add them back into the random role pool for this server.",
+            view=view,
+            ephemeral=True,
         )
 
     @commands.hybrid_command(name="devrestart", aliases=["dev_restart"], description="Pull latest code from git and restart the bot (Developer only)")
@@ -306,20 +444,4 @@ class WipeConfirmationView(discord.ui.View):
             return False
         return True
 
-    @discord.ui.button(label="Confirm Wipe", style=discord.ButtonStyle.danger, emoji=get_emoji("warning"))
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        self.confirmed = True
-        self.interaction = interaction
-        await interaction.response.defer(ephemeral=True)
-        self.stop()
-
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        self.confirmed = False
-        self.interaction = interaction
-        await interaction.response.send_message(f"{get_emoji('cross')} Wipe cancelled.", ephemeral=True)
-        self.stop()
-
-
-async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(AdminCog(bot))
+  
