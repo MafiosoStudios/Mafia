@@ -189,8 +189,8 @@ EVENT_IMAGES: dict[str, str] = {
     "verdict": "https://www.voicesinthevoid.com/wp-content/uploads/2026/02/Higuruma-in-the-courtroom-in-Jujutsu-kaisen-Season-3.jpg",
     "death": "https://i.kym-cdn.com/entries/icons/facebook/000/029/198/Dark_Souls_You_Died_Screen_-_Completely_Black_Screen_0-2_screenshot.jpg",
     "victory_hero": "https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyODdzc24ydDAzb2lhY3l0MWhuam4ycm83NDRyY3UxZ295dzlldThkMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nhFvzFSWaoDy4VZm2W/giphy.gif",
-    "victory_villain": "",
-    "victory_neutral": "",
+    "victory_villain": "https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyODdzc24ydDAzb2lhY3l0MWhuam4ycm83NDRyY3UxZ295dzlldThkMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nhFvzFSWaoDy4VZm2W/giphy.gif",
+    "victory_neutral": "https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyODdzc24ydDAzb2lhY3l0MWhuam4ycm83NDRyY3UxZ295dzlldThkMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nhFvzFSWaoDy4VZm2W/giphy.gif",
     "draw": "",
 }
 
