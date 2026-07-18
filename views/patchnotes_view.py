@@ -32,18 +32,25 @@ PATCHES: list[dict] = [
             "Bot presence, admin reset, and developer tools",
         ],
     },
-    # -----------------------------------------------------------------------
-    # TEMPLATE — copy this block and fill it in to add a new patch version:
-    # {
-    #     "version": "1.1.0",
-    #     "date": "Month DD, YYYY",
-    #     "title": "Short descriptive patch title",
-    #     "description": "One or two sentence summary of what this patch focused on.",
-    #     "changes": [
-    #         "emoji **Category** — description of change",
-    #     ],
-    # },
-    # -----------------------------------------------------------------------
+    {
+        "version": "1.0.1",
+        "date": "July 18, 2026",
+        "title": "Version 1.0.1 — Mahoraga & System Rework",
+        "description": (
+            "A major update introducing a complete rework for Mahoraga, "
+            "critical bug fixes to the game and administration loops, "
+            "interactive roles directory, and player profile enhancements."
+        ),
+        "changes": [
+            "🌀 **Mahoraga Rework** — Adapted factions no longer harm Mahoraga at night; adapt to all 3 factions to gain vote/trial immunity",
+            "⚖️ **Trial Crash Fixed** — Resolved issue where the game would draw or crash during voting and trial verdict phases",
+            "📖 **Interactive Directory** — Added `!roles` command with faction tab navigation to inspect any character's abilities",
+            "📊 **Profile Draws** — Added Draw category field in the profile card output (between Losses and Games Played)",
+            "⚙️ **Admin Sync Fixed** — Fixed command sync mechanism failing to respond during registration of slash commands",
+            "🏆 **Victory Embeds** — Cleaned up and polished the game over win screens for Protagonists, Antagonists, and Neutrals",
+            "🎨 **Visual Polish** — Multiple interface alignments, custom emojis, and interaction locks for command authors",
+        ],
+    },
 ]
 
 
