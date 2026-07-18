@@ -113,7 +113,7 @@ def _build_faction_embed(faction: str) -> discord.Embed:
         name   = rm.get("name", rk.replace("_", " ").title())
         emoji  = get_emoji(rk)
         prefix = f"{emoji} " if emoji else ""
-        lines.append(f"• {prefix}**{name}**")
+        lines.append(f"• {prefix}{name}")
 
     if faction == FACTION_SPECIAL:
         embed = discord.Embed(
