@@ -11,13 +11,18 @@ from utils.helpers import get_emoji_url
 FACTION_PROTAGONIST = "Protagonist"
 FACTION_ANTAGONIST  = "Antagonist"
 FACTION_NEUTRAL     = "Neutral"
+FACTION_SPECIAL     = "Special"
 
 # All internal faction aliases that map to each group
-_TOWN_ALIASES   = ("Hero", "Town", "Protagonist")
-_MAFIA_ALIASES  = ("Villain", "Mafia", "Antagonist")
-_NEUT_ALIASES   = ("Neutral",)
+_TOWN_ALIASES    = ("Hero", "Town", "Protagonist")
+_MAFIA_ALIASES   = ("Villain", "Mafia", "Antagonist")
+_NEUT_ALIASES    = ("Neutral",)
+_SPECIAL_ALIASES = ("Special",)
 
-FACTION_ORDER = [FACTION_PROTAGONIST, FACTION_ANTAGONIST, FACTION_NEUTRAL]
+# These role keys are never shown in the main faction tabs
+SPECIAL_ROLE_KEYS = frozenset({"villager", "lower_moon", "upper_moon"})
+
+FACTION_ORDER = [FACTION_PROTAGONIST, FACTION_ANTAGONIST, FACTION_NEUTRAL, FACTION_SPECIAL]
 
 _FACTION_META = {
     FACTION_PROTAGONIST: {
@@ -44,13 +49,22 @@ _FACTION_META = {
         "dropdown_ph" : "Select a Neutral…",
         "style"       : discord.ButtonStyle.secondary,
     },
+    FACTION_SPECIAL: {
+        "label"       : "Special",
+        "emoji"       : "✨",
+        "color"       : discord.Color.from_rgb(251, 191, 36),   # amber/gold
+        "aliases"     : _SPECIAL_ALIASES,
+        "dropdown_ph" : "Select a Special Role…",
+        "style"       : discord.ButtonStyle.secondary,
+    },
 }
 
-# Role embed colors
+# Role embed colors (aliases → color)
 _COLOR_MAP = {
     **{a: discord.Color.from_rgb(52, 211, 153)  for a in _TOWN_ALIASES},
     **{a: discord.Color.from_rgb(239, 68, 68)   for a in _MAFIA_ALIASES},
     **{a: discord.Color.from_rgb(168, 85, 247)  for a in _NEUT_ALIASES},
+    **{a: discord.Color.from_rgb(251, 191, 36)  for a in _SPECIAL_ALIASES},
 }
 
 
@@ -59,53 +73,88 @@ _COLOR_MAP = {
 # ---------------------------------------------------------------------------
 
 def _canonical_faction(faction_str: str) -> str:
-    """Map any faction alias to one of the 3 canonical keys."""
     if faction_str in _TOWN_ALIASES:
         return FACTION_PROTAGONIST
     if faction_str in _MAFIA_ALIASES:
         return FACTION_ANTAGONIST
+    if faction_str in _SPECIAL_ALIASES:
+        return FACTION_SPECIAL
     return FACTION_NEUTRAL
 
 
 def _roles_for_faction(faction: str) -> list[tuple[str, dict]]:
-    """Return sorted (key, meta) pairs for a canonical faction."""
-    aliases = _FACTION_META[faction]["aliases"]
-    result = [
-        (rk, rm)
-        for rk, rm in roles.ROLES_METADATA.items()
-        if rm.get("faction", "") in aliases
-    ]
+    """Return sorted (key, meta) pairs for a canonical faction.
+    Special faction = exactly the SPECIAL_ROLE_KEYS; all others exclude them.
+    """
+    meta_aliases = _FACTION_META[faction]["aliases"]
+    result = []
+    for rk, rm in roles.ROLES_METADATA.items():
+        rf = rm.get("faction", "")
+        if faction == FACTION_SPECIAL:
+            # Only the three hand-picked special roles
+            if rk in SPECIAL_ROLE_KEYS:
+                result.append((rk, rm))
+        else:
+            # Exclude special roles from all main faction tabs
+            if rk in SPECIAL_ROLE_KEYS:
+                continue
+            if rf in meta_aliases:
+                result.append((rk, rm))
+
     return sorted(result, key=lambda x: x[1].get("name", x[0].replace("_", " ").title()))
 
 
 def _build_faction_embed(faction: str) -> discord.Embed:
-    """Build the roster embed for a given faction."""
     meta  = _FACTION_META[faction]
     pairs = _roles_for_faction(faction)
 
-    lines = []
-    for rk, rm in pairs:
-        name    = rm.get("name", rk.replace("_", " ").title())
-        emoji   = get_emoji(rk)
-        prefix  = f"{emoji} " if emoji else ""
-        wc      = rm.get("win_condition", "")
-        lines.append(f"{prefix}**{name}**\n> {wc}")
+    if faction == FACTION_SPECIAL:
+        # Special tab gets a custom explanatory header
+        lines = []
+        for rk, rm in pairs:
+            name   = rm.get("name", rk.replace("_", " ").title())
+            emoji  = get_emoji(rk)
+            prefix = f"{emoji} " if emoji else ""
+            desc   = rm.get("description", "")
+            lines.append(f"{prefix}**{name}**\n> {desc}")
 
-    embed = discord.Embed(
-        title       = f"{meta['emoji']} {meta['label']} — {len(pairs)} Roles",
-        description = (
-            "\n\n".join(lines)
-            if lines
-            else "No roles in this faction yet."
-        ),
-        color       = meta["color"],
-    )
-    embed.set_footer(text=f"Mafioso  •  Use the dropdown below to inspect any role")
+        embed = discord.Embed(
+            title=(
+                f"{meta['emoji']} Special Roles — Not Assigned at Game Start"
+            ),
+            description=(
+                "These roles are **never distributed during the opening role assignment**. "
+                "They enter the game through specific in-game mechanics:\n\n"
+                + ("\n\n".join(lines) if lines else "None")
+            ),
+            color=meta["color"],
+        )
+    else:
+        lines = []
+        for rk, rm in pairs:
+            name   = rm.get("name", rk.replace("_", " ").title())
+            emoji  = get_emoji(rk)
+            prefix = f"{emoji} " if emoji else ""
+            wc     = rm.get("win_condition", "")
+            lines.append(f"{prefix}**{name}**\n> {wc}")
+
+        embed = discord.Embed(
+            title=(
+                f"{meta['emoji']} {meta['label']} — {len(pairs)} Roles"
+            ),
+            description=(
+                "\n\n".join(lines)
+                if lines
+                else "No roles in this faction yet."
+            ),
+            color=meta["color"],
+        )
+
+    embed.set_footer(text="Mafioso  •  Use the dropdown below to inspect any role")
     return embed
 
 
 def _build_role_detail_embed(rkey: str, rmeta: dict) -> discord.Embed:
-    """Build the detailed embed for a single role."""
     name           = rmeta.get("name", rkey.replace("_", " ").title())
     faction        = rmeta.get("faction", "Unknown")
     win_condition  = rmeta.get("win_condition", "Unknown")
@@ -129,10 +178,10 @@ def _build_role_detail_embed(rkey: str, rmeta: dict) -> discord.Embed:
     if big_image:
         embed.set_image(url=big_image)
 
-    embed.add_field(name="Faction",       value=faction,       inline=True)
-    embed.add_field(name="Win Condition", value=win_condition,  inline=False)
+    embed.add_field(name="Faction",       value=faction,      inline=True)
+    embed.add_field(name="Win Condition", value=win_condition, inline=False)
 
-    # Split multiple active abilities (slash-separated or "Max Ability:" divider)
+    # Split multiple active abilities
     if "Max Ability:" in active_ability:
         parts     = active_ability.split("Max Ability:")
         abilities = [parts[0].strip(), "Max Ability: " + parts[1].strip()]
@@ -160,14 +209,14 @@ def _build_role_detail_embed(rkey: str, rmeta: dict) -> discord.Embed:
 
 
 # ---------------------------------------------------------------------------
-# Dropdown — shows roles for the currently active faction
+# Dropdown — shows roles for the active faction
 # ---------------------------------------------------------------------------
 
 class RoleSelectDropdown(discord.ui.Select):
     def __init__(self, active_faction: str) -> None:
         self.active_faction = active_faction
-        meta    = _FACTION_META[active_faction]
-        pairs   = _roles_for_faction(active_faction)
+        meta  = _FACTION_META[active_faction]
+        pairs = _roles_for_faction(active_faction)
 
         options = []
         for rk, rm in pairs:
@@ -219,32 +268,31 @@ class RoleSelectDropdown(discord.ui.Select):
 
 class FactionButton(discord.ui.Button):
     def __init__(self, faction: str, active_faction: str) -> None:
-        meta    = _FACTION_META[faction]
+        meta      = _FACTION_META[faction]
         is_active = (faction == active_faction)
         super().__init__(
-            label      = meta["label"],
-            emoji      = meta["emoji"],
-            style      = meta["style"] if is_active else discord.ButtonStyle.secondary,
-            custom_id  = f"faction_tab_{faction}",
-            disabled   = is_active,            # highlight the current tab
-            row        = 1,
+            label     = meta["label"],
+            emoji     = meta["emoji"],
+            style     = meta["style"] if is_active else discord.ButtonStyle.secondary,
+            custom_id = f"faction_tab_{faction}",
+            disabled  = is_active,
+            row       = 1,
         )
         self.faction = faction
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        new_view  = RolesView(active_faction=self.faction)
-        embed     = _build_faction_embed(self.faction)
+        new_view = RolesView(active_faction=self.faction)
+        embed    = _build_faction_embed(self.faction)
         await interaction.response.edit_message(embed=embed, view=new_view)
 
 
 class BackToRosterButton(discord.ui.Button):
-    """Appears in detail mode — returns to the faction roster list."""
     def __init__(self, active_faction: str) -> None:
         super().__init__(
-            label      = "← Back to Roster",
-            style      = discord.ButtonStyle.secondary,
-            custom_id  = "back_to_roster",
-            row        = 1,
+            label     = "← Back to Roster",
+            style     = discord.ButtonStyle.secondary,
+            custom_id = "back_to_roster",
+            row       = 1,
         )
         self.active_faction = active_faction
 
@@ -266,19 +314,16 @@ class RolesView(discord.ui.View):
         # Row 0 — dropdown for the active faction's roles
         self.add_item(RoleSelectDropdown(active_faction))
 
-        # Row 1 — faction tab buttons (or Back button in detail mode)
+        # Row 1 — faction tab buttons (or Back + inactive faction tabs in detail mode)
         if detail_mode:
             self.add_item(BackToRosterButton(active_faction))
-            # Still show the inactive faction buttons so the user can jump directly
             for faction in FACTION_ORDER:
                 if faction != active_faction:
-                    btn = FactionButton(faction, active_faction)
-                    self.add_item(btn)
+                    self.add_item(FactionButton(faction, active_faction))
         else:
             for faction in FACTION_ORDER:
                 self.add_item(FactionButton(faction, active_faction))
 
-    # Convenience static used by the command
     @staticmethod
     def build_index_embed(faction: str = FACTION_PROTAGONIST) -> discord.Embed:
         return _build_faction_embed(faction)

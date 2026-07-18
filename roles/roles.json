@@ -192,14 +192,15 @@
     "footer": "Nah I'd Adapt."
   },
   "villager": {
-    "name": "Default Villager",
-    "faction": "Protagonist",
+    "name": "Villager",
+    "faction": "Special",
     "emoji": "🧑",
     "win_condition": "Help the protagonists win. (Wins with Protagonists)",
-    "description": "A normal citizen of the anime world.",
+    "description": "A normal citizen of the anime world with no special abilities. Villager slots only appear when there aren't enough unique Protagonist roles to fill the town — the more players, the more likely a Villager shows up.",
     "active_ability": "None",
     "passive_ability": "None",
-    "action_prompt": ""
+    "action_prompt": "",
+    "footer": "Just a regular person caught in the crossfire."
   },
   "frieza": {
     "name": "Frieza",
@@ -225,23 +226,25 @@
   },
   "lower_moon": {
     "name": "Lower Moon Demon",
-    "faction": "Antagonist",
+    "faction": "Special",
     "emoji": "🌙",
     "win_condition": "Help the antagonists win.",
-    "description": "A powerful demon who serves Muzan Kibutsuji.",
-    "active_ability": "Distract (Roleblock a player).",
+    "description": "A powerful demon turned by Muzan Kibutsuji. Lower Moons are never assigned at game start — they are created mid-game when Muzan converts a dead Protagonist into a demon soldier.",
+    "active_ability": "Distract — Roleblock a player each night.",
     "passive_ability": "None",
-    "action_prompt": "Select a player to roleblock/distract:"
+    "action_prompt": "Select a player to roleblock/distract:",
+    "footer": "Serving Muzan-sama with unwavering loyalty."
   },
   "upper_moon": {
     "name": "Upper Moon Demon",
-    "faction": "Antagonist",
-    "emoji": "💀",
+    "faction": "Special",
+    "emoji": "🌑",
     "win_condition": "Help the antagonists win.",
-    "description": "A lethal demon with supreme power.",
-    "active_ability": "Demon Strike (Kill a player).",
+    "description": "A lethal demon of supreme power turned by Muzan Kibutsuji. Upper Moons are never assigned at game start — they are created mid-game when Muzan converts a dead Protagonist into a demon soldier, granting them killing power.",
+    "active_ability": "Demon Strike — Kill a player each night.",
     "passive_ability": "None",
-    "action_prompt": "Select a player to attack:"
+    "action_prompt": "Select a player to attack:",
+    "footer": "I exist only to serve Muzan-sama's will."
   },
   "kishibe": {
     "name": "Kishibe",
