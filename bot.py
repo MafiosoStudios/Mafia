@@ -63,7 +63,7 @@ class AnimeMafiaBot(commands.Bot):
                     channel = await self.fetch_channel(channel_id)
                 if channel:
                     from config import get_emoji
-                    await channel.send(f"{get_emoji('check')} **Bot has successfully restarted and is now online!**")
+                    await channel.send(f"**Bot process has restarted, getcholazyassup and get to work**")
                 sys.argv.pop(idx + 1)
                 sys.argv.pop(idx)
             except Exception:
