@@ -27,7 +27,7 @@ FACTION_ORDER = [FACTION_PROTAGONIST, FACTION_ANTAGONIST, FACTION_NEUTRAL, FACTI
 _FACTION_META = {
     FACTION_PROTAGONIST: {
         "label"       : "Protagonists",
-        "emoji"       : "🦸",
+        "emoji"       : get_emoji("Protagonist") or "🦸",
         "color"       : discord.Color.from_rgb(52, 211, 153),   # emerald
         "aliases"     : _TOWN_ALIASES,
         "dropdown_ph" : "Select a Protagonist…",
@@ -35,7 +35,7 @@ _FACTION_META = {
     },
     FACTION_ANTAGONIST: {
         "label"       : "Antagonists",
-        "emoji"       : "💀",
+        "emoji"       : get_emoji("Antagonist") or "💀",
         "color"       : discord.Color.from_rgb(239, 68, 68),    # red
         "aliases"     : _MAFIA_ALIASES,
         "dropdown_ph" : "Select an Antagonist…",
@@ -43,7 +43,7 @@ _FACTION_META = {
     },
     FACTION_NEUTRAL: {
         "label"       : "Neutrals",
-        "emoji"       : "⚖️",
+        "emoji"       : get_emoji("Neutral") or "⚖️",
         "color"       : discord.Color.from_rgb(168, 85, 247),   # purple
         "aliases"     : _NEUT_ALIASES,
         "dropdown_ph" : "Select a Neutral…",
@@ -256,9 +256,21 @@ class FactionButton(discord.ui.Button):
     def __init__(self, faction: str, active_faction: str) -> None:
         meta      = _FACTION_META[faction]
         is_active = (faction == active_faction)
+
+        emoji_str = meta["emoji"]
+        button_emoji = None
+        if emoji_str:
+            if emoji_str.startswith("<"):
+                try:
+                    button_emoji = discord.PartialEmoji.from_str(emoji_str)
+                except Exception:
+                    pass
+            else:
+                button_emoji = emoji_str
+
         super().__init__(
             label     = meta["label"],
-            emoji     = meta["emoji"],
+            emoji     = button_emoji,
             style     = meta["style"] if is_active else discord.ButtonStyle.secondary,
             custom_id = f"faction_tab_{faction}",
             disabled  = is_active,
