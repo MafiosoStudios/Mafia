@@ -20,16 +20,16 @@ PATCHES: list[dict] = [
             "has been crafted around the actual powers and personalities of iconic anime characters."
         ),
         "changes": [
-            "🎭 **12 unique anime roles** across Town, Mafia, and Neutral factions",
-            "🌙 **Night & Day cycle** with full ability resolution engine",
-            "⚖️ **Trial system** — nomination, plea, verdict, and retrial support",
-            "🩺 **Doctor Kenzo Tenma rework** — Emergency Surgery links two targets",
-            "👁️ **Frieren** — Zoltraak burst and Demon Detection passive",
-            "👑 **Lelouch** — Geass, Rebellion, and Zero Requiem mechanics",
-            "📊 **Player profiles**, XP, levels, win rates, and leaderboards",
-            "🛍️ **Shop system** with cosmetic inventory",
-            "📖 **Interactive tutorial** and full role directory",
-            "🤖 Bot presence, admin reset, and developer tools",
+            "**26 unique anime roles** across Town, Mafia, and Neutral factions",
+            "**Night & Day cycle** with full ability resolution engine",
+            "**Trial System** — nomination, plea, verdict, and retrial support",
+            "**Leaderboard System** — across all servers, with XP and levels",
+            "**Custom Role Emojis** — for all faction roles and characters",
+            "**Live Support** — Taking active feedback and suggestions from the community",
+            "**Player profiles**, XP, levels, win rates, and leaderboards",
+            "**Shop system** with cosmetic inventory",
+            "**Interactive tutorial** and full role directory",
+            "Bot presence, admin reset, and developer tools",
         ],
     },
     # -----------------------------------------------------------------------
@@ -68,13 +68,13 @@ class PatchNotesView(discord.ui.View):
         changes_text = "\n".join(f"> {line}" for line in patch["changes"])
 
         embed = discord.Embed(
-            title=f"📋 {patch['title']}",
+            title=f"{patch['title']}",
             description=(
                 f"**Version {patch['version']}** — {patch['date']}\n\n"
                 f"{patch['description']}\n\n"
                 f"**What's New:**\n{changes_text}"
             ),
-            color=discord.Color.from_rgb(110, 58, 190),
+            color=discord.Color.from_rgb(0, 0, 0),
         )
         embed.set_footer(text=f"Mafioso Patch Notes  •  Version {patch['version']}  •  {index + 1} of {total}")
         return embed
