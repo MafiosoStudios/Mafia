@@ -1206,10 +1206,39 @@ class GameEngine:
                             defendant_mem = guild.get_member(target_id)
                             defendant_name = defendant_mem.display_name if defendant_mem else f"User {target_id}"
 
+                            # Mahoraga full-adapt vote immunity check
+                            target_pstate = session.players.get(target_id)
+                            if (
+                                session.metadata.get("mahoraga_vote_immune")
+                                and target_pstate
+                                and target_pstate.role_key == "mahoraga"
+                                and target_pstate.metadata.get("mahoraga_adapt_complete")
+                            ):
+                                # Reveal Mahoraga's role and block the trial
+                                await self.bot.message_queue.send(
+                                    mafia_channel,
+                                    embed=discord.Embed(
+                                        title=f"🌀 Adaptation — Absolute!",
+                                        description=(
+                                            f"**{defendant_name}** has fully adapted to all three factions!\n\n"
+                                            f"They are **immune to all votes and trials**. "
+                                            f"No conventional force can remove them from this game.\n\n"
+                                            f"Their role has been revealed: **Eight-Handled Sword Divergent Sila Divine General Mahoraga** 🌀\n\n"
+                                            f"Only an unstoppable one-hit ability can end their reign now."
+                                        ),
+                                        color=discord.Color.from_rgb(110, 58, 190),
+                                    )
+                                )
+                                session.votes.clear()
+                                session.metadata.pop("skip_votes", None)
+                                majority_passed = False
+                                break  # skip the voting phase entirely for this cycle
+
                             # Mute all EXCEPT defendant (but do not mute the text channel during plea)
                             session.phase = GamePhase.TRIAL
                             session.metadata["defendant_id"] = target_id
                             await self._update_channel_mute_trial(mafia_channel, session, target_id)
+
 
                     if majority_passed:
                         if resuming_phase is None or resuming_phase == GamePhase.TRIAL:

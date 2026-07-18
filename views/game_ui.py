@@ -1057,6 +1057,32 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
 
         await asyncio.sleep(3)
 
+        # Mahoraga adaptation intercept — if target has adapted to Protagonist (Town) faction,
+        # the Deadly Sentencing is blocked, role is revealed, and the use is wasted.
+        if (
+            target_player
+            and target_player.role_key == "mahoraga"
+            and "Protagonist" in target_player.metadata.get("mahoraga_adapted_factions", [])
+        ):
+            await self.engine.bot.message_queue.send(
+                mafia_channel,
+                embed=discord.Embed(
+                    title="🌀 Deadly Sentencing Nullified!",
+                    description=(
+                        f"**Hiromi Higuruma's** judgment could not be carried out!\n\n"
+                        f"<@{target_id}> has **adapted to the Protagonist faction** — "
+                        f"all Protagonist abilities, including this Sentencing, are nullified against them.\n\n"
+                        f"Their role has been revealed: **Eight-Handled Sword Divergent Sila Divine General Mahoraga** 🌀\n\n"
+                        f"The Sentencing use has been consumed."
+                    ),
+                    color=discord.Color.from_rgb(110, 58, 190),
+                )
+            )
+            async with self.engine._lock:
+                session.metadata["deadly_sentencing_active"] = False
+            await interaction.edit_original_response(content=f"Deadly Sentencing failed — target has Protagonist adaptation.", view=None)
+            return
+
         faction_display = "Town (Hero)"
         if target_faction == RoleFaction.VILLAIN.value:
             faction_display = "Mafia (Villain)"

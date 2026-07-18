@@ -349,67 +349,145 @@ class ErenJaeger(BaseRole):
 
 # --- Mahoraga ---
 
+# Factions that can be adapted to (internal string values)
+_MAHORAGA_FACTIONS = (
+    "Protagonist",   # Town / Hero
+    "Antagonist",    # Mafia / Villain
+    "Neutral",       # Neutral
+)
+# Adaptation success chances per stage (1st→2nd→3rd adaptation)
+_ADAPT_CHANCES = [0.75, 0.50, 0.25]
+
+
 class MahoragaWinCondition(WinCondition):
     def __init__(self) -> None:
-        super().__init__("Survive an attack and eliminate at least 1 player who tried to kill you.")
+        super().__init__("Be the last remaining player alive in the lobby.")
 
     def check(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
         session = context.payload.get("session")
         if not session:
             return False
         player_state = session.players.get(context.user_id)
-        if not player_state:
+        if not player_state or not player_state.alive:
             return False
-            
-        attackers = player_state.metadata.get("attackers", [])
-        if not attackers:
-            return False
-            
-        for attacker_id in attackers:
-            attacker_state = session.players.get(attacker_id)
-            if attacker_state and not attacker_state.alive:
-                return True
-        return False
+        # Win if Mahoraga is the only living player
+        alive_players = [pid for pid, ps in session.players.items() if ps.alive]
+        return len(alive_players) == 1 and alive_players[0] == context.user_id
 
 
-class MahoragaAdapt(PassiveEffect):
+class MahoragaAdaptation(NightAction):
+    """
+    Adaptation — Mahoraga's active night ability.
+    Mahoraga visits a player each night to attempt adapting to their faction.
+    Stages: 75% → 50% → 25% success per new faction.
+    Once a faction is adapted to, their night-kill abilities are blocked.
+    After all 3 factions are adapted, Mahoraga is also immune to being voted out.
+    """
+
     def __init__(self) -> None:
         super().__init__(
             name="Adaptation",
-            description="75% chance to survive attacks. Upon surviving, gain permanent immunity and lynch immunity for 1 day."
+            description=(
+                "Visit a player to attempt adapting to their faction. "
+                "1st faction: 75% success. 2nd: 50%. 3rd: 25%.\n"
+                "Adapted factions cannot kill Mahoraga at night (only unstoppable/one-hit "
+                "abilities bypass this). After adapting to all 3 factions, you also cannot "
+                "be voted out by the town."
+            ),
+            priority=3,
         )
 
-    async def resolve_protection(self, context: RoleContext, attack_sources: list[str]) -> bool:
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str]:
+        adapted: list = player_state.metadata.get("mahoraga_adapted_factions", [])
+        if player_state.metadata.get("mahoraga_adapt_complete"):
+            return False, "You have already adapted to all three factions. Adaptation is complete."
+        return True, None
+
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        actor_state = session.players.get(actor_id)
+        adapted: list = actor_state.metadata.get("mahoraga_adapted_factions", []) if actor_state else []
+        # Only target players whose faction hasn't been adapted yet
+        eligible = []
+        for pid, pstate in session.players.items():
+            if pid == actor_id or not pstate.alive:
+                continue
+            if pstate.faction not in adapted:
+                eligible.append(pid)
+        return eligible
+
+    async def execute(self, context: RoleContext) -> None:
+        target_id = context.target_id
         session = context.payload.get("session")
-        if not session:
-            return False
-            
-        player_state = session.players.get(context.user_id)
-        if player_state:
-            attacker_ids = []
-            for actor_id, payload in session.night_actions.items():
-                if payload.get("target_id") == context.user_id:
-                    attacker_ids.append(actor_id)
+        if not target_id or not session:
+            return
 
-            if random.random() < 0.75:
-                mahoraga_attackers = player_state.metadata.setdefault("attackers", [])
-                mahoraga_attackers.extend(attacker_ids)
+        player_state = session.players[context.user_id]
+        target_state = session.players.get(target_id)
+        if not target_state:
+            return
 
-                day_num = session.metadata.get("day_num", 1)
-                player_state.metadata["lynch_immune_day"] = day_num + 1
+        target_faction = target_state.faction
+        adapted: list = player_state.metadata.setdefault("mahoraga_adapted_factions", [])
 
-                # Send adaptation notification
-                guild = context.bot.get_guild(session.game_handle.guild_id) if (context.bot and session.game_handle) else None
-                if guild:
-                    mahoraga_mem = guild.get_member(context.user_id)
-                    if mahoraga_mem:
-                        context.bot.message_queue.send(
-                            mahoraga_mem,
-                            f"{get_emoji('shield')} **Adaptation triggered!** You survived the attack, adapted to their roles, "
-                            "and gained lynch immunity for tomorrow!"
-                        )
-                return True
-        return False
+        # Determine which stage this adaptation is (0-indexed)
+        stage = len(adapted)
+        if stage >= 3:
+            context.payload["result"] = f"🌀 **Adaptation Complete.** You have already adapted to all factions."
+            return
+
+        if target_faction in adapted:
+            context.payload["result"] = (
+                f"🌀 You have already adapted to the **{target_faction}** faction. "
+                f"Choose a player from a different faction next night."
+            )
+            return
+
+        chance = _ADAPT_CHANCES[stage]
+        success = random.random() < chance
+
+        faction_label_map = {
+            "Protagonist": "Protagonist (Town)",
+            "Antagonist": "Antagonist (Mafia)",
+            "Neutral": "Neutral",
+        }
+        faction_label = faction_label_map.get(target_faction, target_faction)
+
+        if success:
+            adapted.append(target_faction)
+            player_state.metadata["mahoraga_adapted_factions"] = adapted
+
+            # Update the session-level immune factions list so the engine can read it quickly
+            immune: list = session.metadata.setdefault("mahoraga_faction_immune", [])
+            if target_faction not in immune:
+                immune.append(target_faction)
+
+            remaining_factions = [f for f in _MAHORAGA_FACTIONS if f not in adapted]
+
+            if len(adapted) == 3:
+                player_state.metadata["mahoraga_adapt_complete"] = True
+                session.metadata["mahoraga_vote_immune"] = True
+                context.payload["result"] = (
+                    f"🌀 **Adaptation Successful!** You have now adapted to all three factions — "
+                    f"**{faction_label}** was your final target.\n\n"
+                    f"No faction can eliminate you through night abilities anymore, "
+                    f"and **the town can no longer vote you out.** "
+                    f"Only an unstoppable one-hit ability can end your reign."
+                )
+            else:
+                next_stage_chance = int(_ADAPT_CHANCES[len(adapted)] * 100)
+                context.payload["result"] = (
+                    f"🌀 **Adaptation Successful!** You have adapted to the **{faction_label}** faction "
+                    f"({int(chance * 100)}% chance).\n"
+                    f"Their faction can no longer kill you through night abilities.\n\n"
+                    f"Remaining factions to adapt: **{', '.join(faction_label_map.get(f, f) for f in remaining_factions)}**\n"
+                    f"Next adaptation chance: **{next_stage_chance}%**"
+                )
+        else:
+            context.payload["result"] = (
+                f"🌀 **Adaptation Failed!** ({int(chance * 100)}% chance)\n"
+                f"You attempted to adapt to the **{faction_label}** faction but failed. "
+                f"Try again next night — you may target the same faction again."
+            )
 
 
 @role_registry.register
@@ -418,13 +496,93 @@ class Mahoraga(BaseRole):
     priority: ClassVar[int] = 5
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "survival")
     is_unique: ClassVar[bool] = False
-    cooldown_text: ClassVar[str] = "None"
-    limitations_text: ClassVar[str] = "No active night actions."
+    cooldown_text: ClassVar[str] = "None — Adaptation can be used every night until all 3 factions are adapted"
+    limitations_text: ClassVar[str] = "Cannot target a faction already adapted to."
 
     def __init__(self) -> None:
         super().__init__()
-        self.passives = [MahoragaAdapt()]
+        self.abilities = [MahoragaAdaptation()]
+        self.passives = []
         self.win_condition_obj = MahoragaWinCondition()
+
+    async def resolve_protection(self, context: RoleContext, attack_sources: list[str]) -> bool:
+        """
+        Block night kills from adapted factions.
+        Unstoppable sources (light_guess, devils_pen_kill, bang_kill, frieza_golden_kill,
+        tosen_kill, gates_of_babylon, kishibe_alert_kill) always bypass this.
+        """
+        session = context.payload.get("session")
+        if not session:
+            return False
+
+        player_state = session.players.get(context.user_id)
+        if not player_state:
+            return False
+
+        immune_factions: list = session.metadata.get("mahoraga_faction_immune", [])
+        if not immune_factions:
+            return False
+
+        # These sources always bypass Mahoraga's adaptation immunity
+        UNSTOPPABLE = {
+            "light_guess", "devils_pen_kill", "bang_kill", "frieza_golden_kill",
+            "tosen_kill", "gates_of_babylon", "kishibe_alert_kill",
+        }
+        # If any unstoppable source is present → don't block
+        if any(src in UNSTOPPABLE for src in attack_sources):
+            return False
+
+        # Map attack sources back to their originating faction
+        # Sources from known faction attackers
+        VILLAIN_SOURCES = {"mafia_strike", "frieza_kill", "demon_strike", "upper_moon"}
+        HERO_SOURCES = {"levi_kill"}
+        NEUTRAL_SOURCES = {"eren_attack", "muzan_kill", "gilgamesh_attack"}
+
+        faction_of_source: dict[str, str] = {}
+        for src in attack_sources:
+            if src in VILLAIN_SOURCES:
+                faction_of_source[src] = "Antagonist"
+            elif src in HERO_SOURCES:
+                faction_of_source[src] = "Protagonist"
+            elif src in NEUTRAL_SOURCES:
+                faction_of_source[src] = "Neutral"
+            else:
+                # For generic sources, try to trace back via night_actions
+                for pid, action in session.night_actions.items():
+                    t_id = action.get("target_id")
+                    targets = action.get("targets", ())
+                    if t_id == context.user_id or context.user_id in targets:
+                        pstate = session.players.get(pid)
+                        if pstate:
+                            faction_of_source[src] = pstate.faction
+                            break
+
+        # Block only if ALL attack sources come from adapted (immune) factions
+        if not faction_of_source:
+            return False
+
+        all_immune = all(
+            faction_of_source.get(src, "") in immune_factions
+            for src in attack_sources
+        )
+
+        if all_immune:
+            # Notify Mahoraga
+            if context.bot:
+                guild = context.bot.get_guild(session.game_handle.guild_id)
+                if guild:
+                    mahoraga_mem = guild.get_member(context.user_id)
+                    if mahoraga_mem:
+                        attacker_factions = set(faction_of_source.values())
+                        context.bot.message_queue.send(
+                            mahoraga_mem,
+                            f"🌀 **Mahoraga — Adaptation Shield!**\n"
+                            f"An attack from the **{', '.join(attacker_factions)}** faction was nullified "
+                            f"by your adaptation. They cannot harm you."
+                        )
+            return True
+
+        return False
 
 
 class LelouchGeass(NightAction):
