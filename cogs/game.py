@@ -346,5 +346,14 @@ class GameCog(commands.Cog):
         await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=True)
 
 
+    @commands.hybrid_command(name="patchnotes", description="Browse Mafioso version patch notes")
+    async def patchnotes(self, ctx: commands.Context) -> None:
+        from views.patchnotes_view import PatchNotesView
+        index = len(PatchNotesView.PATCHES) - 1  # start at latest
+        view = PatchNotesView(index)
+        embed = PatchNotesView.build_embed(index)
+        await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=False)
+
+
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(GameCog(bot))
