@@ -20,7 +20,7 @@ _NEUT_ALIASES    = ("Neutral",)
 _SPECIAL_ALIASES = ("Special",)
 
 # These role keys are never shown in the main faction tabs
-SPECIAL_ROLE_KEYS = frozenset({"villager", "lower_moon", "upper_moon"})
+SPECIAL_ROLE_KEYS = frozenset({"villager", "demon", "lower_moon", "upper_moon"})
 
 FACTION_ORDER = [FACTION_PROTAGONIST, FACTION_ANTAGONIST, FACTION_NEUTRAL, FACTION_SPECIAL]
 

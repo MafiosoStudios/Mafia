@@ -216,13 +216,14 @@
   },
   "demon": {
     "name": "Demon",
-    "faction": "Antagonist",
+    "faction": "Special",
     "emoji": "👿",
     "win_condition": "Help the antagonists win.",
-    "description": "A human turned demon by Muzan Kibutsuji.",
+    "description": "A human turned demon by Muzan Kibutsuji. Demons are never assigned at game start — they are created mid-game when Muzan targets a Protagonist at night to turn them into a demon ally.",
     "active_ability": "None",
     "passive_ability": "None",
-    "action_prompt": ""
+    "action_prompt": "",
+    "footer": "My humanity is gone. I serve only the demon lord."
   },
   "lower_moon": {
     "name": "Lower Moon Demon",

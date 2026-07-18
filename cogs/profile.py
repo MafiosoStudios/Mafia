@@ -47,10 +47,10 @@ class ProfileCog(commands.Cog):
         embed.add_field(name="XP", value=str(profile_record.xp), inline=True)
         embed.add_field(name="\u200b", value="\u200b", inline=True)
 
-        # Row 3: Wins and Losses
+        # Row 3: Wins, Losses, and Draws
         embed.add_field(name="Wins", value=str(statistics.wins), inline=True)
         embed.add_field(name="Losses", value=str(statistics.losses), inline=True)
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(name="Draws", value=str(statistics.draws), inline=True)
 
         # Row 4: Games Played and Win Rate
         embed.add_field(name="Games Played", value=str(total_games), inline=True)
