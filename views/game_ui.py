@@ -1181,7 +1181,7 @@ class VerdictUISelectView(discord.ui.View):
 
                 async def normal_cb(inter: discord.Interaction) -> None:
                     verdicts = session.metadata.setdefault("verdicts", {})
-                    verdicts[inter.user.id] = "innocent"
+                    verdicts[str(inter.user.id)] = "innocent"
                     await inter.response.edit_message(content="Registered normal Innocent verdict.", view=None)
 
                 async def retrial_cb(inter: discord.Interaction) -> None:
@@ -1206,5 +1206,5 @@ class VerdictUISelectView(discord.ui.View):
                 return
 
         verdicts = session.metadata.setdefault("verdicts", {})
-        verdicts[user_id] = decision
+        verdicts[str(user_id)] = decision
         await interaction.response.send_message(f"You cast a verdict of **{decision.upper()}**.", ephemeral=True)

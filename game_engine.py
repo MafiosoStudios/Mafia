@@ -1381,7 +1381,7 @@ class GameEngine:
                             guilty_count = 0
                             inno_count = 0
                             for voter_id, decision in verdict_data.items():
-                                voter_state = session.players.get(voter_id)
+                                voter_state = session.players.get(int(voter_id))
                                 weight = voter_state.vote_weight if voter_state else 1
                                 if decision == "guilty":
                                     if target_id == geass_target:
@@ -1393,7 +1393,7 @@ class GameEngine:
                             # Verdict results output
                             verdict_report_lines = []
                             for pid, decision in verdict_data.items():
-                                v_mem = guild.get_member(pid)
+                                v_mem = guild.get_member(int(pid))
                                 v_name = v_mem.display_name if v_mem else f"User {pid}"
                                 verdict_report_lines.append(f"• **{v_name}**: {decision.upper()}")
 
@@ -1415,7 +1415,7 @@ class GameEngine:
                             if guilty_count > inno_count:
                                 # Perform lynch
                                 def_state = session.players[target_id]
-                                if def_state.metadata.get("lynch_immune_day") == day_num:
+                                if def_state.metadata.get("lynch_immune_day") == session.metadata.get("day_num", 0):
                                     await self.bot.message_queue.send(mafia_channel, f"{get_emoji('mahoraga')} **Mahoraga is immune to being lynched today!** The trial is dismissed.")
                                 elif def_state.role_key == "makima" and not def_state.metadata.get("pm_contract_activated"):
                                     def_state.metadata["pm_contract_activated"] = True
@@ -2807,6 +2807,15 @@ class GameEngine:
             logger.exception("Failed to set trial mute overrides.")
 
 
+def _stringify_keys(obj: Any) -> Any:
+    """Recursively convert any dict with non-string keys to string keys (MongoDB requirement)."""
+    if isinstance(obj, dict):
+        return {str(k): _stringify_keys(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_stringify_keys(i) for i in obj]
+    return obj
+
+
 def serialize_session(session: GameSession) -> dict[str, Any]:
     from dataclasses import asdict
     players_dict = {}
@@ -2820,7 +2829,7 @@ def serialize_session(session: GameSession) -> dict[str, Any]:
             "vote_weight": pstate.vote_weight,
             "votes_cast": pstate.votes_cast,
             "night_actions_used": pstate.night_actions_used,
-            "metadata": pstate.metadata,
+            "metadata": _stringify_keys(pstate.metadata),
         }
 
     return {
@@ -2844,7 +2853,7 @@ def serialize_session(session: GameSession) -> dict[str, Any]:
         "night_actions": {str(k): v for k, v in session.night_actions.items()},
         "winner_faction": session.winner_faction,
         "draw_reason": session.draw_reason,
-        "metadata": session.metadata,
+        "metadata": _stringify_keys(session.metadata),
     }
 
 
