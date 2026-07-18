@@ -661,8 +661,14 @@ class GameEngine:
         # 1. Roles Distribution — category-balanced (see roles/balance.py):
         # guarantees Protective/Investigative/Council-Utility coverage for town
         # and exactly one Killing + one support role for mafia, instead of a
-        # purely random draw.
-        assigned_keys = roles.build_role_pool(len(session.player_ids))
+        # purely random draw. Roles disabled via /roledisable are excluded.
+        disabled_roles: list[str] = []
+        if self._database is not None:
+            try:
+                disabled_roles = await self._database.get_disabled_roles(guild_id)
+            except Exception:
+                logger.exception("Failed to load disabled roles for guild %s; proceeding with full roster.", guild_id)
+        assigned_keys = roles.build_role_pool(len(session.player_ids), disabled_roles=disabled_roles)
 
         # Apply role assignments
         await self.assign_roles(game_id, tuple(assigned_keys))

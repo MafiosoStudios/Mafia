@@ -106,6 +106,7 @@ class DatabaseManager:
         guild_id: int | None,
         player_faction: str | None,
         winner_faction: str | None,
+        has_won: bool | None = None,
     ) -> StatisticsRecord:
         current = await self.get_statistics(user_id)
         statistics = current or StatisticsRecord(user_id=user_id)
@@ -113,6 +114,13 @@ class DatabaseManager:
         games_played = statistics.games_played + 1
         if winner_faction is None or winner_faction == "Draw":
             wins, losses, draws = statistics.wins, statistics.losses, statistics.draws + 1
+        elif has_won is not None:
+            # has_won reflects game_engine's authoritative win calculation
+            # (accounts for custom win conditions, not just faction match).
+            if has_won:
+                wins, losses, draws = statistics.wins + 1, statistics.losses, statistics.draws
+            else:
+                wins, losses, draws = statistics.wins, statistics.losses + 1, statistics.draws
         elif player_faction == winner_faction:
             wins, losses, draws = statistics.wins + 1, statistics.losses, statistics.draws
         else:
@@ -349,6 +357,7 @@ class DatabaseManager:
             "plea_duration": 60,
             "verdict_duration": 30,
             "anonymous_voting": True,
+            "disabled_roles": [],
         }
         if doc and "settings" in doc:
             defaults.update(doc["settings"])
@@ -360,6 +369,21 @@ class DatabaseManager:
             {"$set": {f"settings.{key}": value}},
             upsert=True,
         )
+
+    async def get_disabled_roles(self, guild_id: int) -> list[str]:
+        settings = await self.get_guild_settings(guild_id)
+        return list(settings.get("disabled_roles", []))
+
+    async def set_role_disabled(self, guild_id: int, role_key: str, disabled: bool) -> list[str]:
+        """Adds/removes role_key from the guild's disabled_roles list and returns the new list."""
+        current = set(await self.get_disabled_roles(guild_id))
+        if disabled:
+            current.add(role_key)
+        else:
+            current.discard(role_key)
+        updated = sorted(current)
+        await self.update_guild_setting(guild_id, "disabled_roles", updated)
+        return updated
 
     # ---- Active Game Recovery -----------------------------------------------
 
