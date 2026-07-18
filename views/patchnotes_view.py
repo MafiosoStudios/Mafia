@@ -35,20 +35,20 @@ PATCHES: list[dict] = [
     {
         "version": "1.0.1",
         "date": "July 18, 2026",
-        "title": "Version 1.0.1 — Mahoraga & System Rework",
+        "title": "Version 1.0.1 — Mahoraga Rework, Bug Fixes, and Moreg",
         "description": (
             "A major update introducing a complete rework for Mahoraga, "
             "critical bug fixes to the game and administration loops, "
             "interactive roles directory, and player profile enhancements."
         ),
         "changes": [
-            "🌀 **Mahoraga Rework** — Adapted factions no longer harm Mahoraga at night; adapt to all 3 factions to gain vote/trial immunity",
-            "⚖️ **Trial Crash Fixed** — Resolved issue where the game would draw or crash during voting and trial verdict phases",
-            "📖 **Interactive Directory** — Added `!roles` command with faction tab navigation to inspect any character's abilities",
-            "📊 **Profile Draws** — Added Draw category field in the profile card output (between Losses and Games Played)",
-            "⚙️ **Admin Sync Fixed** — Fixed command sync mechanism failing to respond during registration of slash commands",
-            "🏆 **Victory Embeds** — Cleaned up and polished the game over win screens for Protagonists, Antagonists, and Neutrals",
-            "🎨 **Visual Polish** — Multiple interface alignments, custom emojis, and interaction locks for command authors",
+            "**Mahoraga Rework** — Adapted factions no longer harm Mahoraga at night; adapt to all 3 factions to gain vote/trial immunity",
+            "**Trial Crash Fixed** — Resolved issue where the game would draw or crash during voting and trial verdict phases",
+            "**Interactive Directory** — Added `!roles` command with faction tab navigation to inspect any character's abilities",
+            "**Profile Draws** — Added Draw category field in the profile card output (between Losses and Games Played)",
+            "**Admin Sync Fixed** — Fixed command sync mechanism failing to respond during registration of slash commands",
+            "**Victory Embeds** — Cleaned up and polished the game over win screens for Protagonists, Antagonists, and Neutrals",
+            "**Visual Polish** — Multiple interface alignments, custom emojis, and interaction locks for command authors",
         ],
     },
 ]
