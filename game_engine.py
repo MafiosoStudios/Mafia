@@ -1561,12 +1561,12 @@ class GameEngine:
         """Sends a detailed victory embed with Winners and Losers lists."""
         # Determine the display title for the winner
         faction_display_map = {
-            RoleFaction.HERO.value: f"{get_emoji('victory')} Protagonists Win!",
-            RoleFaction.VILLAIN.value: f"{get_emoji('victory')} Antagonists Win!",
+            RoleFaction.HERO.value: f"Protagonists Win!",
+            RoleFaction.VILLAIN.value: f"Antagonists Win!",
             "Draw": f"{get_emoji('peace')} It's a Draw!",
         }
         # If it's a neutral solo winner, show their name
-        title = faction_display_map.get(winner_faction, f"{get_emoji('victory')} {winner_faction} Wins!")
+        title = faction_display_map.get(winner_faction, f"{winner_faction} Wins!")
 
         victory_embed = discord.Embed(
             title=title,
@@ -1587,7 +1587,7 @@ class GameEngine:
             pstate = session.players.get(pid)
             status = "Alive" if (pstate and pstate.alive) else "Dead"
 
-            player_line = f"• **{name}** — {role_emoji_prefix}{role_display} ({status})"
+            player_line = f"• **{name}** — {role_display}  ({status})"
 
             # Determine if this player is a winner
             is_winner = False
