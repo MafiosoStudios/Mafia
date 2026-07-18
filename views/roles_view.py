@@ -244,7 +244,7 @@ class RoleSelectDropdown(discord.ui.Select):
             return
 
         embed    = _build_role_detail_embed(rkey, rmeta)
-        new_view = RolesView(active_faction=self.active_faction, detail_mode=True)
+        new_view = RolesView(author_id=self.view.author_id, active_faction=self.active_faction, detail_mode=True)
         await interaction.response.edit_message(embed=embed, view=new_view)
 
 
@@ -279,7 +279,7 @@ class FactionButton(discord.ui.Button):
         self.faction = faction
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        new_view = RolesView(active_faction=self.faction)
+        new_view = RolesView(author_id=self.view.author_id, active_faction=self.faction)
         embed    = _build_faction_embed(self.faction)
         await interaction.response.edit_message(embed=embed, view=new_view)
 
@@ -295,7 +295,7 @@ class BackToRosterButton(discord.ui.Button):
         self.active_faction = active_faction
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        new_view = RolesView(active_faction=self.active_faction)
+        new_view = RolesView(author_id=self.view.author_id, active_faction=self.active_faction)
         embed    = _build_faction_embed(self.active_faction)
         await interaction.response.edit_message(embed=embed, view=new_view)
 
@@ -305,8 +305,9 @@ class BackToRosterButton(discord.ui.Button):
 # ---------------------------------------------------------------------------
 
 class RolesView(discord.ui.View):
-    def __init__(self, active_faction: str = FACTION_PROTAGONIST, detail_mode: bool = False) -> None:
+    def __init__(self, author_id: int, active_faction: str = FACTION_PROTAGONIST, detail_mode: bool = False) -> None:
         super().__init__(timeout=300)
+        self.author_id = author_id
         self.active_faction = active_faction
 
         # Row 0 — dropdown for the active faction's roles
@@ -321,6 +322,15 @@ class RolesView(discord.ui.View):
         else:
             for faction in FACTION_ORDER:
                 self.add_item(FactionButton(faction, active_faction))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                f"{get_emoji('cross') or '❌'} **Unauthorized:** Only the person who ran this command can interact with it.",
+                ephemeral=True
+            )
+            return False
+        return True
 
     @staticmethod
     def build_index_embed(faction: str = FACTION_PROTAGONIST) -> discord.Embed:

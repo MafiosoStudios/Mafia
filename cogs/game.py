@@ -298,7 +298,7 @@ class GameCog(commands.Cog):
     @commands.hybrid_command(name="roles", description="View the interactive directory of every role in the game")
     async def roles(self, ctx: commands.Context) -> None:
         from views.roles_view import RolesView
-        view = RolesView()
+        view = RolesView(ctx.author.id)
         embed = RolesView.build_index_embed()
         await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=True)
 
