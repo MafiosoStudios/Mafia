@@ -35,7 +35,7 @@ PATCHES: list[dict] = [
     {
         "version": "1.0.1",
         "date": "July 18, 2026",
-        "title": "Version 1.0.1 — Mahoraga Rework, Bug Fixes, and Moreg",
+        "title": "Version 1.0.1 — Mahoraga Rework, Bug Fixes, and More",
         "description": (
             "A major update introducing a complete rework for Mahoraga, "
             "critical bug fixes to the game and administration loops, "
