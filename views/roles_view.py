@@ -108,42 +108,28 @@ def _build_faction_embed(faction: str) -> discord.Embed:
     meta  = _FACTION_META[faction]
     pairs = _roles_for_faction(faction)
 
-    if faction == FACTION_SPECIAL:
-        # Special tab gets a custom explanatory header
-        lines = []
-        for rk, rm in pairs:
-            name   = rm.get("name", rk.replace("_", " ").title())
-            emoji  = get_emoji(rk)
-            prefix = f"{emoji} " if emoji else ""
-            desc   = rm.get("description", "")
-            lines.append(f"{prefix}**{name}**\n> {desc}")
+    lines = []
+    for rk, rm in pairs:
+        name   = rm.get("name", rk.replace("_", " ").title())
+        emoji  = get_emoji(rk)
+        prefix = f"{emoji} " if emoji else ""
+        lines.append(f"• {prefix}**{name}**")
 
+    if faction == FACTION_SPECIAL:
         embed = discord.Embed(
-            title=(
-                f"{meta['emoji']} Special Roles — Not Assigned at Game Start"
-            ),
+            title=f"{meta['emoji']} Special Roles — Not Assigned at Game Start",
             description=(
                 "These roles are **never distributed during the opening role assignment**. "
                 "They enter the game through specific in-game mechanics:\n\n"
-                + ("\n\n".join(lines) if lines else "None")
+                + ("\n".join(lines) if lines else "None")
             ),
             color=meta["color"],
         )
     else:
-        lines = []
-        for rk, rm in pairs:
-            name   = rm.get("name", rk.replace("_", " ").title())
-            emoji  = get_emoji(rk)
-            prefix = f"{emoji} " if emoji else ""
-            wc     = rm.get("win_condition", "")
-            lines.append(f"{prefix}**{name}**\n> {wc}")
-
         embed = discord.Embed(
-            title=(
-                f"{meta['emoji']} {meta['label']} — {len(pairs)} Roles"
-            ),
+            title=f"{meta['emoji']} {meta['label']} — {len(pairs)} Roles",
             description=(
-                "\n\n".join(lines)
+                "\n".join(lines)
                 if lines
                 else "No roles in this faction yet."
             ),
