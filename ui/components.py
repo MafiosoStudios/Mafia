@@ -132,13 +132,15 @@ def build_v2_layout(
             if current_row.children:
                 container.add_item(current_row)
 
-    container.add_item(ui.Separator())
-    container.add_item(ui.TextDisplay(small_footer(footer_text)))
+    if footer_text:
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(small_footer(footer_text)))
 
     timeout = getattr(view, "timeout", 180) if view else 180
     layout = MafiosoLayoutView(timeout=timeout)
     layout.add_item(container)
     return layout
+
 
 
 

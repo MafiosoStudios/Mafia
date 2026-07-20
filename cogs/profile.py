@@ -37,10 +37,10 @@ class ProfileCog(commands.Cog):
         win_rate = 0.0 if total_games == 0 else (statistics.wins / total_games) * 100
 
         desc = (
-            f"🏆 **Rank:** `{profile_record.rank}`\n"
-            f"⭐ **Level:** `{profile_record.level}` | **XP:** `{profile_record.xp}`\n"
-            f"💰 **Gold:** `{profile_record.coins}`\n"
-            f"🎭 **Favorite Character:** {profile_record.favorite_character or '*None set*'}\n\n"
+            f"**Rank:** `{profile_record.rank}`\n"
+            f"**Level:** `{profile_record.level}` | **XP:** `{profile_record.xp}`\n"
+            f"**Gold:** `{profile_record.coins}`\n"
+            f"**Favorite Character:** {profile_record.favorite_character or '*None set*'}\n\n"
             f"## Match Statistics\n"
             f"• **Wins:** `{statistics.wins}` | **Losses:** `{statistics.losses}` | **Draws:** `{statistics.draws}`\n"
             f"• **Total Games:** `{total_games}` | **Win Rate:** `{win_rate:.1f}%`"
@@ -48,12 +48,14 @@ class ProfileCog(commands.Cog):
 
         from ui import build_v2_layout
         profile_view = build_v2_layout(
-            title=f"👤 {profile_record.username}'s Profile",
+            title=f"{profile_record.username}'s Profile",
             description=desc,
-            color=discord.Color.from_rgb(45, 136, 255),
+            color=discord.Color.from_rgb(0, 0, 0),
             thumbnail_url=ctx.author.display_avatar.url,
+            footer_text="",
         )
         await send_hybrid_response(ctx, view=profile_view)
+
 
 
     @commands.hybrid_command(name="setfavourite", description="Set your favorite anime character on your profile")
