@@ -27,9 +27,10 @@ def build_embed(
     color: discord.Color = ANIME_PRIMARY,
     image_url: str | None = None,
     thumbnail_url: str | None = None,
-    footer_text: str = "Mafioso",
+    footer_text: str = "",
     view: ui.LayoutView | ui.View | None = None,
 ) -> ui.LayoutView:
+
     """Builds a V2 LayoutView card replacing the legacy discord.Embed builder."""
     return build_v2_layout(
         title=title,

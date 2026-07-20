@@ -180,8 +180,7 @@ class TutorialView(MafiosoLayoutView):
         container = _build_tutorial_card(selected_value)
         container.add_item(ui.Separator())
         container.add_item(ui.ActionRow(TutorialSelect(selected_value)))
-        container.add_item(ui.Separator())
-        container.add_item(ui.TextDisplay(small_footer("Anime Mafia")))
-
-
         self.add_item(container)
+
+
+

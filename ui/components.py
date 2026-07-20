@@ -22,7 +22,7 @@ def build_status_card(
     *,
     color: discord.Color = COLOR_SECONDARY,
     thumbnail_url: str | None = None,
-    footer_text: str = "Anime Mafia",
+    footer_text: str = "",
 ) -> ui.Container:
     """Builds a basic status/info V2 Container card."""
     container = ui.Container(accent_color=color)
@@ -38,9 +38,9 @@ def build_status_card(
     else:
         container.add_item(text_item)
 
-        
-    container.add_item(ui.Separator())
-    container.add_item(ui.TextDisplay(small_footer(footer_text)))
+    if footer_text:
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(small_footer(footer_text)))
     return container
 
 
@@ -51,7 +51,7 @@ def build_card(
     color: discord.Color = COLOR_SYSTEM,
     thumbnail_url: str | None = None,
     image_url: str | None = None,
-    footer_text: str = "Anime Mafia",
+    footer_text: str = "",
 ) -> ui.Container:
     """Builds a rich content V2 Container card supporting thumbnail, media gallery, and footer."""
     container = ui.Container(accent_color=color)
@@ -70,8 +70,9 @@ def build_card(
     if image_url:
         container.add_item(ui.MediaGallery(discord.MediaGalleryItem(image_url)))
         
-    container.add_item(ui.Separator())
-    container.add_item(ui.TextDisplay(small_footer(footer_text)))
+    if footer_text:
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(small_footer(footer_text)))
     return container
 
 
@@ -82,10 +83,11 @@ def build_v2_layout(
     color: discord.Color = COLOR_SYSTEM,
     image_url: str | None = None,
     thumbnail_url: str | None = None,
-    footer_text: str = "Anime Mafia",
+    footer_text: str = "",
     view: discord.ui.LayoutView | discord.ui.View | None = None,
 ) -> ui.LayoutView:
     """Builds a complete LayoutView from legacy embed parameters and an optional View."""
+
     from ui.base import MafiosoLayoutView
 
     container = ui.Container(accent_color=color)

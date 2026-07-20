@@ -37,12 +37,14 @@ class GameCog(commands.Cog):
             return
         session = await game_engine.get_session(active.game_id) if game_engine is not None else None
         if session is None:
-            embed = build_status_embed(
+            status_layout = build_status_embed(
                 f"Game {active.game_id}",
                 f"State: `{active.state}`\nUse the lobby controls to manage the match.",
             )
-            await send_hybrid_response(ctx, embed=embed, view=VoteView(), ephemeral=True)
+            await send_hybrid_response(ctx, view=status_layout, ephemeral=True)
             return
+
+
 
         import roles
         player_lines = []

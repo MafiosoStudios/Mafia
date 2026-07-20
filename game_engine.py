@@ -969,7 +969,6 @@ class GameEngine:
                         )
                         await self.bot.message_queue.send(mafia_channel, view=night_view)
 
-                        await self.bot.message_queue.send(mafia_channel, embed=night_embed)
 
                     night_num = session.metadata["night_num"]
                     # Send action interface (button that opens ephemeral select menu)

@@ -28,9 +28,10 @@ class LeaderboardCog(commands.Cog):
             await send_hybrid_response(ctx, "No leaderboard data yet.", ephemeral=True)
             return
 
-        lines = [f"{entry.rank}. <@{entry.user_id}> - {entry.value} wins" for entry in entries]
-        embed = build_victory_embed("Top Wins", "\n".join(lines))
-        await send_hybrid_response(ctx, embed=embed)
+        from ui import build_v2_layout
+        leaderboard_layout = build_v2_layout(title="Top Wins", description="\n".join(lines), footer_text="")
+        await send_hybrid_response(ctx, view=leaderboard_layout)
+
 
 
 async def setup(bot: commands.Bot) -> None:

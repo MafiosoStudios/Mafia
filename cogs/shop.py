@@ -28,9 +28,10 @@ class ShopCog(commands.Cog):
             await send_hybrid_response(ctx, "Your inventory is empty.", ephemeral=True)
             return
 
+        from ui import build_v2_layout
         lines = [f"{item.name} x{item.quantity} - {item.item_type}" for item in items]
-        embed = build_shop_embed(f"{ctx.author.display_name}'s Inventory", "\n".join(lines))
-        await send_hybrid_response(ctx, embed=embed, ephemeral=True)
+        shop_layout = build_v2_layout(title=f"{ctx.author.display_name}'s Inventory", description="\n".join(lines), footer_text="")
+        await send_hybrid_response(ctx, view=shop_layout, ephemeral=True)
 
     @shop.command(name="cosmetics")
     async def cosmetics(self, ctx: commands.Context) -> None:
@@ -44,9 +45,11 @@ class ShopCog(commands.Cog):
             await send_hybrid_response(ctx, "No cosmetics have been registered yet.", ephemeral=True)
             return
 
+        from ui import build_v2_layout
         lines = [f"{row['name']} - {row['cosmetic_type']} ({row['rarity']})" for row in cosmetics[:10]]
-        embed = build_shop_embed("Available Cosmetics", "\n".join(lines))
-        await send_hybrid_response(ctx, embed=embed, ephemeral=True)
+        shop_layout = build_v2_layout(title="Available Cosmetics", description="\n".join(lines), footer_text="")
+        await send_hybrid_response(ctx, view=shop_layout, ephemeral=True)
+
 
 
 async def setup(bot: commands.Bot) -> None:
