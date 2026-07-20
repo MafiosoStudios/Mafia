@@ -238,33 +238,26 @@ class LobbyManager:
         if message is None:
             return
         if started:
-            await message.edit(
-                embed=build_lobby_embed(
-                    guild_name=self._guild_name(lobby.guild_id),
-                    leader_text=f"<@{lobby.leader_id}>",
-                    roster_lines=self._render_roster(lobby),
-                    current_players=len(lobby.players),
-                    min_players=lobby.min_players,
-                    max_players=lobby.max_players,
-                    started=True,
-                    gamemode=lobby.gamemode,
-                ),
-                view=None,
-            )
-            return
-
-        await message.edit(
-            embed=build_lobby_embed(
+            from discord import ui
+            from ui.components import build_lobby_card
+            container = build_lobby_card(
                 guild_name=self._guild_name(lobby.guild_id),
                 leader_text=f"<@{lobby.leader_id}>",
                 roster_lines=self._render_roster(lobby),
                 current_players=len(lobby.players),
                 min_players=lobby.min_players,
                 max_players=lobby.max_players,
+                started=True,
                 gamemode=lobby.gamemode,
-            ),
-            view=self._build_lobby_view(lobby),
-        )
+            )
+            started_view = ui.LayoutView()
+            started_view.add_item(container)
+            await message.edit(view=started_view)
+            return
+
+        view = self._build_lobby_view(lobby)
+        await message.edit(view=view)
+
 
     async def _delete_lobby_message(self, lobby: LobbySession) -> None:
         message = await self._fetch_lobby_message(lobby)

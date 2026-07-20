@@ -10,8 +10,11 @@ import asyncio
 import logging
 from config import get_emoji
 from utils.constants import GamePhase, RoleFaction
+from ui.base import MafiosoLayoutView
+from ui.theme import heading, small_footer
 
 logger = logging.getLogger(__name__)
+
 
 
 async def _safe_queue_night_action(
@@ -47,7 +50,7 @@ async def _safe_queue_night_action(
         return False
 
 
-class StartGameView(discord.ui.View):
+class StartGameView(MafiosoLayoutView):
     """Shown to the host after setup. Clicking 'Start Game' creates the channel and begins the match."""
 
     def __init__(self, game_id: str, engine: GameEngine) -> None:
@@ -73,20 +76,24 @@ class StartGameView(discord.ui.View):
         # Disable the button immediately
         button.disabled = True
         button.label = "Game Starting..."
-        await interaction.response.edit_message(
-            embed=discord.Embed(
-                title=f"{get_emoji('lobby')} Game Starting!",
-                description="Creating the game channel and initializing the match...",
-                color=discord.Color.blurple()
-            ),
-            view=self
-        )
+
+        container = discord.ui.Container(accent_color=discord.Color.blurple())
+        emoji_lobby = get_emoji('lobby')
+        container.add_item(discord.ui.TextDisplay(f"{heading(f'{emoji_lobby} Game Starting!')}\nCreating the game channel and initializing the match..."))
+        container.add_item(discord.ui.Separator())
+        container.add_item(discord.ui.TextDisplay(small_footer("Anime Mafia")))
+
+        start_view = MafiosoLayoutView(timeout=300)
+        start_view.add_item(container)
+
+        await interaction.response.edit_message(view=start_view)
 
         # Launch the game loop as a background task
         asyncio.create_task(self.engine.run_game_loop(self.game_id))
 
 
-class SpectateView(discord.ui.View):
+
+class SpectateView(MafiosoLayoutView):
     """Shown in the lobby channel when a game begins, allowing non-players to spectate the match channel."""
 
     def __init__(self, game_id: str, engine: GameEngine) -> None:
@@ -121,11 +128,12 @@ class SpectateView(discord.ui.View):
         await interaction.response.send_message(f"{get_emoji('cross')} Failed to add spectator permissions.", ephemeral=True)
 
 
-class NightActionView(discord.ui.View):
+class NightActionView(MafiosoLayoutView):
     def __init__(self, game_id: str, engine: GameEngine) -> None:
         super().__init__(timeout=None)
         self.game_id = game_id
         self.engine = engine
+
 
     @discord.ui.button(label="Choose Night Action", style=discord.ButtonStyle.primary, custom_id="mafia_choose_night_action")
     async def choose_action(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -220,7 +228,7 @@ class NightActionView(discord.ui.View):
         await interaction.response.send_message("Select an ability to use tonight:", view=view, ephemeral=True)
 
 
-class NightAbilityButtonsView(discord.ui.View):
+class NightAbilityButtonsView(MafiosoLayoutView):
     def __init__(self, game_id: str, engine: GameEngine, player_id: int, role_inst: Any, session: GameSession) -> None:
         super().__init__(timeout=120)
         self.game_id = game_id
@@ -228,6 +236,7 @@ class NightAbilityButtonsView(discord.ui.View):
         self.player_id = player_id
         self.role_inst = role_inst
         self.session = session
+
 
         from utils.roles import NightAction
         for idx, ability in enumerate(role_inst.abilities):
@@ -933,9 +942,10 @@ class HisokaBungeeLinkSelect(discord.ui.Select):
         await interaction.response.edit_message(content=f"Bungee Gum registered: linking <@{self.target1}> with <@{target2}>.", view=None)
 
 
-class VoteUISelectView(discord.ui.View):
+class VoteUISelectView(MafiosoLayoutView):
     def __init__(self, game_id: str, engine: GameEngine) -> None:
         super().__init__(timeout=None)
+
         self.game_id = game_id
         self.engine = engine
 
@@ -1064,20 +1074,23 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
             and target_player.role_key == "mahoraga"
             and "Protagonist" in target_player.metadata.get("mahoraga_adapted_factions", [])
         ):
+            from ui import build_v2_layout
+            mahoraga_null_view = build_v2_layout(
+                title="🌀 Deadly Sentencing Nullified!",
+                description=(
+                    f"**Hiromi Higuruma's** judgment could not be carried out!\n\n"
+                    f"<@{target_id}> has **adapted to the Protagonist faction** — "
+                    f"all Protagonist abilities, including this Sentencing, are nullified against them.\n\n"
+                    f"Their role has been revealed: **Eight-Handled Sword Divergent Sila Divine General Mahoraga** 🌀\n\n"
+                    f"The Sentencing use has been consumed."
+                ),
+                color=discord.Color.from_rgb(110, 58, 190),
+            )
             await self.engine.bot.message_queue.send(
                 mafia_channel,
-                embed=discord.Embed(
-                    title="🌀 Deadly Sentencing Nullified!",
-                    description=(
-                        f"**Hiromi Higuruma's** judgment could not be carried out!\n\n"
-                        f"<@{target_id}> has **adapted to the Protagonist faction** — "
-                        f"all Protagonist abilities, including this Sentencing, are nullified against them.\n\n"
-                        f"Their role has been revealed: **Eight-Handled Sword Divergent Sila Divine General Mahoraga** 🌀\n\n"
-                        f"The Sentencing use has been consumed."
-                    ),
-                    color=discord.Color.from_rgb(110, 58, 190),
-                )
+                view=mahoraga_null_view
             )
+
             async with self.engine._lock:
                 session.metadata["deadly_sentencing_active"] = False
             await interaction.edit_original_response(content=f"Deadly Sentencing failed — target has Protagonist adaptation.", view=None)
@@ -1151,9 +1164,10 @@ class VoteSelector(discord.ui.Select):
             )
 
 
-class VerdictUISelectView(discord.ui.View):
+class VerdictUISelectView(MafiosoLayoutView):
     def __init__(self, game_id: str, engine: GameEngine) -> None:
         super().__init__(timeout=None)
+
         self.game_id = game_id
         self.engine = engine
 

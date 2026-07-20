@@ -53,11 +53,15 @@ class _RoleSelect(discord.ui.Select):
         )
 
 
-class RoleToggleView(discord.ui.View):
+from ui import MafiosoLayoutView
+
+
+class RoleToggleView(MafiosoLayoutView):
     """Lets an admin pick one or more roles to disable/enable for this server."""
 
     def __init__(self, bot: commands.Bot, guild_id: int, author_id: int, disable: bool, eligible_roles: list[str]) -> None:
         super().__init__(timeout=120)
+
         self.bot = bot
         self.guild_id = guild_id
         self.author_id = author_id
@@ -430,9 +434,10 @@ class AdminCog(commands.Cog):
         await ctx.send(f"{get_emoji('package')} **Git Push Summary:**\n```\n{full_output[:1800]}\n```")
 
 
-class WipeConfirmationView(discord.ui.View):
+class WipeConfirmationView(MafiosoLayoutView):
     def __init__(self, bot: commands.Bot, author_id: int) -> None:
         super().__init__(timeout=30)
+
         self.bot = bot
         self.author_id = author_id
         self.confirmed = False
@@ -444,4 +449,7 @@ class WipeConfirmationView(discord.ui.View):
             return False
         return True
 
-  
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(AdminCog(bot))
+

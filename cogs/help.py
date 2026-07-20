@@ -13,17 +13,16 @@ class HelpCog(commands.Cog):
 
     async def _send_help(self, interaction_or_ctx: commands.Context | discord.Interaction) -> None:
         prefix = getattr(self.bot, "config", None).command_prefix if getattr(self.bot, "config", None) else "!"
-        view = HelpView(prefix)
-        embed = view.build_index_embed(prefix)
+        view = HelpView.build_index_layout(prefix)
 
         if isinstance(interaction_or_ctx, commands.Context):
-            await send_hybrid_response(interaction_or_ctx, embed=embed, view=view, ephemeral=True)
+            await send_hybrid_response(interaction_or_ctx, view=view, ephemeral=True)
             return
 
         if interaction_or_ctx.response.is_done():
-            await interaction_or_ctx.followup.send(embed=embed, view=view, ephemeral=True)
+            await interaction_or_ctx.followup.send(view=view, ephemeral=True)
         else:
-            await interaction_or_ctx.response.send_message(embed=embed, view=view, ephemeral=True)
+            await interaction_or_ctx.response.send_message(view=view, ephemeral=True)
 
     @commands.command(name="help", help="Show the Mafioso command guide")
     async def help_prefix(self, ctx: commands.Context) -> None:
@@ -39,6 +38,8 @@ class HelpCog(commands.Cog):
         await ctx.defer()
         import roles
         from config import get_emoji
+        from ui import build_v2_layout
+        from utils.helpers import get_emoji_url
 
         character_matched_key = None
         character_matched_meta = None
@@ -52,7 +53,6 @@ class HelpCog(commands.Cog):
                 break
 
         if character_matched_key is None:
-            # Try partial matching
             for rkey, rmeta in roles.ROLES_METADATA.items():
                 rname = rmeta.get("name", "").lower().strip()
                 if input_cleaned in rkey or input_cleaned in rname.replace(" ", "_") or input_cleaned in rname:
@@ -71,7 +71,6 @@ class HelpCog(commands.Cog):
         active_ability = character_matched_meta.get("active_ability", "None")
         passive_ability = character_matched_meta.get("passive_ability", "None")
 
-        # Color mapping based on faction
         color_map = {
             "Hero": discord.Color.green(),
             "Town": discord.Color.green(),
@@ -84,26 +83,15 @@ class HelpCog(commands.Cog):
         embed_color = color_map.get(faction, discord.Color.purple())
 
         emoji = get_emoji(character_matched_key)
-        emoji_prefix = f"{emoji} " if emoji else ""
-
-        embed = discord.Embed(
-            title=name,
-            description=description,
-            color=embed_color
-        )
-        from utils.helpers import get_emoji_url
         emoji_url = get_emoji_url(emoji) if emoji else None
-        if emoji_url:
-            embed.set_thumbnail(url=emoji_url)
 
         from config import ROLE_IMAGES
         big_image = ROLE_IMAGES.get(character_matched_key) or character_matched_meta.get("image_url")
-        if big_image:
-            embed.set_image(url=big_image)
-        embed.add_field(name="Faction", value=faction, inline=True)
-        embed.add_field(name="Win Condition", value=win_condition, inline=False)
-        
-        # Split active abilities
+
+        desc_parts = [description]
+        desc_parts.append(f"• **Faction:** **{faction}**")
+        desc_parts.append(f"• **Win Condition:** {win_condition}")
+
         if "Max Ability:" in active_ability:
             parts = active_ability.split("Max Ability:")
             abilities = [parts[0].strip(), "Max Ability: " + parts[1].strip()]
@@ -114,22 +102,30 @@ class HelpCog(commands.Cog):
             abilities = [a.strip() for a in active_ability.split(" / ") if a.strip()]
 
         if not abilities or (len(abilities) == 1 and not abilities[0]):
-            embed.add_field(name="Active Ability", value="None", inline=False)
+            desc_parts.append("• **Active Ability:** None")
         elif len(abilities) == 1:
-            embed.add_field(name="Active Ability", value=abilities[0], inline=False)
+            desc_parts.append(f"• **Active Ability:** {abilities[0]}")
         else:
             for idx, ability in enumerate(abilities, 1):
-                embed.add_field(name=f"Active Ability {idx}", value=ability, inline=False)
+                desc_parts.append(f"• **Active Ability {idx}:** {ability}")
 
         passive_val = passive_ability.strip()
         if passive_val and passive_val.lower() != "none":
-            embed.add_field(name="Passive Ability", value=passive_val, inline=False)
+            desc_parts.append(f"• **Passive Ability:** {passive_val}")
 
         footer_text = character_matched_meta.get("footer", "")
-        if footer_text:
-            embed.set_footer(text=footer_text)
 
-        await send_hybrid_response(ctx, embed=embed)
+        role_layout = build_v2_layout(
+            title=name,
+            description="\n\n".join(desc_parts),
+            color=embed_color,
+            thumbnail_url=emoji_url,
+            image_url=big_image,
+            footer_text=footer_text,
+        )
+
+        await send_hybrid_response(ctx, view=role_layout)
+
 
     @roleinfo.autocomplete("character")
     async def roleinfo_autocomplete(self, interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:

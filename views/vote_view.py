@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 import discord
+from ui import MafiosoLayoutView
 
 
-class VoteView(discord.ui.View):
+class VoteView(MafiosoLayoutView):
     def __init__(self) -> None:
         super().__init__(timeout=120)
 
@@ -11,6 +10,8 @@ class VoteView(discord.ui.View):
     async def confirm_button(
         self,
         interaction: discord.Interaction,
-        button: discord.ui.Button["VoteView"],
+        button: discord.ui.Button,
     ) -> None:
         await interaction.response.send_message("Vote received.", ephemeral=True)
+
+

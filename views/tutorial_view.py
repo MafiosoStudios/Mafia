@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import discord
+from discord import ui
 from config import get_emoji, get_event_image
+from ui.base import MafiosoLayoutView
+from ui.theme import (
+    COLOR_PRIMARY,
+    heading,
+    subheading,
+    small_footer,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,62 +104,84 @@ TUTORIAL_TOPICS: tuple[TutorialTopic, ...] = (
 )
 
 
-class TutorialSelect(discord.ui.Select):
-    def __init__(self, view: TutorialView) -> None:
-        self.view_ref = view
+def _build_tutorial_card(selected_value: str | None = None) -> ui.Container:
+    topic = next((t for t in TUTORIAL_TOPICS if t.value == selected_value), None)
+
+    if topic:
+        accent_color = topic.color
+        header_md = heading(topic.title)
+        body_md = topic.body
+        image_key = topic.image_key
+    else:
+        accent_color = COLOR_PRIMARY
+        header_md = heading(f"{get_emoji('book')} Mafioso Remastered Tutorial")
+        body_md = (
+            "Welcome to the **Mafioso Interactive Walkthrough**!\n\n"
+            "Use the dropdown select menu below to explore different guides:\n"
+            "• **General Overview:** Objective, Factions (Town, Mafia, Neutral).\n"
+            "• **Game Phases:** Day/Night cycle, discussion, trial, voting.\n"
+            "• **Roles & Factions:** Active/passive abilities and key characters.\n"
+            "• **Commands Quickstart:** Playing matches, profile, shop, rankings."
+        )
+        image_key = "rules"
+
+    container = ui.Container(accent_color=accent_color)
+    container.add_item(ui.TextDisplay(f"{header_md}\n\n{body_md}"))
+
+    if image_key:
+        img_url = get_event_image(image_key)
+        if img_url:
+            container.add_item(ui.MediaGallery(discord.MediaGalleryItem(img_url)))
+
+    return container
+
+
+class TutorialSelect(ui.Select):
+    def __init__(self, current_value: str | None = None) -> None:
+        options = [
+            discord.SelectOption(
+                label=topic.label,
+                value=topic.value,
+                description=topic.description,
+                default=(topic.value == current_value),
+            )
+            for topic in TUTORIAL_TOPICS
+        ]
         super().__init__(
             placeholder="Select a tutorial topic...",
             min_values=1,
             max_values=1,
-            options=[
-                discord.SelectOption(label=topic.label, value=topic.value, description=topic.description)
-                for topic in TUTORIAL_TOPICS
-            ],
+            options=options,
+            custom_id="tutorial_topic_select",
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        topic = next(t for t in TUTORIAL_TOPICS if t.value == self.values[0])
-        embed = discord.Embed(
-            title=topic.title,
-            description=topic.body,
-            color=topic.color
-        )
-        if topic.image_key:
-            img = get_event_image(topic.image_key)
-            if img:
-                embed.set_image(url=img)
+        val = self.values[0]
+        new_view = TutorialView(selected_value=val)
         try:
-            await interaction.response.edit_message(embed=embed, view=self.view_ref)
+            await interaction.response.edit_message(view=new_view)
         except (discord.NotFound, discord.InteractionResponded):
             try:
                 if interaction.message:
-                    await interaction.followup.edit_message(message_id=interaction.message.id, embed=embed, view=self.view_ref)
+                    await interaction.followup.edit_message(message_id=interaction.message.id, view=new_view)
             except Exception:
                 pass
         except Exception:
             pass
 
 
-class TutorialView(discord.ui.View):
-    def __init__(self) -> None:
-        super().__init__(timeout=180)
-        self.add_item(TutorialSelect(self))
+class TutorialView(MafiosoLayoutView):
+    """Components V2 LayoutView for the interactive tutorial guide."""
 
-    @staticmethod
-    def build_index_embed() -> discord.Embed:
-        embed = discord.Embed(
-            title=f"{get_emoji('book')} Mafioso Remastered Tutorial",
-            description=(
-                "Welcome to the **Mafioso Interactive Walkthrough**!\n\n"
-                "Use the dropdown select menu below to explore different guides:\n"
-                "• **General Overview:** Objective, Factions (Town, Mafia, Neutral).\n"
-                "• **Game Phases:** Day/Night cycle, discussion, trial, voting.\n"
-                "• **Roles & Factions:** Active/passive abilities and key characters.\n"
-                "• **Commands Quickstart:** Playing matches, profile, shop, rankings."
-            ),
-            color=discord.Color.dark_purple()
-        )
-        img = get_event_image("rules")
-        if img:
-            embed.set_image(url=img)
-        return embed
+    def __init__(self, selected_value: str | None = None) -> None:
+        super().__init__(timeout=180)
+        self.selected_value = selected_value
+
+        container = _build_tutorial_card(selected_value)
+        container.add_item(ui.Separator())
+        container.add_item(ui.ActionRow(TutorialSelect(selected_value)))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(small_footer("Anime Mafia")))
+
+
+        self.add_item(container)

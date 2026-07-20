@@ -171,7 +171,8 @@ class AyanokojiPublicReveal(NightAction):
                 except Exception:
                     pass
             if ch:
-                embed = discord.Embed(
+                from ui import build_v2_layout
+                ayanokoji_view = build_v2_layout(
                     title=f"{get_emoji('ayanokoji')} Ayanokoji Kiyotaka — Mastermind Revelation",
                     description=(
                         f"Ayanokoji Kiyotaka has analyzed the targets from the shadows and exposed a player's true identity!\n\n"
@@ -179,12 +180,11 @@ class AyanokojiPublicReveal(NightAction):
                         f"🎭 **True Role:** **{role_display}**\n"
                         f"🍏 **Faction:** **{faction_display}**"
                     ),
-                    color=discord.Color.purple()
+                    color=discord.Color.purple(),
+                    thumbnail_url=role_meta.get("image_url"),
                 )
-                footer_img = role_meta.get("image_url")
-                if footer_img:
-                    embed.set_thumbnail(url=footer_img)
-                await context.bot.message_queue.send(ch, embed=embed)
+                await context.bot.message_queue.send(ch, view=ayanokoji_view)
+
 
         context.payload["result"] = f"{get_emoji('ayanokoji')} **Public Reveal:** You have publicly exposed <@{target_id}> as the **{role_display}** ({faction_display})."
 

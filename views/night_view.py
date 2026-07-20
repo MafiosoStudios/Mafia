@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 import discord
+from ui import MafiosoLayoutView
 
 
-class NightView(discord.ui.View):
+class NightView(MafiosoLayoutView):
     def __init__(self) -> None:
         super().__init__(timeout=120)
 
@@ -11,6 +10,8 @@ class NightView(discord.ui.View):
     async def submit_button(
         self,
         interaction: discord.Interaction,
-        button: discord.ui.Button["NightView"],
+        button: discord.ui.Button,
     ) -> None:
         await interaction.response.send_message("Night action submitted.", ephemeral=True)
+
+

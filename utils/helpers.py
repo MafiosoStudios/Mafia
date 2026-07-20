@@ -27,17 +27,17 @@ async def send_hybrid_response(
     ctx: commands.Context[commands.Bot, object, object],
     content: str | None = None,
     *,
-    embed: discord.Embed | None = None,
-    view: discord.ui.View | None = None,
+    embed: discord.ui.LayoutView | None = None,
+    view: discord.ui.LayoutView | None = None,
     ephemeral: bool = False,
 ) -> discord.Message | None:
     message_kwargs: dict[str, object] = {}
     if content is not None:
         message_kwargs["content"] = content
-    if embed is not None:
-        message_kwargs["embed"] = embed
-    if view is not None:
-        message_kwargs["view"] = view
+    final_view = view or embed
+    if final_view is not None:
+        message_kwargs["view"] = final_view
+
 
     if ctx.interaction is not None:
         if ctx.interaction.response.is_done():
@@ -47,6 +47,7 @@ async def send_hybrid_response(
             return await ctx.interaction.original_response()
 
     return await ctx.send(**message_kwargs)
+
 
 
 def get_emoji_url(emoji_str: str) -> str | None:
