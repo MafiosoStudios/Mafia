@@ -774,6 +774,7 @@ class GameEngine:
         setup_view = build_v2_layout(
             title="Setup Complete!",
             description=(
+                f"<@{host_id}>\n\n"
                 "All roles have been assigned and sent to DMs.\n"
                 "Click **Start Game** below to create the game channel and begin the match!"
             ),
@@ -782,9 +783,9 @@ class GameEngine:
         )
         await self.bot.message_queue.send(
             lobby_channel,
-            f"<@{host_id}>",
             view=setup_view
         )
+
 
         logger.info("Setup complete for game_id: %s. Waiting for host to start.", game_id)
 
