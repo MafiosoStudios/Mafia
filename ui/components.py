@@ -76,7 +76,7 @@ def build_card(
 
 
 def build_v2_layout(
-    title: str,
+    title: str | None = None,
     description: str | None = None,
     *,
     color: discord.Color = COLOR_SYSTEM,
@@ -90,15 +90,20 @@ def build_v2_layout(
 
     container = ui.Container(accent_color=color)
     
-    header_md = heading(title)
-    if description:
-        header_md += f"\n\n{description}"
-        
-    text_display = ui.TextDisplay(header_md)
-    if thumbnail_url:
-        container.add_item(ui.Section(text_display, accessory=ui.Thumbnail(thumbnail_url)))
-    else:
-        container.add_item(text_display)
+    header_md = ""
+    if title:
+        header_md = heading(title)
+        if description:
+            header_md += f"\n\n{description}"
+    elif description:
+        header_md = description
+
+    if header_md:
+        text_display = ui.TextDisplay(header_md)
+        if thumbnail_url:
+            container.add_item(ui.Section(text_display, accessory=ui.Thumbnail(thumbnail_url)))
+        else:
+            container.add_item(text_display)
         
     if image_url:
         container.add_item(ui.MediaGallery(discord.MediaGalleryItem(image_url)))
@@ -195,8 +200,7 @@ def build_lobby_card(
     if lobby_image:
         container.add_item(ui.MediaGallery(discord.MediaGalleryItem(lobby_image)))
 
-    container.add_item(ui.Separator())
-    container.add_item(ui.TextDisplay(small_footer("Anime Mafia")))
     return container
+
 
 

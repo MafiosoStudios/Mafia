@@ -31,22 +31,28 @@ async def send_hybrid_response(
     view: discord.ui.LayoutView | None = None,
     ephemeral: bool = False,
 ) -> discord.Message | None:
-    message_kwargs: dict[str, object] = {}
-    if content is not None:
-        message_kwargs["content"] = content
+    from ui.components import build_v2_layout
     final_view = view or embed
-    if final_view is not None:
-        message_kwargs["view"] = final_view
 
+    if final_view is not None:
+        if isinstance(final_view, discord.ui.LayoutView):
+            if content:
+                final_view = build_v2_layout(description=content, view=final_view, footer_text="")
+        else:
+            if content:
+                final_view = build_v2_layout(description=content, view=final_view, footer_text="")
+    elif content is not None:
+        final_view = build_v2_layout(description=content, footer_text="")
 
     if ctx.interaction is not None:
         if ctx.interaction.response.is_done():
-            return await ctx.interaction.followup.send(**message_kwargs, ephemeral=ephemeral)
+            return await ctx.interaction.followup.send(view=final_view, ephemeral=ephemeral)
         else:
-            await ctx.interaction.response.send_message(**message_kwargs, ephemeral=ephemeral)
+            await ctx.interaction.response.send_message(view=final_view, ephemeral=ephemeral)
             return await ctx.interaction.original_response()
 
-    return await ctx.send(**message_kwargs)
+    return await ctx.send(view=final_view)
+
 
 
 

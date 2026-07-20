@@ -997,9 +997,10 @@ class GameEngine:
 
                     # Delete night actions prompt view
                     try:
-                        await night_msg.edit(content=f"{get_emoji('night')} **Night Action Phase Ended**", view=None)
+                        await night_msg.edit(view=build_v2_layout(description=f"{get_emoji('night')} **Night Action Phase Ended**", footer_text=""))
                     except Exception:
                         pass
+
 
                     # Resolve Night
                     await self._resolve_night_logic(session)
