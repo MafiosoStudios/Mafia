@@ -15,12 +15,14 @@ from utils.constants import GamePhase, GameState, RoleFaction
 from utils.helpers import utcnow
 from utils.roles import BaseRole, RoleContext, role_registry, NightAction
 import roles
+from ui import build_v2_layout
 from config import (
     get_emoji, get_death_message, get_inaction_message, get_event_image, get_role_image,
     GAME_CATEGORY_NAME_TEMPLATE, GAME_CHANNEL_NAME_TEMPLATE,
 )
 
 logger = logging.getLogger(__name__)
+
 
 
 def get_rules_text() -> str:
@@ -437,7 +439,7 @@ class GameEngine:
                     role_meta = roles.ROLES_METADATA.get(player.role_key or "", {})
                     role_display = role_meta.get("name", player.role_key or "Unknown")
                     try:
-                        death_embed = discord.Embed(
+                        death_view = build_v2_layout(
                             title=f"{get_emoji('death')} You Have Died",
                             description=(
                                 f"You were eliminated during the game.\n\n"
@@ -445,10 +447,11 @@ class GameEngine:
                                 f"**Cause of Death:** {cause.replace('_', ' ').title()}\n\n"
                                 f"You may continue spectating, but you can no longer act or vote."
                             ),
-                            color=discord.Color.dark_grey()
+                            color=discord.Color.dark_grey(),
                         )
-                        self.bot.message_queue.send(member, embed=death_embed)
+                        self.bot.message_queue.send(member, view=death_view)
                     except Exception:
+
                         logger.exception("Failed to send death DM to %s", user_id)
 
     async def mark_disconnected(self, game_id: str, user_id: int) -> None:
@@ -708,20 +711,15 @@ class GameEngine:
             embed_color = color_map.get(pstate.faction, discord.Color.purple())
 
             role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
-            embed = discord.Embed(
-                title=f"Your Role: {role_emoji_prefix}{role_meta.get('name', 'Unknown')}",
-                description=role_meta.get('description', ''),
-                color=embed_color
-            )
+            role_title = f"Your Role: {role_emoji_prefix}{role_meta.get('name', 'Unknown')}"
+            
             from utils.helpers import get_emoji_url
             emoji_url = get_emoji_url(role_emoji) if role_emoji else None
-            if emoji_url:
-                embed.set_thumbnail(url=emoji_url)
 
-            embed.add_field(name="Faction", value=f"{faction_emoji} **{display_faction}**", inline=True)
-            embed.add_field(name="Win Condition", value=role_meta.get('win_condition', ''), inline=False)
-            
-            # Split active abilities
+            desc_parts = [role_meta.get('description', '')]
+            desc_parts.append(f"• **Faction:** {faction_emoji} **{display_faction}**")
+            desc_parts.append(f"• **Win Condition:** {role_meta.get('win_condition', '')}")
+
             active_ability = role_meta.get('active_ability', 'None')
             if "Max Ability:" in active_ability:
                 parts = active_ability.split("Max Ability:")
@@ -733,25 +731,33 @@ class GameEngine:
                 abilities = [a.strip() for a in active_ability.split(" / ") if a.strip()]
 
             if not abilities or (len(abilities) == 1 and not abilities[0]):
-                embed.add_field(name="Active Ability", value="None", inline=False)
+                desc_parts.append("• **Active Ability:** None")
             elif len(abilities) == 1:
-                embed.add_field(name="Active Ability", value=abilities[0], inline=False)
+                desc_parts.append(f"• **Active Ability:** {abilities[0]}")
             else:
                 for idx, ability in enumerate(abilities, 1):
-                    embed.add_field(name=f"Active Ability {idx}", value=ability, inline=False)
+                    desc_parts.append(f"• **Active Ability {idx}:** {ability}")
 
             passive_ability = role_meta.get('passive_ability', 'None').strip()
             if passive_ability and passive_ability.lower() != "none":
-                embed.add_field(name="Passive Ability", value=passive_ability, inline=False)
+                desc_parts.append(f"• **Passive Ability:** {passive_ability}")
+
             footer_text = role_meta.get("footer", "Keep your role secret!")
-            embed.set_footer(text=footer_text)
+
             from config import ROLE_IMAGES
             big_image = ROLE_IMAGES.get(pstate.role_key) or role_meta.get("image_url")
-            if big_image:
-                embed.set_image(url=big_image)
+
+            role_dm_layout = build_v2_layout(
+                title=role_title,
+                description="\n\n".join(desc_parts),
+                color=embed_color,
+                thumbnail_url=emoji_url,
+                image_url=big_image,
+                footer_text=footer_text,
+            )
 
             try:
-                self.bot.message_queue.send(member, embed=embed)
+                self.bot.message_queue.send(member, view=role_dm_layout)
                 if pstate.faction == RoleFaction.VILLAIN.value and len(mafia_members) > 1:
                     self.bot.message_queue.send(member, f"{get_emoji('group')} **Your Fellow Antagonists:** {mafia_list_str}")
             except Exception:
@@ -765,19 +771,22 @@ class GameEngine:
         host_id = session.game_handle.host_id
         from views.game_ui import StartGameView
         view = StartGameView(game_id, self)
+        setup_view = build_v2_layout(
+            title="Setup Complete!",
+            description=(
+                f"<@{host_id}>\n\n"
+                "All roles have been assigned and sent to DMs.\n"
+                "Click **Start Game** below to create the game channel and begin the match!"
+            ),
+            color=discord.Color.green(),
+            view=view,
+        )
         await self.bot.message_queue.send(
             lobby_channel,
-            f"<@{host_id}>",
-            embed=discord.Embed(
-                title=f"Setup Complete!",
-                description=(
-                    "All roles have been assigned and sent to DMs.\n"
-                    "Click **Start Game** below to create the game channel and begin the match!"
-                ),
-                color=discord.Color.green()
-            ),
-            view=view
+            view=setup_view
         )
+
+
         logger.info("Setup complete for game_id: %s. Waiting for host to start.", game_id)
 
     async def run_game_loop_from_resume(self, game_id: str) -> None:
@@ -880,44 +889,41 @@ class GameEngine:
             if lobby_channel:
                 from views.game_ui import SpectateView
                 view = SpectateView(game_id, self)
-                embed = discord.Embed(
-                    title=f"👀 Spectate Mafioso",
+                spectate_view = build_v2_layout(
+                    title="👀 Spectate Mafioso",
                     description=(
                         "A new match has started!\n"
                         f"Click the button below to spectate the match channel <#{mafia_channel.id}>."
                     ),
-                    color=discord.Color.blue()
+                    color=discord.Color.blue(),
+                    view=view,
                 )
-                self.bot.message_queue.send(lobby_channel, embed=embed, view=view)
+                self.bot.message_queue.send(lobby_channel, view=spectate_view)
 
             # 2. Ping all alive players so they can find the channel easily
             player_mentions = " ".join(f"<@{pid}>" for pid in session.player_ids)
             await self.bot.message_queue.send(mafia_channel, f"{get_emoji('lobby')} {player_mentions}")
 
-            # 3. Send rules embed
-            rules_embed = discord.Embed(
+            # 3. Send rules layout
+            rules_view = build_v2_layout(
                 title=f"{get_emoji('lobby')} Mafioso Remastered — Game Rules",
                 description=get_rules_text(),
-                color=discord.Color.from_rgb(0, 0, 0)
+                color=discord.Color.from_rgb(0, 0, 0),
+                image_url=get_event_image("rules"),
+                footer_text="Roles have been sent to your DMs. Good luck!",
             )
-            rules_embed.set_footer(text="Roles have been sent to your DMs. Good luck!")
-            rules_image = get_event_image("rules")
-            if rules_image:
-                rules_embed.set_image(url=rules_image)
-            await self.bot.message_queue.send(mafia_channel, embed=rules_embed)
+            await self.bot.message_queue.send(mafia_channel, view=rules_view)
 
             # Wait a few seconds for players to read rules
             await asyncio.sleep(8)
 
-            match_start_embed = discord.Embed(
-                title=f"THE GAME HAS BEGUN!",
-                description="Every player now wears a mask. Some seek justice, others crave blood, and a few answer only to themselves. From this moment on, every word matters, every vote has consequences..",
-                color=discord.Color.from_rgb(255, 255, 255)
+            match_start_view = build_v2_layout(
+                title="THE GAME HAS BEGUN!",
+                description="Every player now wears a mask. Some seek justice, others crave blood, and a few answer only to Governments and themselves. From this moment on, every word matters, every vote has consequences..",
+                color=discord.Color.from_rgb(255, 255, 255),
+                image_url=get_event_image("match_start"),
             )
-            match_start_image = get_event_image("match_start")
-            if match_start_image:
-                match_start_embed.set_image(url=match_start_image)
-            await self.bot.message_queue.send(mafia_channel, embed=match_start_embed)
+            await self.bot.message_queue.send(mafia_channel, view=match_start_view)
             await asyncio.sleep(3)
 
             # 4. Game Cycles
@@ -948,6 +954,23 @@ class GameEngine:
                         await self._update_channel_mute(mafia_channel, session, mute=True)
 
                         night_num = session.metadata["night_num"]
+<<<<<<< HEAD
+=======
+                        from views.game_ui import NightActionView
+                        night_action_view = NightActionView(game_id, self)
+                        night_view = build_v2_layout(
+                            title=f"Night {night_num}",
+                            description=(
+                                "Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n"
+                                "Check your DMs or use the buttons below to take your action before sunrise!"
+                            ),
+                            color=discord.Color.dark_blue(),
+                            image_url=get_event_image("night"),
+                            view=night_action_view,
+                        )
+                        await self.bot.message_queue.send(mafia_channel, view=night_view)
+
+>>>>>>> 01295486b513b5003fdd1a0c792bf0e1055fa7f5
 
                     night_num = session.metadata["night_num"]
                     # Send action interface (single embed with image and action button)
@@ -992,9 +1015,10 @@ class GameEngine:
 
                     # Delete night actions prompt view
                     try:
-                        await night_msg.edit(content=f"{get_emoji('night')} **Night Action Phase Ended**", view=None)
+                        await night_msg.edit(view=build_v2_layout(description=f"{get_emoji('night')} **Night Action Phase Ended**", footer_text=""))
                     except Exception:
                         pass
+
 
                     # Resolve Night
                     await self._resolve_night_logic(session)
@@ -1036,18 +1060,19 @@ class GameEngine:
                         # Check if Gilgamesh has transformed and is preparing apocalypse
                         for pid, pstate in list(session.players.items()):
                             if pstate.role_key == "gilgamesh" and pstate.metadata.get("transformed") and pstate.alive:
+                                gilgamesh_layout = build_v2_layout(
+                                    title=f"{get_emoji('warning')} Warning!",
+                                    description=(
+                                        f"{get_emoji('zap')} **Gilgamesh has retrieved all of his swords and "
+                                        f"transformed into the Horseman of Apocalypse!**\n"
+                                        f"You have until the end of today to find and lynch him, "
+                                        f"or he will unleash the Gates of Babylon and wipe everyone out!"
+                                    ),
+                                    color=discord.Color.red(),
+                                )
                                 await self.bot.message_queue.send(
                                     mafia_channel,
-                                    embed=discord.Embed(
-                                        title=f"{get_emoji('warning')} Warning!",
-                                        description=(
-                                            f"{get_emoji('zap')} **Gilgamesh has retrieved all of his swords and "
-                                            f"transformed into the Horseman of Apocalypse!**\n"
-                                            f"You have until the end of today to find and lynch him, "
-                                            f"or he will unleash the Gates of Babylon and wipe everyone out!"
-                                        ),
-                                        color=discord.Color.red()
-                                    )
+                                    view=gilgamesh_layout
                                 )
 
                         # Unmute alive in #mafia for discussion
@@ -1081,42 +1106,40 @@ class GameEngine:
                             session.votes.clear()
                             session.metadata.pop("skip_votes", None)
 
-                            # Send Vote Embed
+                            # Send Vote Layout
                             from views.game_ui import VoteUISelectView
                             vote_view = VoteUISelectView(game_id, self)
-                            vote_embed = discord.Embed(
+                            vote_layout = build_v2_layout(
                                 title=f"Day {session.metadata['day_num']} - Nomination Phase",
                                 description=(
                                     "Accusations are flying, friendship is a myth! It's time to choose who gets dragged onto the stand.\n"
                                     "Click the button below to nominate someone to face judgment, or vote to skip today's trial."
                                 ),
-                                color=discord.Color.red()
+                                color=discord.Color.red(),
+                                image_url=get_event_image("vote") or "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTkzVOSwfpSbFQmCQiOFDVQ6HYJZSlaPFTif988sFYfU5mV6F7x3SpsAas&s=10",
+                                view=vote_view,
                             )
-                            vote_image = get_event_image("vote")
-                            if vote_image:
-                                vote_embed.set_image(url="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTkzVOSwfpSbFQmCQiOFDVQ6HYJZSlaPFTif988sFYfU5mV6F7x3SpsAas&s=10")
 
                             vote_msg = await self.bot.message_queue.send(
                                 mafia_channel,
-                                embed=vote_embed,
-                                view=vote_view
+                                view=vote_layout
                             )
 
                         if is_resume:
                             from views.game_ui import VoteUISelectView
                             vote_view = VoteUISelectView(game_id, self)
-                            vote_embed = discord.Embed(
+                            vote_layout = build_v2_layout(
                                 title=f"🔄 Game Resumed — Day {session.metadata['day_num']} - Nomination Phase",
                                 description=(
                                     "Accusations are flying, nomination buttons have been refreshed!\n"
                                     "Click the button below to nominate someone to face judgment, or vote to skip today's trial."
                                 ),
-                                color=discord.Color.red()
+                                color=discord.Color.red(),
+                                view=vote_view,
                             )
                             vote_msg = await self.bot.message_queue.send(
                                 mafia_channel,
-                                embed=vote_embed,
-                                view=vote_view
+                                view=vote_layout
                             )
 
                         # Wait for Voting timeout
@@ -1135,10 +1158,15 @@ class GameEngine:
 
                         # Remove vote view
                         try:
-                            vote_embed.description = "The nomination window has closed. The ballots are being counted..."
-                            await vote_msg.edit(embed=vote_embed, view=None)
+                            closed_vote_layout = build_v2_layout(
+                                title=f"Day {session.metadata['day_num']} - Nomination Phase Closed",
+                                description="The nomination window has closed. The ballots are being counted...",
+                                color=discord.Color.red(),
+                            )
+                            await vote_msg.edit(view=closed_vote_layout)
                         except Exception:
                             pass
+
 
                         # Check if Deadly Sentencing was run
                         if session.metadata.get("deadly_sentencing_run") or session.metadata.get("deadly_sentencing_triggered"):
@@ -1187,13 +1215,14 @@ class GameEngine:
                             vote_detail_lines.append(f"• **{vname}** voted for **{tname}**")
 
                         if not anon and vote_detail_lines:
+                            vote_details_view = build_v2_layout(
+                                title=f"{get_emoji('vote')} Vote Details",
+                                description="\n".join(vote_detail_lines),
+                                color=discord.Color.blue(),
+                            )
                             await self.bot.message_queue.send(
                                 mafia_channel,
-                                embed=discord.Embed(
-                                    title=f"{get_emoji('vote')} Vote Details",
-                                    description="\n".join(vote_detail_lines),
-                                    color=discord.Color.blue()
-                                )
+                                view=vote_details_view
                             )
 
                     majority_passed = False
@@ -1218,19 +1247,20 @@ class GameEngine:
                                 and target_pstate.metadata.get("mahoraga_adapt_complete")
                             ):
                                 # Reveal Mahoraga's role and block the trial
+                                mahoraga_view = build_v2_layout(
+                                    title="🌀 Adaptation — Absolute!",
+                                    description=(
+                                        f"**{defendant_name}** has fully adapted to all three factions!\n\n"
+                                        f"They are **immune to all votes and trials**. "
+                                        f"No conventional force can remove them from this game.\n\n"
+                                        f"Their role has been revealed: **Eight-Handled Sword Divergent Sila Divine General Mahoraga** 🌀\n\n"
+                                        f"Only an unstoppable one-hit ability can end their reign now."
+                                    ),
+                                    color=discord.Color.from_rgb(110, 58, 190),
+                                )
                                 await self.bot.message_queue.send(
                                     mafia_channel,
-                                    embed=discord.Embed(
-                                        title=f"🌀 Adaptation — Absolute!",
-                                        description=(
-                                            f"**{defendant_name}** has fully adapted to all three factions!\n\n"
-                                            f"They are **immune to all votes and trials**. "
-                                            f"No conventional force can remove them from this game.\n\n"
-                                            f"Their role has been revealed: **Eight-Handled Sword Divergent Sila Divine General Mahoraga** 🌀\n\n"
-                                            f"Only an unstoppable one-hit ability can end their reign now."
-                                        ),
-                                        color=discord.Color.from_rgb(110, 58, 190),
-                                    )
+                                    view=mahoraga_view
                                 )
                                 session.votes.clear()
                                 session.metadata.pop("skip_votes", None)
@@ -1250,20 +1280,18 @@ class GameEngine:
 
                             if not is_resume:
                                 plea_time = settings.get("plea_duration", 60)
-                                plea_embed = discord.Embed(
-                                    title=f"Trial: Defendant on the Stand",
+                                plea_view = build_v2_layout(
+                                    title="Trial: Defendant on the Stand",
                                     description=(
                                         f"**{defendant_name}** has been dragged onto the stand by majority vote!\n"
                                         f"They have {plea_time} seconds to defend themselves before the court decides their fate. Speak, or get voted out."
                                     ),
-                                    color=discord.Color.orange()
+                                    color=discord.Color.orange(),
+                                    image_url=get_event_image("plea"),
                                 )
-                                plea_image = get_event_image("plea")
-                                if plea_image:
-                                    plea_embed.set_image(url=plea_image)
                                 await self.bot.message_queue.send(
                                     mafia_channel,
-                                    embed=plea_embed
+                                    view=plea_view
                                 )
                             else:
                                 await self.bot.message_queue.send(
@@ -1296,42 +1324,38 @@ class GameEngine:
 
                                     from views.game_ui import VerdictUISelectView
                                     verdict_view = VerdictUISelectView(game_id, self)
-                                    
-                                    verdict_embed = discord.Embed(
-                                        title=f"Verdict Phase: Life or Death",
+                                    verdict_layout = build_v2_layout(
+                                        title="Verdict Phase: Life or Death",
                                         description=(
                                             f"Cast your final judgment on defendant **{defendant_name}**.\n"
                                             "Will they walk free, or face the hangman's noose? Choose Guilty or Innocent below."
                                         ),
-                                        color=discord.Color.red()
+                                        color=discord.Color.red(),
+                                        image_url=get_event_image("verdict"),
+                                        view=verdict_view,
                                     )
-                                    verdict_image = get_event_image("verdict")
-                                    if verdict_image:
-                                        verdict_embed.set_image(url=verdict_image)
 
                                     verdict_msg = await self.bot.message_queue.send(
                                         mafia_channel,
-                                        embed=verdict_embed,
-                                        view=verdict_view
+                                        view=verdict_layout
                                     )
 
                                 if is_resume:
                                     await self._update_channel_mute(mafia_channel, session, mute=False)
                                     from views.game_ui import VerdictUISelectView
                                     verdict_view = VerdictUISelectView(game_id, self)
-                                    
-                                    verdict_embed = discord.Embed(
+                                    verdict_layout = build_v2_layout(
                                         title=f"🔄 Game Resumed — {get_emoji('trial')} Verdict Phase: Life or Death",
                                         description=(
                                             f"Cast your final judgment on defendant **{defendant_name}**.\n"
                                             "Verdict buttons have been refreshed! Choose Guilty or Innocent below."
                                         ),
-                                        color=discord.Color.red()
+                                        color=discord.Color.red(),
+                                        view=verdict_view,
                                     )
                                     verdict_msg = await self.bot.message_queue.send(
                                         mafia_channel,
-                                        embed=verdict_embed,
-                                        view=verdict_view
+                                        view=verdict_layout
                                     )
 
                                 if not is_resume:
@@ -1345,10 +1369,15 @@ class GameEngine:
 
                                 # Remove verdict view
                                 try:
-                                    verdict_embed.description = "The verdict phase has closed. The court is deciding..."
-                                    await verdict_msg.edit(embed=verdict_embed, view=None)
+                                    closed_verdict_layout = build_v2_layout(
+                                        title="Verdict Phase: Closed",
+                                        description="The verdict phase has closed. The court is deciding...",
+                                        color=discord.Color.red(),
+                                    )
+                                    await verdict_msg.edit(view=closed_verdict_layout)
                                 except Exception:
                                     pass
+
 
                             # Check if Retrial was triggered during this verdict phase
                             if session.metadata.get("retrial_triggered"):
@@ -1370,17 +1399,18 @@ class GameEngine:
                                 def_player = session.players.get(retrial_defendant)
                                 if def_player and def_player.faction == RoleFaction.HERO.value:
                                     # Successful Retrial (Saved Town player)
+                                    acquittal_layout = build_v2_layout(
+                                        title=f"{get_emoji('trial')} RETRIAL: SUCCESSFUL ACQUITTAL",
+                                        description=(
+                                            f"Defendant <@{retrial_defendant}> has been proven beyond a reasonable doubt to be a **Protagonist**!\n"
+                                            f"Their execution is canceled. The court has released them.\n\n"
+                                            f"Returning to the Nomination/Voting phase to choose a new target."
+                                        ),
+                                        color=discord.Color.green(),
+                                    )
                                     await self.bot.message_queue.send(
                                         mafia_channel,
-                                        embed=discord.Embed(
-                                            title=f"{get_emoji('trial')} RETRIAL: SUCCESSFUL ACQUITTAL",
-                                            description=(
-                                                f"Defendant <@{retrial_defendant}> has been proven beyond a reasonable doubt to be a **Protagonist**!\n"
-                                                f"Their execution is canceled. The court has released them.\n\n"
-                                                f"Returning to the Nomination/Voting phase to choose a new target."
-                                            ),
-                                            color=discord.Color.green()
-                                        )
+                                        view=acquittal_layout
                                     )
                                     # wait a bit before starting next phase
                                     await asyncio.sleep(3)
@@ -1397,17 +1427,18 @@ class GameEngine:
                                         higuruma_p.metadata["retrial_uses"] = 0
                                         
                                     def_role_display = def_player.role_key.replace('_', ' ').title() if def_player else "Unknown"
+                                    confirmed_layout = build_v2_layout(
+                                        title=f"{get_emoji('trial')} RETRIAL: JUDGMENT CONFIRMED",
+                                        description=(
+                                            f"An attempt to acquit <@{retrial_defendant}> failed! They are **not a Protagonist**.\n"
+                                            f"• The defendant's true identity is revealed as **{def_role_display}**.\n\n"
+                                            f"Returning to the Verdict phase to seal their fate."
+                                        ),
+                                        color=discord.Color.red(),
+                                    )
                                     await self.bot.message_queue.send(
                                         mafia_channel,
-                                        embed=discord.Embed(
-                                            title=f"{get_emoji('trial')} RETRIAL: JUDGMENT CONFIRMED",
-                                            description=(
-                                                f"An attempt to acquit <@{retrial_defendant}> failed! They are **not a Protagonist**.\n"
-                                                f"• The defendant's true identity is revealed as **{def_role_display}**.\n\n"
-                                                f"Returning to the Verdict phase to seal their fate."
-                                            ),
-                                            color=discord.Color.red()
-                                        )
+                                        view=confirmed_layout
                                     )
                                     # wait a bit before returning to verdict selection
                                     await asyncio.sleep(3)
@@ -1436,13 +1467,14 @@ class GameEngine:
                                 verdict_report_lines.append(f"• **{v_name}**: {decision.upper()}")
 
                             if not anon and verdict_report_lines:
+                                verdict_logs_layout = build_v2_layout(
+                                    title=f"{get_emoji('trial')} Verdict Logs",
+                                    description="\n".join(verdict_report_lines),
+                                    color=discord.Color.blue(),
+                                )
                                 await self.bot.message_queue.send(
                                     mafia_channel,
-                                    embed=discord.Embed(
-                                        title=f"{get_emoji('trial')} Verdict Logs",
-                                        description="\n".join(verdict_report_lines),
-                                        color=discord.Color.blue()
-                                    )
+                                    view=verdict_logs_layout
                                 )
 
                             await self.bot.message_queue.send(
@@ -1471,17 +1503,18 @@ class GameEngine:
                                     # Check Lelouch Zero Requiem lynch trigger
                                     if def_state.role_key == "lelouch":
                                         def_state.metadata["lelouch_lynched"] = True
+                                        zero_requiem_layout = build_v2_layout(
+                                            title=f"{get_emoji('crown')} Zero Requiem Activated!",
+                                            description=(
+                                                f"**{defendant_name}** (Lelouch Lamperouge) has been executed by the town!\n\n"
+                                                f"This was all part of his master plan to focus the world's hatred on himself and die, breaking the cycle of hatred.\n\n"
+                                                f"{get_emoji('victory')} **Lelouch Lamperouge wins the game!**"
+                                            ),
+                                            color=discord.Color.purple(),
+                                        )
                                         await self.bot.message_queue.send(
                                             mafia_channel,
-                                            embed=discord.Embed(
-                                                title=f"{get_emoji('crown')} Zero Requiem Activated!",
-                                                description=(
-                                                    f"**{defendant_name}** (Lelouch Lamperouge) has been executed by the town!\n\n"
-                                                    f"This was all part of his master plan to focus the world's hatred on himself and die, breaking the cycle of hatred.\n\n"
-                                                    f"{get_emoji('victory')} **Lelouch Lamperouge wins the game!**"
-                                                ),
-                                                color=discord.Color.purple()
-                                            )
+                                            view=zero_requiem_layout
                                         )
 
                                     # Check Hisoka Post-Mortem Nen lynch trigger
@@ -1497,14 +1530,16 @@ class GameEngine:
                                     role_emoji = get_emoji(def_state.role_key) if def_state.role_key else ""
                                     role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
                                     await self.eliminate_player(game_id, target_id, "execution")
+                                    exec_layout = build_v2_layout(
+                                        title=f"{get_emoji('death')} Execution",
+                                        description=f"**{defendant_name}** was executed by the town! Their role was **{role_emoji_prefix}{role_display}**.",
+                                        color=discord.Color.red(),
+                                    )
                                     await self.bot.message_queue.send(
                                         mafia_channel,
-                                        embed=discord.Embed(
-                                            title=f"{get_emoji('death')} Execution",
-                                            description=f"**{defendant_name}** was executed by the town! Their role was **{role_emoji_prefix}{role_display}**.",
-                                            color=discord.Color.red()
-                                        )
+                                        view=exec_layout
                                     )
+
                             else:
                                 await self.bot.message_queue.send(mafia_channel, f"{get_emoji('peace')} The town has voted to release the defendant.")
 
@@ -1590,22 +1625,14 @@ class GameEngine:
         history: MatchHistoryRecord,
         winner_faction: str,
     ) -> None:
-        """Sends a detailed victory embed with Winners and Losers lists."""
-        # Determine the display title for the winner
+        """Sends a detailed victory V2 layout view with Winners and Losers lists."""
         faction_display_map = {
             RoleFaction.HERO.value: f"Protagonists Win!",
             RoleFaction.VILLAIN.value: f"Antagonists Win!",
             "Draw": f"{get_emoji('peace')} It's a Draw!",
         }
-        # If it's a neutral solo winner, show their name
         title = faction_display_map.get(winner_faction, f"{winner_faction} Wins!")
 
-        victory_embed = discord.Embed(
-            title=title,
-            color=discord.Color.gold()
-        )
-
-        # Categorize players into winners and losers
         winners_lines = []
         losers_lines = []
 
@@ -1621,10 +1648,9 @@ class GameEngine:
 
             player_line = f"• **{name}** — {role_display}  ({status})"
 
-            # Determine if this player is a winner
             is_winner = False
             if winner_faction == "Draw":
-                is_winner = False  # No winners in a draw
+                is_winner = False
             elif winner_faction == RoleFaction.HERO.value:
                 if pstate and pstate.faction == RoleFaction.HERO.value:
                     is_winner = True
@@ -1632,7 +1658,6 @@ class GameEngine:
                 if pstate and pstate.faction == RoleFaction.VILLAIN.value:
                     is_winner = True
             else:
-                # Neutral solo winner: check by metadata or if they're that role
                 if pstate and pstate.metadata.get("has_won"):
                     is_winner = True
                 elif pstate and rkey and roles.ROLES_METADATA.get(rkey, {}).get("name") == winner_faction:
@@ -1641,35 +1666,22 @@ class GameEngine:
             if is_winner:
                 winners_lines.append(player_line)
             else:
-                # Check if neutral players who individually won should also be listed
                 if pstate and pstate.metadata.get("has_won"):
                     winners_lines.append(player_line)
                 else:
                     losers_lines.append(player_line)
 
+        desc_sections = []
         if winners_lines:
-            victory_embed.add_field(
-                name=f"{get_emoji('victory')} Winners",
-                value="\n".join(winners_lines),
-                inline=False
-            )
+            desc_sections.append(f"## {get_emoji('victory')} Winners\n" + "\n".join(winners_lines))
         if losers_lines:
-            victory_embed.add_field(
-                name=f"{get_emoji('death')} Losers",
-                value="\n".join(losers_lines),
-                inline=False
-            )
+            desc_sections.append(f"## {get_emoji('death')} Losers\n" + "\n".join(losers_lines))
         if winner_faction == "Draw":
-            victory_embed.add_field(
-                name=f"{get_emoji('chat')} All Players",
-                value="\n".join(winners_lines + losers_lines) if (winners_lines or losers_lines) else "No players.",
-                inline=False
-            )
+            desc_sections.append(f"## {get_emoji('chat')} All Players\n" + ("\n".join(winners_lines + losers_lines) if (winners_lines or losers_lines) else "No players."))
 
-        # Add match duration
         minutes = history.duration_seconds // 60
         seconds = history.duration_seconds % 60
-        victory_embed.set_footer(text=f"Match Duration: {minutes}m {seconds}s")
+        footer_text = f"Match Duration: {minutes}m {seconds}s"
 
         image_key = {
             RoleFaction.HERO.value: "victory_hero",
@@ -1677,13 +1689,23 @@ class GameEngine:
             "Draw": "draw",
         }.get(winner_faction, "victory_neutral")
         image_url = get_event_image(image_key)
-        if image_url:
-            victory_embed.set_image(url=image_url)
 
+<<<<<<< HEAD
         try:
             await self.bot.message_queue.send(channel, embed=victory_embed)
         except Exception as err:
             logger.error(f"Failed to send victory embed: {err}")
+=======
+        victory_view = build_v2_layout(
+            title=title,
+            description="\n\n".join(desc_sections),
+            color=discord.Color.gold(),
+            image_url=image_url,
+            footer_text=footer_text,
+        )
+
+        await self.bot.message_queue.send(channel, view=victory_view)
+>>>>>>> 01295486b513b5003fdd1a0c792bf0e1055fa7f5
 
     async def _send_death_and_status_embeds(
         self,
@@ -1694,7 +1716,7 @@ class GameEngine:
         title: str,
     ) -> None:
         """Sends the night's death report and the alive/dead roster as two
-        separate embeds (kept apart so each is easy to read on its own)."""
+        separate layout views (kept apart so each is easy to read on its own)."""
         dead_this_round = session.metadata.pop("dead_this_round", [])
 
         mafia_deaths = []
@@ -1721,11 +1743,13 @@ class GameEngine:
         else:
             death_description = f"No one was targeted by the Antagonists tonight.. How weird.."
 
-        death_embed = discord.Embed(
+        death_layout = build_v2_layout(
             title=f"{title} - Death Report",
             description=death_description,
             color=discord.Color.dark_red() if mafia_deaths else discord.Color.gold(),
+            image_url=get_event_image("death" if mafia_deaths else "day"),
         )
+<<<<<<< HEAD
         death_image = get_event_image("death" if mafia_deaths else "day")
         if death_image:
             death_embed.set_image(url=death_image)
@@ -1734,15 +1758,21 @@ class GameEngine:
         except Exception as err:
             logger.error(f"Failed to send death embed: {err}")
         await asyncio.sleep(2.5)  # Wait 2.5 seconds between embeds to prevent spam
+=======
+        await self.bot.message_queue.send(channel, view=death_layout)
+        await asyncio.sleep(2.5)
+>>>>>>> 01295486b513b5003fdd1a0c792bf0e1055fa7f5
 
         # 2. Other Casualties Report
         if other_deaths:
             other_description = "\n".join(f"{get_emoji('death')} {msg}" for msg in other_deaths)
-            other_embed = discord.Embed(
+            other_layout = build_v2_layout(
                 title=f"{title} - Other Casualties",
                 description=other_description,
                 color=discord.Color.dark_orange(),
+                image_url=get_event_image("death"),
             )
+<<<<<<< HEAD
             other_image = get_event_image("death")
             if other_image:
                 other_embed.set_image(url=other_image)
@@ -1751,6 +1781,10 @@ class GameEngine:
             except Exception as err:
                 logger.error(f"Failed to send other casualties embed: {err}")
             await asyncio.sleep(2.5)  # Wait 2.5 seconds between embeds to prevent spam
+=======
+            await self.bot.message_queue.send(channel, view=other_layout)
+            await asyncio.sleep(2.5)
+>>>>>>> 01295486b513b5003fdd1a0c792bf0e1055fa7f5
 
         alive_list = []
         dead_list = []
@@ -1766,15 +1800,20 @@ class GameEngine:
                 role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
                 dead_list.append(f"• ~~{mname}~~ ({role_emoji_prefix}{role_display})")
 
-        status_embed = discord.Embed(
-            title=f"{title} - Player Status",
-            color=discord.Color.blurple(),
+        status_desc = (
+            "## Alive Players\n" + ("\n".join(alive_list) if alive_list else "None") +
+            "\n\n## Dead Players\n" + ("\n".join(dead_list) if dead_list else "None")
         )
-        status_embed.set_image(url="https://img.magnific.com/free-vector/anime-cloud-blue-heaven-sky-vector-background-summer-abstract-cloudy-air-design-with-gradient-sun-light-with-reflection-beautiful-calm-morning-game-outdoor-panorama-with-sunshine-painting_107791-23777.jpg")
-        status_embed.add_field(name=f"Alive Players", value="\n\n".join(alive_list) if alive_list else "None", inline=True)
-        status_embed.add_field(name=f"Dead Players", value="\n\n".join(dead_list) if dead_list else "None", inline=True)
-        await self.bot.message_queue.send(channel, embed=status_embed)
-        await asyncio.sleep(2.5)  # Wait 2.5 seconds after player status embed before proceeding
+
+        status_layout = build_v2_layout(
+            title=f"{title} - Player Status",
+            description=status_desc,
+            color=discord.Color.blurple(),
+            image_url="https://img.magnific.com/free-vector/anime-cloud-blue-heaven-sky-vector-background-summer-abstract-cloudy-air-design-with-gradient-sun-light-with-reflection-beautiful-calm-morning-game-outdoor-panorama-with-sunshine-painting_107791-23777.jpg",
+        )
+        await self.bot.message_queue.send(channel, view=status_layout)
+        await asyncio.sleep(2.5)
+
 
     async def _all_active_submitted(self, session: GameSession) -> bool:
         """Checks if all alive players who have active night actions have submitted."""
@@ -2078,12 +2117,13 @@ class GameEngine:
                                     role_meta = roles.ROLES_METADATA.get(actor_state.role_key or "", {})
                                     role_display = role_meta.get("name", "Investigator")
                                     emoji = get_emoji(actor_state.role_key) or get_emoji("search")
-                                    embed = discord.Embed(
+                                    intel_layout = build_v2_layout(
                                         title=f"{emoji} {role_display} Intel",
                                         description=context.payload["result"],
-                                        color=discord.Color.blue()
+                                        color=discord.Color.blue(),
                                     )
-                                    self.bot.message_queue.send(actor_member, embed=embed)
+                                    self.bot.message_queue.send(actor_member, view=intel_layout)
+
                                 except Exception:
                                     logger.exception("Failed to DM scan result to %s", actor_id)
 
@@ -2683,27 +2723,26 @@ class GameEngine:
         converted_member = guild.get_member(converted_id)
         if converted_member:
             try:
-                convert_embed = discord.Embed(
-                    title=f"{get_emoji('muzan_kibutsuji')} You Have Been Transformed!",
-                    description=(
-                        f"**Muzan Kibutsuji** has infected you with his blood!\n\n"
-                        f"**Your New Role:** {role_display}\n"
-                        f"**Your New Faction:** Villain (Mafia)\n\n"
-                        f"You now win with the Mafia. Your old role and abilities are gone.\n"
-                        f"You can now communicate with your fellow Mafia members by sending me DMs."
-                    ),
-                    color=discord.Color.dark_red()
-                )
+                desc_parts = [
+                    f"**Muzan Kibutsuji** has infected you with his blood!\n\n"
+                    f"**Your New Role:** {role_display}\n"
+                    f"**Your New Faction:** Villain (Mafia)\n\n"
+                    f"You now win with the Mafia. Your old role and abilities are gone.\n"
+                    f"You can now communicate with your fellow Mafia members by sending me DMs."
+                ]
                 if role_meta.get("active_ability"):
-                    convert_embed.add_field(
-                        name="Active Ability", value=role_meta["active_ability"], inline=False
-                    )
+                    desc_parts.append(f"• **Active Ability:** {role_meta['active_ability']}")
                 if role_meta.get("passive_ability"):
-                    convert_embed.add_field(
-                        name="Passive Ability", value=role_meta["passive_ability"], inline=False
-                    )
-                self.bot.message_queue.send(converted_member, embed=convert_embed)
+                    desc_parts.append(f"• **Passive Ability:** {role_meta['passive_ability']}")
+
+                convert_layout = build_v2_layout(
+                    title=f"{get_emoji('muzan_kibutsuji')} You Have Been Transformed!",
+                    description="\n\n".join(desc_parts),
+                    color=discord.Color.dark_red(),
+                )
+                self.bot.message_queue.send(converted_member, view=convert_layout)
                 self.bot.message_queue.send(converted_member, f"{get_emoji('group')} **Your Fellow Mafia Members:** {mafia_list_str}")
+
             except Exception:
                 logger.exception("Failed to DM converted player %s", converted_id)
 

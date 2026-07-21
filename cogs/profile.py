@@ -35,34 +35,28 @@ class ProfileCog(commands.Cog):
 
         total_games = statistics.games_played
         win_rate = 0.0 if total_games == 0 else (statistics.wins / total_games) * 100
-        embed = build_profile_embed(f"{profile_record.username}'s Profile")
-        embed.set_thumbnail(url=ctx.author.display_avatar.url)
-        embed.remove_footer()
 
-        # Row 1: Rank alone
-        embed.add_field(name="Rank", value=profile_record.rank, inline=False)
+        desc = (
+            f"**Rank:** `{profile_record.rank}`\n"
+            f"**Level:** `{profile_record.level}` | **XP:** `{profile_record.xp}`\n"
+            f"**Gold:** `{profile_record.coins}`\n"
+            f"**Favorite Character:** {profile_record.favorite_character or '*None set*'}\n\n"
+            f"## Match Statistics\n"
+            f"• **Wins:** `{statistics.wins}` | **Losses:** `{statistics.losses}` | **Draws:** `{statistics.draws}`\n"
+            f"• **Total Games:** `{total_games}` | **Win Rate:** `{win_rate:.1f}%`"
+        )
 
-        # Row 2: Level and XP
-        embed.add_field(name="Level", value=str(profile_record.level), inline=True)
-        embed.add_field(name="XP", value=str(profile_record.xp), inline=True)
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        from ui import build_v2_layout
+        profile_view = build_v2_layout(
+            title=f"{profile_record.username}'s Profile",
+            description=desc,
+            color=discord.Color.from_rgb(0, 0, 0),
+            thumbnail_url=ctx.author.display_avatar.url,
+            footer_text="",
+        )
+        await send_hybrid_response(ctx, view=profile_view)
 
-        # Row 3: Wins, Losses, and Draws
-        embed.add_field(name="Wins", value=str(statistics.wins), inline=True)
-        embed.add_field(name="Losses", value=str(statistics.losses), inline=True)
-        embed.add_field(name="Draws", value=str(statistics.draws), inline=True)
 
-        # Row 4: Games Played and Win Rate
-        embed.add_field(name="Games Played", value=str(total_games), inline=True)
-        embed.add_field(name="Win Rate", value=f"{win_rate:.1f}%", inline=True)
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
-
-        # Row 5: Gold
-        embed.add_field(name="Gold", value=str(profile_record.coins), inline=False)
-
-        # Row 6: Favorite Character
-        embed.add_field(name="Favorite Character", value=profile_record.favorite_character or "None yet", inline=False)
-        await send_hybrid_response(ctx, embed=embed)
 
     @commands.hybrid_command(name="setfavourite", description="Set your favorite anime character on your profile")
     @discord.app_commands.describe(character="Name of the character")

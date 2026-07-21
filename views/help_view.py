@@ -83,9 +83,12 @@ HELP_TOPICS: tuple[HelpTopic, ...] = (
 )
 
 
+from ui import MafiosoLayoutView, build_v2_layout
+
+
 class HelpSelect(discord.ui.Select):
-    def __init__(self, view: "HelpView") -> None:
-        self.view_ref = view
+    def __init__(self, view_ref: "HelpView") -> None:
+        self.view_ref = view_ref
         super().__init__(
             placeholder="Choose a command category..",
             min_values=1,
@@ -99,13 +102,23 @@ class HelpSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction) -> None:
         topic = next(topic for topic in HELP_TOPICS if topic.value == self.values[0])
         self.view_ref.selected_topic = topic.value
-        embed = build_embed(topic.title, topic.body, color=topic.color)
-        embed.add_field(name="Prefix", value=f"`{self.view_ref.prefix}{topic.label.lower()} ...`", inline=False)
-        embed.add_field(name="Slash", value=f"`/{topic.label.lower()} ...`", inline=False)
-        await interaction.response.edit_message(embed=embed, view=self.view_ref)
+        
+        body_with_usage = (
+            f"{topic.body}\n\n"
+            f"• **Prefix:** `{self.view_ref.prefix}{topic.label.lower()} ...` \n"
+            f"• **Slash:** `/{topic.label.lower()} ...`"
+        )
+
+        new_layout = build_v2_layout(
+            title=topic.title,
+            description=body_with_usage,
+            color=topic.color,
+            view=self.view_ref,
+        )
+        await interaction.response.edit_message(view=new_layout)
 
 
-class HelpView(discord.ui.View):
+class HelpView(MafiosoLayoutView):
     def __init__(self, prefix: str) -> None:
         super().__init__(timeout=180)
         self.prefix = prefix
@@ -113,7 +126,7 @@ class HelpView(discord.ui.View):
         self.add_item(HelpSelect(self))
 
     @staticmethod
-    def build_index_embed(prefix: str) -> discord.Embed:
+    def build_index_layout(prefix: str) -> MafiosoLayoutView:
         lines = [
             f"`{prefix}lobby` - Lobby Management",
             f"`{prefix}game` - Active Match Controls",
@@ -121,7 +134,12 @@ class HelpView(discord.ui.View):
             f"`{prefix}shop` - Cosmetics and Inventory",
             f"`{prefix}leaderboard` - Server Rankings",
             f"`{prefix}admin` - Moderator Tools",
+            "\n**How to use:** Pick a category from the menu below to see a short explanation.",
         ]
-        embed = build_status_embed("Mafioso Help", "\n".join(lines))
-        embed.add_field(name="How to use", value="Pick a category from the menu below to see a short explanation.", inline=False)
-        return embed
+        view = HelpView(prefix)
+        return build_v2_layout(
+            title="Mafioso Help",
+            description="\n".join(lines),
+            view=view,
+        )
+

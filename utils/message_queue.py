@@ -9,6 +9,26 @@ import discord
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_v2_kwargs(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
+    kwargs = dict(kwargs)
+    view = kwargs.get("view") or kwargs.get("embed")
+    if view is not None and isinstance(view, discord.ui.LayoutView):
+        content_str: str | None = None
+        new_args = list(args)
+        if new_args and isinstance(new_args[0], str):
+            content_str = new_args.pop(0)
+        elif "content" in kwargs and isinstance(kwargs["content"], str):
+            content_str = kwargs.pop("content")
+
+        if content_str:
+            from ui.components import build_v2_layout
+            view = build_v2_layout(description=content_str, view=view, footer_text="")
+            kwargs["view"] = view
+            kwargs.pop("embed", None)
+        return tuple(new_args), kwargs
+    return args, kwargs
+
+
 class DiscordMessageQueue:
     """Queues all non-urgent outgoing Discord messages to prevent rate limits."""
 
@@ -58,11 +78,12 @@ class DiscordMessageQueue:
             try:
                 # Add a small spacing delay before every API call
                 await asyncio.sleep(self._delay)
+                clean_args, clean_kwargs = _sanitize_v2_kwargs(args, kwargs)
 
                 if action == "send":
-                    res = await target.send(*args, **kwargs)
+                    res = await target.send(*clean_args, **clean_kwargs)
                 elif action == "edit":
-                    res = await target.edit(*args, **kwargs)
+                    res = await target.edit(*clean_args, **clean_kwargs)
                 else:
                     res = None
 
@@ -78,3 +99,4 @@ class DiscordMessageQueue:
                     fut.set_exception(e)
             finally:
                 self._queue.task_done()
+

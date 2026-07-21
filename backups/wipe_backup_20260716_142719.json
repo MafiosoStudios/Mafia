@@ -1,0 +1,44 @@
+{
+    "players": [
+        {
+            "_id": "6a58d7fe81c92cf944b897a0",
+            "user_id": 839182501091344444,
+            "coins": 0,
+            "created_at": "2026-07-16T13:09:18.538000",
+            "discriminator": "0",
+            "draws": 0,
+            "favorite_character": null,
+            "games_played": 0,
+            "guild_id": 0,
+            "level": 1,
+            "losses": 0,
+            "most_played_character": null,
+            "rank": "Bronze",
+            "updated_at": "2026-07-16T13:09:18.538000",
+            "username": "gojo",
+            "wins": 0,
+            "xp": 0
+        }
+    ],
+    "statistics": [
+        {
+            "_id": "6a58d7fe81c92cf944b897a1",
+            "user_id": 839182501091344444,
+            "achievements_unlocked": 0,
+            "draws": 0,
+            "executions": 0,
+            "games_played": 0,
+            "guild_id": 0,
+            "losses": 0,
+            "mvp_titles": 0,
+            "night_kills": 0,
+            "votes_cast": 0,
+            "wins": 0
+        }
+    ],
+    "character_statistics": [],
+    "leaderboards": [],
+    "unlocked_achievements": [],
+    "inventory": [],
+    "unlocked_characters": []
+}

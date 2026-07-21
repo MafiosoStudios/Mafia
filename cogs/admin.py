@@ -53,11 +53,15 @@ class _RoleSelect(discord.ui.Select):
         )
 
 
-class RoleToggleView(discord.ui.View):
+from ui import MafiosoLayoutView
+
+
+class RoleToggleView(MafiosoLayoutView):
     """Lets an admin pick one or more roles to disable/enable for this server."""
 
     def __init__(self, bot: commands.Bot, guild_id: int, author_id: int, disable: bool, eligible_roles: list[str]) -> None:
         super().__init__(timeout=120)
+
         self.bot = bot
         self.guild_id = guild_id
         self.author_id = author_id
@@ -375,64 +379,14 @@ class AdminCog(commands.Cog):
         # Restart process and pass the restart channel ID
         os.execv(sys.executable, [sys.executable] + clean_argv + ["--restart-channel", str(ctx.channel.id)])
 
-    @commands.hybrid_command(name="push", description="Stage all, commit, push changes, and print git output (Developer only)")
-    @discord.app_commands.describe(message="The commit message")
-    async def push(self, ctx: commands.Context, *, message: str) -> None:
-        import config
-        if ctx.author.id not in config.ADMIN_IDS:
-            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** Only bot developers can run this command.", ephemeral=True)
-            return
-
-        await ctx.defer(ephemeral=False)
-
-        import subprocess
-        outputs = []
-        
-        # 1. git add .
-        try:
-            subprocess.run(["git", "add", "."], capture_output=True, text=True, check=True)
-            outputs.append(f"{get_emoji('check')} Git Add: Success")
-        except Exception as e:
-            outputs.append(f"{get_emoji('cross')} Git Add Failed:\n{e}")
-            await ctx.send("\n".join(outputs))
-            return
-
-        # 2. git commit -m "..."
-        try:
-            res_commit = subprocess.run(["git", "commit", "-m", message], capture_output=True, text=True, check=True)
-            outputs.append(f"{get_emoji('check')} Git Commit:\n{res_commit.stdout or res_commit.stderr}")
-        except Exception as e:
-            err_str = str(e)
-            if hasattr(e, "stdout") and e.stdout:
-                err_str += f"\nstdout: {e.stdout}"
-            if hasattr(e, "stderr") and e.stderr:
-                err_str += f"\nstderr: {e.stderr}"
-            outputs.append(f"{get_emoji('warning')} Git Commit Warning/Failure:\n{err_str}")
-            if "nothing to commit" in err_str.lower() or "no changes added to commit" in err_str.lower():
-                pass
-            else:
-                await ctx.send("\n".join(outputs))
-                return
-
-        # 3. git push
-        try:
-            res_push = subprocess.run(["git", "push"], capture_output=True, text=True, check=True)
-            outputs.append(f"{get_emoji('check')} Git Push:\n{res_push.stdout or res_push.stderr}")
-        except Exception as e:
-            err_str = str(e)
-            if hasattr(e, "stdout") and e.stdout:
-                err_str += f"\nstdout: {e.stdout}"
-            if hasattr(e, "stderr") and e.stderr:
-                err_str += f"\nstderr: {e.stderr}"
-            outputs.append(f"{get_emoji('cross')} Git Push Failed:\n{err_str}")
-
-        full_output = "\n\n".join(outputs)
-        await ctx.send(f"{get_emoji('package')} **Git Push Summary:**\n```\n{full_output[:1800]}\n```")
 
 
-class WipeConfirmationView(discord.ui.View):
+
+
+class WipeConfirmationView(MafiosoLayoutView):
     def __init__(self, bot: commands.Bot, author_id: int) -> None:
         super().__init__(timeout=30)
+
         self.bot = bot
         self.author_id = author_id
         self.confirmed = False
@@ -444,4 +398,7 @@ class WipeConfirmationView(discord.ui.View):
             return False
         return True
 
-  
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(AdminCog(bot))
+

@@ -5,9 +5,10 @@ from discord.ext import commands
 
 from views.vote_view import VoteView
 from utils.constants import GameState
-from utils.embeds import build_status_embed
+from ui import build_v2_layout, MafiosoLayoutView
 from utils.helpers import send_hybrid_response
 from config import get_emoji
+
 
 
 class GameCog(commands.Cog):
@@ -36,12 +37,14 @@ class GameCog(commands.Cog):
             return
         session = await game_engine.get_session(active.game_id) if game_engine is not None else None
         if session is None:
-            embed = build_status_embed(
+            status_layout = build_status_embed(
                 f"Game {active.game_id}",
                 f"State: `{active.state}`\nUse the lobby controls to manage the match.",
             )
-            await send_hybrid_response(ctx, embed=embed, view=VoteView(), ephemeral=True)
+            await send_hybrid_response(ctx, view=status_layout, ephemeral=True)
             return
+
+
 
         import roles
         player_lines = []
@@ -53,18 +56,20 @@ class GameCog(commands.Cog):
                 player_lines.append(f"<@{user_id}>: {role_emoji_prefix}{role_name}")
             else:
                 player_lines.append(f"<@{user_id}>: Unassigned")
-        embed = build_status_embed(
-            f"Game {active.game_id}",
-            "\n".join(player_lines) if player_lines else "No players registered.",
+        desc = (
+            f"• **State:** `{session.state.name if hasattr(session.state, 'name') else session.state}`\n"
+            f"• **Phase:** `{session.phase.name if hasattr(session.phase, 'name') else session.phase}`\n"
+            f"• **Players Registered:** `{len(session.players)}`\n\n"
+            f"## Roster\n" + ("\n".join(player_lines) if player_lines else "*No players registered.*")
         )
-        if session.state == GameState.ENDED:
-            embed.color = discord.Color.red()
-        embed.add_field(name="State", value=str(session.state), inline=True)
-        embed.add_field(name="Phase", value=str(session.phase), inline=True)
-        embed.add_field(name="Players", value=str(len(session.players)), inline=True)
-        await send_hybrid_response(ctx, embed=embed, view=VoteView(), ephemeral=True)
+        status_view = build_v2_layout(
+            title=f"🎮 Game Status — Match {active.game_id}",
+            description=desc,
+            color=discord.Color.red() if session.state == GameState.ENDED else discord.Color.blue(),
+        )
+        await send_hybrid_response(ctx, view=status_view, ephemeral=True)
 
-    @commands.hybrid_group(name="settings", description="Configure game settings for this server")
+    @commands.hybrid_group(name="settings", description="Configure game settings for this server", invoke_without_command=True)
     async def settings(self, ctx: commands.Context) -> None:
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
@@ -72,9 +77,9 @@ class GameCog(commands.Cog):
             await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
             return
         if ctx.invoked_subcommand is None:
-            await send_hybrid_response(ctx, "Try `/settings list` or `/settings set <key> <value>`.", ephemeral=True)
+            await self.list_settings(ctx)
 
-    @settings.command(name="list", description="List current game settings")
+    @settings.command(name="list", aliases=["show"], description="List current game settings for this server")
     async def list_settings(self, ctx: commands.Context) -> None:
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
@@ -88,10 +93,32 @@ class GameCog(commands.Cog):
             return
         current = await db.get_guild_settings(guild_id)
         
-        embed = discord.Embed(title=f"{get_emoji('settings')} Server Game Settings", color=discord.Color.blue())
+        labels = {
+            "night_duration": "🌙 Night Duration",
+            "day_duration": "☀️ Day Discussion Duration",
+            "vote_duration": "🗳️ Nomination/Vote Duration",
+            "plea_duration": "⚖️ Defense Plea Duration",
+            "verdict_duration": "⚔️ Verdict Duration",
+            "anonymous_voting": "🕶️ Anonymous Voting",
+        }
+        
+        lines = []
         for key, val in current.items():
-            embed.add_field(name=key, value=f"`{val}`", inline=True)
-        await send_hybrid_response(ctx, embed=embed, ephemeral=True)
+            label = labels.get(key, f"⚙️ {key.replace('_', ' ').title()}")
+            display_val = f"`{val}` seconds" if "duration" in key else (f"`Enabled`" if val else f"`Disabled`")
+            lines.append(f"• **{label}:** {display_val}")
+
+        settings_desc = (
+            f"Here are the active game parameters for **{ctx.guild.name if ctx.guild else 'this server'}**:\n\n"
+            + "\n".join(lines) + "\n\n"
+            f"-# Use `/settings set <key> <value>` to change any value."
+        )
+        settings_view = build_v2_layout(
+            title=f"{get_emoji('settings')} Server Game Settings",
+            description=settings_desc,
+            color=discord.Color.blue(),
+        )
+        await send_hybrid_response(ctx, view=settings_view, ephemeral=True)
 
     @settings.command(name="set", description="Set a game setting value")
     @discord.app_commands.choices(key=[
@@ -126,7 +153,13 @@ class GameCog(commands.Cog):
                 return
 
         await db.update_guild_setting(guild_id, key, parsed_value)
-        await send_hybrid_response(ctx, f"{get_emoji('check')} Setting `{key}` successfully updated to `{parsed_value}`.", ephemeral=True)
+        updated_card = build_v2_layout(
+            title=f"{get_emoji('check')} Setting Updated",
+            description=f"Setting **`{key}`** has been updated to **`{parsed_value}`** for this server.",
+            color=discord.Color.green(),
+        )
+        await send_hybrid_response(ctx, view=updated_card, ephemeral=True)
+
 
     @commands.command(name="rebellion", aliases=["rebel"])
     async def rebellion(self, ctx: commands.Context) -> None:
@@ -195,8 +228,8 @@ class GameCog(commands.Cog):
                 if os.path.exists(default_path):
                     image_path = default_path
 
-        embed = discord.Embed(
-            title=f"Mafioso",
+        newrelease_layout = build_v2_layout(
+            title="Mafioso",
             description=(
                 f"We are thrilled to announce the official release of **Mafioso**, "
                 f"the ultimate anime-themed Mafia Discord bot! Here's a brief overview "
@@ -211,18 +244,16 @@ class GameCog(commands.Cog):
                 f"• ``lobby`` to jump right into the game, ``lobby_create`` to actually host one, this bot operates just like our traditional mafia bots\n\n"
                 f"• If you do not understand some roles you can always do ``roleinfo`` for information on every character"
             ),
-            color=discord.Color.from_rgb(0, 0, 0)
+            color=discord.Color.from_rgb(0, 0, 0),
+            thumbnail_url=ctx.guild.icon.url if (ctx.guild and ctx.guild.icon) else None,
+            footer_text="Mafioso Patch Note • Version 1.0.0",
         )
-        embed.set_footer(text="Mafioso Patch Note • Version 1.0.0")
-        if ctx.guild and ctx.guild.icon:
-            embed.set_thumbnail(url=ctx.guild.icon.url)
 
         if image_path and os.path.exists(image_path):
             file = discord.File(image_path, filename="release_image.png")
-            embed.set_image(url="attachment://release_image.png")
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=file, view=newrelease_layout)
         else:
-            await ctx.send(embed=embed)
+            await ctx.send(view=newrelease_layout)
 
     @commands.hybrid_command(name="resume", description="Resume the active game from database state")
     async def resume(self, ctx: commands.Context) -> None:
@@ -292,15 +323,15 @@ class GameCog(commands.Cog):
     async def tutorial(self, ctx: commands.Context) -> None:
         from views.tutorial_view import TutorialView
         view = TutorialView()
-        embed = TutorialView.build_index_embed()
-        await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=True)
+        await send_hybrid_response(ctx, view=view, ephemeral=True)
+
 
     @commands.hybrid_command(name="roles", description="View the interactive directory of every role in the game")
     async def roles(self, ctx: commands.Context) -> None:
         from views.roles_view import RolesView
         view = RolesView(ctx.author.id)
-        embed = RolesView.build_index_embed()
-        await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=True)
+        await send_hybrid_response(ctx, view=view, ephemeral=True)
+
 
     @commands.hybrid_command(name="invite", description="Generate the bot's invite link with calculated permissions")
     async def invite(self, ctx: commands.Context) -> None:
@@ -324,35 +355,39 @@ class GameCog(commands.Cog):
             scopes=("bot", "applications.commands")
         )
 
-        embed = discord.Embed(
+        invite_button = discord.ui.Button(
+            label="Invite Bot",
+            url=invite_url,
+            style=discord.ButtonStyle.link,
+            emoji=get_emoji("lobby")
+        )
+
+        invite_action_view = MafiosoLayoutView()
+        invite_avatar_url = self.bot.user.display_avatar.url if self.bot.user else None
+        invite_layout = build_v2_layout(
             title=f"{get_emoji('link')} Summon Mafioso",
             description=(
                 "Invoke the ultimate anime-themed social deduction bot to your server!\n"
                 "Unleash characters like Frieza, Lelouch, and Ayanokoji in intense faction battles."
             ),
-            color=discord.Color.purple()
+            color=discord.Color.purple(),
+            thumbnail_url=invite_avatar_url,
+            view=invite_action_view,
         )
-        if self.bot.user and self.bot.user.avatar:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
-            
-        view = discord.ui.View()
-        view.add_item(discord.ui.Button(
-            label="Invite Bot",
-            url=invite_url,
-            style=discord.ButtonStyle.link,
-            emoji=get_emoji("lobby")
-        ))
-        
-        await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=True)
+        # Add the invite link button inside the layout
+        container = invite_layout.children[0]
+        container.add_item(discord.ui.ActionRow(invite_button))
+
+        await send_hybrid_response(ctx, view=invite_layout, ephemeral=True)
 
 
     @commands.hybrid_command(name="patchnotes", description="Browse Mafioso version patch notes")
     async def patchnotes(self, ctx: commands.Context) -> None:
         from views.patchnotes_view import PatchNotesView
         index = len(PatchNotesView.PATCHES) - 1  # start at latest
-        view = PatchNotesView(index)
-        embed = PatchNotesView.build_embed(index)
-        await send_hybrid_response(ctx, embed=embed, view=view, ephemeral=False)
+        view = PatchNotesView.build_layout_view(index)
+        await send_hybrid_response(ctx, view=view, ephemeral=False)
+
 
 
 async def setup(bot: commands.Bot) -> None:

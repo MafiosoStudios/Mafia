@@ -10,8 +10,11 @@ import asyncio
 import logging
 from config import get_emoji
 from utils.constants import GamePhase, RoleFaction
+from ui.base import MafiosoLayoutView
+from ui.theme import heading, small_footer
 
 logger = logging.getLogger(__name__)
+
 
 
 async def _safe_queue_night_action(
@@ -28,26 +31,24 @@ async def _safe_queue_night_action(
         return True
     except RuntimeError:
         await interaction.response.edit_message(
-            content=f"{get_emoji('cross')} Night actions have already locked in — your action wasn't submitted.",
-            view=None,
+            view=build_v2_layout(description=f"{get_emoji('cross')} Night actions have already locked in — your action wasn't submitted.", footer_text="")
         )
         return False
     except ValueError as val_err:
         await interaction.response.edit_message(
-            content=f"{get_emoji('cross')} **Invalid Action:** {val_err}",
-            view=None,
+            view=build_v2_layout(description=f"{get_emoji('cross')} **Invalid Action:** {val_err}", footer_text="")
         )
         return False
     except Exception as exc:
         logger.exception("Unexpected error in night action queue")
         await interaction.response.edit_message(
-            content=f"{get_emoji('cross')} An unexpected error occurred: {exc}",
-            view=None,
+            view=build_v2_layout(description=f"{get_emoji('cross')} An unexpected error occurred: {exc}", footer_text="")
         )
         return False
 
 
-class StartGameView(discord.ui.View):
+
+class StartGameView(MafiosoLayoutView):
     """Shown to the host after setup. Clicking 'Start Game' creates the channel and begins the match."""
 
     def __init__(self, game_id: str, engine: GameEngine) -> None:
@@ -73,20 +74,24 @@ class StartGameView(discord.ui.View):
         # Disable the button immediately
         button.disabled = True
         button.label = "Game Starting..."
-        await interaction.response.edit_message(
-            embed=discord.Embed(
-                title=f"{get_emoji('lobby')} Game Starting!",
-                description="Creating the game channel and initializing the match...",
-                color=discord.Color.blurple()
-            ),
-            view=self
-        )
+
+        container = discord.ui.Container(accent_color=discord.Color.blurple())
+        emoji_lobby = get_emoji('lobby')
+        container.add_item(discord.ui.TextDisplay(f"{heading(f'{emoji_lobby} Game Starting!')}\nCreating the game channel and initializing the match..."))
+        container.add_item(discord.ui.Separator())
+        container.add_item(discord.ui.TextDisplay(small_footer("Anime Mafia")))
+
+        start_view = MafiosoLayoutView(timeout=300)
+        start_view.add_item(container)
+
+        await interaction.response.edit_message(view=start_view)
 
         # Launch the game loop as a background task
         asyncio.create_task(self.engine.run_game_loop(self.game_id))
 
 
-class SpectateView(discord.ui.View):
+
+class SpectateView(MafiosoLayoutView):
     """Shown in the lobby channel when a game begins, allowing non-players to spectate the match channel."""
 
     def __init__(self, game_id: str, engine: GameEngine) -> None:
@@ -121,11 +126,12 @@ class SpectateView(discord.ui.View):
         await interaction.response.send_message(f"{get_emoji('cross')} Failed to add spectator permissions.", ephemeral=True)
 
 
-class NightActionView(discord.ui.View):
+class NightActionView(MafiosoLayoutView):
     def __init__(self, game_id: str, engine: GameEngine) -> None:
         super().__init__(timeout=None)
         self.game_id = game_id
         self.engine = engine
+
 
     @discord.ui.button(label="Choose Night Action", style=discord.ButtonStyle.primary, custom_id="mafia_choose_night_action")
     async def choose_action(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -206,21 +212,22 @@ class NightActionView(discord.ui.View):
                     if inter.user.id in session.night_actions:
                         session.night_actions.pop(inter.user.id, None)
                         player.night_actions_used = max(0, player.night_actions_used - 1)
-                        await inter.response.edit_message(content=f"{get_emoji('check')} **Your night action has been cancelled.**", view=None)
+                        await inter.response.edit_message(view=build_v2_layout(description=f"{get_emoji('check')} **Your night action has been cancelled.**", footer_text=""))
                         return
-                await inter.response.send_message(f"{get_emoji('cross')} You have not submitted any night actions yet tonight.", ephemeral=True)
+                await inter.response.send_message(view=build_v2_layout(description=f"{get_emoji('cross')} You have not submitted any night actions yet tonight.", footer_text=""), ephemeral=True)
             cancel_btn.callback = ly_cancel_callback
             view.add_item(cancel_btn)
             
-            await interaction.response.send_message("Select which ability you wish to use:", view=view, ephemeral=True)
+            await interaction.response.send_message(view=build_v2_layout(description="Select which ability you wish to use:", view=view, footer_text=""), ephemeral=True)
             return
 
         # Otherwise, present the dynamic separate buttons view for the role's abilities!
         view = NightAbilityButtonsView(self.game_id, self.engine, user_id, role_inst, session)
-        await interaction.response.send_message("Select an ability to use tonight:", view=view, ephemeral=True)
+        await interaction.response.send_message(view=build_v2_layout(description="Select an ability to use tonight:", view=view, footer_text=""), ephemeral=True)
 
 
-class NightAbilityButtonsView(discord.ui.View):
+
+class NightAbilityButtonsView(MafiosoLayoutView):
     def __init__(self, game_id: str, engine: GameEngine, player_id: int, role_inst: Any, session: GameSession) -> None:
         super().__init__(timeout=120)
         self.game_id = game_id
@@ -228,6 +235,7 @@ class NightAbilityButtonsView(discord.ui.View):
         self.player_id = player_id
         self.role_inst = role_inst
         self.session = session
+
 
         from utils.roles import NightAction
         for idx, ability in enumerate(role_inst.abilities):
@@ -311,7 +319,7 @@ class NightAbilityButtonsView(discord.ui.View):
                 }
                 if not await _safe_queue_night_action(interaction, self.engine, self.game_id, self.player_id, payload):
                     return
-                await interaction.response.edit_message(content=f"Ability **{ability.name}** activated successfully.", view=None)
+                await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{ability.name}** activated successfully.", footer_text=""))
                 return
 
             # Build SelectOptions
@@ -326,7 +334,7 @@ class NightAbilityButtonsView(discord.ui.View):
                 options.append(discord.SelectOption(label=name, value=str(pid)))
 
             if not options:
-                await interaction.response.send_message("No eligible targets for this ability.", ephemeral=True)
+                await interaction.response.send_message(view=build_v2_layout(description="No eligible targets for this ability.", footer_text=""), ephemeral=True)
                 return
 
             view = discord.ui.View(timeout=120)
@@ -350,27 +358,27 @@ class NightAbilityButtonsView(discord.ui.View):
             back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
             async def back_callback(inter: discord.Interaction) -> None:
                 orig_view = NightAbilityButtonsView(self.game_id, self.engine, self.player_id, self.role_inst, session)
-                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+                await inter.response.edit_message(view=build_v2_layout(description="Select an ability to use tonight:", view=orig_view, footer_text=""))
             back_btn.callback = back_callback
             view.add_item(back_btn)
 
             if ability.name == "Texture Surprise":
-                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the player to disguise:", view=view)
+                await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{ability.name}**.\nSelect the player to disguise:", view=view, footer_text=""))
             elif ability.name == "Brew Potion":
-                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the potion you want to brew:", view=view)
+                await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{ability.name}**.\nSelect the potion you want to brew:", view=view, footer_text=""))
             elif ability.name == "Demon Detection":
-                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the first target:", view=view)
+                await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{ability.name}**.\nSelect the first target:", view=view, footer_text=""))
             elif ability.num_targets == 2:
-                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect the first target:", view=view)
+                await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{ability.name}**.\nSelect the first target:", view=view, footer_text=""))
             else:
-                await interaction.response.edit_message(content=f"Using **{ability.name}**.\nSelect your target:", view=view)
+                await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{ability.name}**.\nSelect your target:", view=view, footer_text=""))
 
         return callback
 
     async def cancel_action_callback(self, interaction: discord.Interaction) -> None:
         session = await self.engine.get_session(self.game_id)
         if not session:
-            await interaction.response.send_message("This game is no longer active.", ephemeral=True)
+            await interaction.response.send_message(view=build_v2_layout(description="This game is no longer active.", footer_text=""), ephemeral=True)
             return
 
         player_state = session.players.get(self.player_id)
@@ -381,10 +389,11 @@ class NightAbilityButtonsView(discord.ui.View):
             if self.player_id in session.night_actions:
                 session.night_actions.pop(self.player_id, None)
                 player_state.night_actions_used = max(0, player_state.night_actions_used - 1)
-                await interaction.response.edit_message(content=f"{get_emoji('check')} **Your night action has been cancelled.**\nFeel free to select a new target at any time tonight.", view=None)
+                await interaction.response.edit_message(view=build_v2_layout(description=f"{get_emoji('check')} **Your night action has been cancelled.**\nFeel free to select a new target at any time tonight.", footer_text=""))
                 return
         
-        await interaction.response.send_message(f"{get_emoji('cross')} You have not submitted any night actions yet tonight.", ephemeral=True)
+        await interaction.response.send_message(view=build_v2_layout(description=f"{get_emoji('cross')} You have not submitted any night actions yet tonight.", footer_text=""), ephemeral=True)
+
 
 
 class AbilityTargetSelect(discord.ui.Select):
@@ -403,7 +412,7 @@ class AbilityTargetSelect(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered on <@{target_id}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{self.ability.name}** registered on <@{target_id}>.", footer_text=""))
 
 
 class TwoTargetSelectStep1(discord.ui.Select):
@@ -421,7 +430,7 @@ class TwoTargetSelectStep1(discord.ui.Select):
         view = discord.ui.View(timeout=120)
         select2 = TwoTargetSelectStep2(self.game_id, self.engine, self.ability, self.action_index, target1, options2)
         view.add_item(select2)
-        await interaction.response.edit_message(content=f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:", view=view)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:", view=view, footer_text=""))
 
 
 class TwoTargetSelectStep2(discord.ui.Select):
@@ -443,7 +452,8 @@ class TwoTargetSelectStep2(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered on <@{self.target1}> and <@{target2}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{self.ability.name}** registered on <@{self.target1}> and <@{target2}>.", footer_text=""))
+
 
 
 class TextureSurpriseStep1(discord.ui.Select):
@@ -471,12 +481,12 @@ class TextureSurpriseStep1(discord.ui.Select):
             if session:
                 from views.game_ui import NightAbilityButtonsView
                 role_inst = session.players[interaction.user.id].role_inst
-                orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
-                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+                await inter.response.edit_message(view=build_v2_layout(description="Select an ability to use tonight:", view=orig_view, footer_text=""))
+
         back_btn.callback = back_callback
         view.add_item(back_btn)
         
-        await interaction.response.edit_message(content=f"Using **{self.ability.name}** on <@{target_id}>.\nChoose disguised Faction:", view=view)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{self.ability.name}** on <@{target_id}>.\nChoose disguised Faction:", view=view, footer_text=""))
 
 
 class TextureSurpriseStep2(discord.ui.Select):
@@ -511,11 +521,11 @@ class TextureSurpriseStep2(discord.ui.Select):
                 from views.game_ui import NightAbilityButtonsView
                 role_inst = session.players[interaction.user.id].role_inst
                 orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
-                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+                await inter.response.edit_message(view=build_v2_layout(description="Select an ability to use tonight:", view=orig_view, footer_text=""))
         back_btn.callback = back_callback
         view.add_item(back_btn)
         
-        await interaction.response.edit_message(content=f"Using **{self.ability.name}** on <@{self.target_id}>.\nChoose disguised Category:", view=view)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{self.ability.name}** on <@{self.target_id}>.\nChoose disguised Category:", view=view, footer_text=""))
 
 
 class TextureSurpriseStep3(discord.ui.Select):
@@ -538,7 +548,7 @@ class TextureSurpriseStep3(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered. Target <@{self.target_id}> will appear as faction **{self.faction_choice}** and category **{category_choice}** tonight.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{self.ability.name}** registered. Target <@{self.target_id}> will appear as faction **{self.faction_choice}** and category **{category_choice}** tonight.", footer_text=""))
 
 
 class MaomaoBrewPotionStep1(discord.ui.Select):
@@ -570,12 +580,12 @@ class MaomaoBrewPotionStep1(discord.ui.Select):
                 from views.game_ui import NightAbilityButtonsView
                 role_inst = session.players[interaction.user.id].role_inst
                 orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
-                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+                await inter.response.edit_message(view=build_v2_layout(description="Select an ability to use tonight:", view=orig_view, footer_text=""))
         back_btn.callback = back_callback
         view.add_item(back_btn)
         
         potion_label = next(opt.label for opt in self.options if opt.value == potion_choice)
-        await interaction.response.edit_message(content=f"Brewing **{potion_label}**.\nSelect the player to use it on:", view=view)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Brewing **{potion_label}**.\nSelect the player to use it on:", view=view, footer_text=""))
 
 
 class MaomaoBrewPotionStep2(discord.ui.Select):
@@ -604,7 +614,7 @@ class MaomaoBrewPotionStep2(discord.ui.Select):
             "intelligence": "Potion of Intelligence"
         }
         potion_name = potion_names.get(self.potion_choice, "Potion")
-        await interaction.response.edit_message(content=f"Successfully queued **{potion_name}** on <@{target_id}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Successfully queued **{potion_name}** on <@{target_id}>.", footer_text=""))
 
 
 class FrierenDemonDetectionStep1(discord.ui.Select):
@@ -630,11 +640,11 @@ class FrierenDemonDetectionStep1(discord.ui.Select):
                 from views.game_ui import NightAbilityButtonsView
                 role_inst = session.players[interaction.user.id].role_inst
                 orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
-                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+                await inter.response.edit_message(view=build_v2_layout(description="Select an ability to use tonight:", view=orig_view, footer_text=""))
         back_btn.callback = back_callback
         view.add_item(back_btn)
         
-        await interaction.response.edit_message(content=f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:", view=view)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:", view=view, footer_text=""))
 
 
 class FrierenDemonDetectionStep2(discord.ui.Select):
@@ -661,11 +671,11 @@ class FrierenDemonDetectionStep2(discord.ui.Select):
                 from views.game_ui import NightAbilityButtonsView
                 role_inst = session.players[interaction.user.id].role_inst
                 orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
-                await inter.response.edit_message(content="Select an ability to use tonight:", view=orig_view)
+                await inter.response.edit_message(view=build_v2_layout(description="Select an ability to use tonight:", view=orig_view, footer_text=""))
         back_btn.callback = back_callback
         view.add_item(back_btn)
         
-        await interaction.response.edit_message(content=f"Using **{self.ability.name}**.\nSelect the third target to pair with <@{self.target1}> and <@{target2}>:", view=view)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{self.ability.name}**.\nSelect the third target to pair with <@{self.target1}> and <@{target2}>:", view=view, footer_text=""))
 
 
 class FrierenDemonDetectionStep3(discord.ui.Select):
@@ -687,7 +697,7 @@ class FrierenDemonDetectionStep3(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(content=f"Ability **{self.ability.name}** registered on <@{self.target1}>, <@{self.target2}>, and <@{target3}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{self.ability.name}** registered on <@{self.target1}>, <@{self.target2}>, and <@{target3}>.", footer_text=""))
 
 
 class StandardActionSelect(discord.ui.Select):
@@ -700,7 +710,7 @@ class StandardActionSelect(discord.ui.Select):
         target_id = int(self.values[0])
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id}):
             return
-        await interaction.response.edit_message(content=f"Night action registered on <@{target_id}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Night action registered on <@{target_id}>.", footer_text=""))
 
 
 class DoctorTenmaActionSelect(discord.ui.Select):
@@ -721,7 +731,7 @@ class DoctorTenmaActionSelect(discord.ui.Select):
         if action_type == "heal":
             select = TenmaHealSelect(self.game_id, self.engine, self.target_options)
             view.add_item(select)
-            await interaction.response.edit_message(content="Select a player to heal:", view=view)
+            await interaction.response.edit_message(view=build_v2_layout(description="Select a player to heal:", view=view, footer_text=""))
         else:
             # For revive, must select a dead player
             session = await self.engine.get_session(self.game_id)
@@ -735,12 +745,12 @@ class DoctorTenmaActionSelect(discord.ui.Select):
                         dead_mafia_options.append(discord.SelectOption(label=name, value=str(pid)))
 
             if not dead_mafia_options:
-                await interaction.response.edit_message(content="There are no dead mafia members to revive.", view=None)
+                await interaction.response.edit_message(view=build_v2_layout(description="There are no dead mafia members to revive.", footer_text=""))
                 return
 
             select = TenmaReviveSelect(self.game_id, self.engine, dead_mafia_options)
             view.add_item(select)
-            await interaction.response.edit_message(content="Select a dead mafia member to revive as a Default Villager:", view=view)
+            await interaction.response.edit_message(view=build_v2_layout(description="Select a dead mafia member to revive as a Default Villager:", view=view, footer_text=""))
 
 
 class TenmaHealSelect(discord.ui.Select):
@@ -753,7 +763,7 @@ class TenmaHealSelect(discord.ui.Select):
         target_id = int(self.values[0])
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "heal"}):
             return
-        await interaction.response.edit_message(content=f"Night action registered: Healing <@{target_id}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Night action registered: Healing <@{target_id}>.", footer_text=""))
 
 
 class TenmaReviveSelect(discord.ui.Select):
@@ -766,7 +776,7 @@ class TenmaReviveSelect(discord.ui.Select):
         target_id = int(self.values[0])
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "revive"}):
             return
-        await interaction.response.edit_message(content=f"Night action registered: Reviving <@{target_id}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Night action registered: Reviving <@{target_id}>.", footer_text=""))
 
 
 class LightYagamiActionSelect(discord.ui.Select):
@@ -787,11 +797,11 @@ class LightYagamiActionSelect(discord.ui.Select):
         if action_type == "guess":
             select = LightYagamiTargetSelect(self.game_id, self.engine, self.target_options)
             view.add_item(select)
-            await interaction.response.edit_message(content="Select a player to guess their role:", view=view)
+            await interaction.response.edit_message(view=build_v2_layout(description="Select a player to guess their role:", view=view, footer_text=""))
         else:
             select = LightYagamiPenSelect(self.game_id, self.engine, self.target_options)
             view.add_item(select)
-            await interaction.response.edit_message(content="Select a player to write in your notebook:", view=view)
+            await interaction.response.edit_message(view=build_v2_layout(description="Select a player to write in your notebook:", view=view, footer_text=""))
 
 
 class LightYagamiTargetSelect(discord.ui.Select):
@@ -813,7 +823,7 @@ class LightYagamiTargetSelect(discord.ui.Select):
         view = discord.ui.View(timeout=120)
         select = LightYagamiRoleGuessSelect(self.game_id, self.engine, target_id, role_options)
         view.add_item(select)
-        await interaction.response.edit_message(content=f"Select the guessed role for <@{target_id}>:", view=view)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Select the guessed role for <@{target_id}>:", view=view, footer_text=""))
 
 
 class LightYagamiRoleGuessSelect(discord.ui.Select):
@@ -832,7 +842,7 @@ class LightYagamiRoleGuessSelect(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(content=f"Death Note guess registered on <@{self.target_id}> for role '{guessed_role}'.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Death Note guess registered on <@{self.target_id}> for role '{guessed_role}'.", footer_text=""))
 
 
 class LightYagamiPenSelect(discord.ui.Select):
@@ -849,7 +859,7 @@ class LightYagamiPenSelect(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(content=f"Devil's Pen registered on <@{target_id}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Devil's Pen registered on <@{target_id}>.", footer_text=""))
 
 
 class MakimaSelect(discord.ui.Select):
@@ -877,7 +887,7 @@ class MakimaSelect(discord.ui.Select):
         view = discord.ui.View(timeout=120)
         select2 = MakimaRedirectTargetSelect(self.game_id, self.engine, target1, options2)
         view.add_item(select2)
-        await interaction.response.edit_message(content=f"Select the target <@{target1}>'s action will be redirected to:", view=view)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Select the target <@{target1}>'s action will be redirected to:", view=view, footer_text=""))
 
 
 class MakimaRedirectTargetSelect(discord.ui.Select):
@@ -896,7 +906,7 @@ class MakimaRedirectTargetSelect(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(content=f"Control Devil registered: Redirecting <@{self.target1}> to target <@{target2}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Control Devil registered: Redirecting <@{self.target1}> to target <@{target2}>.", footer_text=""))
 
 
 class HisokaBungeeSelect(discord.ui.Select):
@@ -912,7 +922,7 @@ class HisokaBungeeSelect(discord.ui.Select):
         view = discord.ui.View(timeout=120)
         select2 = HisokaBungeeLinkSelect(self.game_id, self.engine, target1, options2)
         view.add_item(select2)
-        await interaction.response.edit_message(content=f"Select the second target to link with <@{target1}>:", view=view)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Select the second target to link with <@{target1}>:", view=view, footer_text=""))
 
 
 class HisokaBungeeLinkSelect(discord.ui.Select):
@@ -930,12 +940,13 @@ class HisokaBungeeLinkSelect(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(content=f"Bungee Gum registered: linking <@{self.target1}> with <@{target2}>.", view=None)
+        await interaction.response.edit_message(view=build_v2_layout(description=f"Bungee Gum registered: linking <@{self.target1}> with <@{target2}>.", footer_text=""))
 
 
-class VoteUISelectView(discord.ui.View):
+class VoteUISelectView(MafiosoLayoutView):
     def __init__(self, game_id: str, engine: GameEngine) -> None:
         super().__init__(timeout=None)
+
         self.game_id = game_id
         self.engine = engine
 
@@ -1064,23 +1075,25 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
             and target_player.role_key == "mahoraga"
             and "Protagonist" in target_player.metadata.get("mahoraga_adapted_factions", [])
         ):
-            await self.engine.bot.message_queue.send(
-                mafia_channel,
-                embed=discord.Embed(
-                    title="🌀 Deadly Sentencing Nullified!",
-                    description=(
-                        f"**Hiromi Higuruma's** judgment could not be carried out!\n\n"
-                        f"<@{target_id}> has **adapted to the Protagonist faction** — "
-                        f"all Protagonist abilities, including this Sentencing, are nullified against them.\n\n"
-                        f"Their role has been revealed: **Eight-Handled Sword Divergent Sila Divine General Mahoraga** 🌀\n\n"
-                        f"The Sentencing use has been consumed."
-                    ),
-                    color=discord.Color.from_rgb(110, 58, 190),
-                )
+            from ui import build_v2_layout
+            mahoraga_null_view = build_v2_layout(
+                title="🌀 Deadly Sentencing Nullified!",
+                description=(
+                    f"**Hiromi Higuruma's** judgment could not be carried out!\n\n"
+                    f"<@{target_id}> has **adapted to the Protagonist faction** — "
+                    f"all Protagonist abilities, including this Sentencing, are nullified against them.\n\n"
+                    f"Their role has been revealed: **Eight-Handled Sword Divergent Sila Divine General Mahoraga** 🌀\n\n"
+                    f"The Sentencing use has been consumed."
+                ),
+                color=discord.Color.from_rgb(110, 58, 190),
             )
+            await self.engine.bot.message_queue.send(
+                mafia_channel, view=mahoraga_null_view)
+
+
             async with self.engine._lock:
                 session.metadata["deadly_sentencing_active"] = False
-            await interaction.edit_original_response(content=f"Deadly Sentencing failed — target has Protagonist adaptation.", view=None)
+            await interaction.edit_original_response(view=build_v2_layout(description=f"Deadly Sentencing failed — target has Protagonist adaptation.", footer_text=""))
             return
 
         faction_display = "Town (Hero)"
@@ -1113,7 +1126,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         async with self.engine._lock:
             session.metadata["deadly_sentencing_active"] = False
 
-        await interaction.edit_original_response(content=f"Deadly Sentencing declared on <@{target_id}>.", view=None)
+        await interaction.edit_original_response(view=build_v2_layout(description=f"Deadly Sentencing declared on <@{target_id}>.", footer_text=""))
 
 
 class VoteSelector(discord.ui.Select):
@@ -1136,24 +1149,23 @@ class VoteSelector(discord.ui.Select):
                 # Store skip in session metadata
                 skips = session.metadata.setdefault("skip_votes", set())
                 skips.add(voter_id)
-                await interaction.response.edit_message(content="You voted to Skip.", view=None)
+                await interaction.response.edit_message(view=build_v2_layout(description="You voted to Skip.", footer_text=""))
             else:
                 target_id = int(value)
                 await self.engine.register_vote(self.game_id, voter_id, target_id)
                 # Remove from skips
                 skips = session.metadata.setdefault("skip_votes", set())
                 skips.discard(voter_id)
-                await interaction.response.edit_message(content=f"You voted for <@{target_id}>.", view=None)
+                await interaction.response.edit_message(view=build_v2_layout(description=f"You voted for <@{target_id}>.", footer_text=""))
         except RuntimeError:
-            await interaction.response.edit_message(
-                content=f"{get_emoji('cross')} Voting has already ended for this round — your vote wasn't counted.",
-                view=None,
-            )
+            await interaction.response.edit_message(view=build_v2_layout(description=f"{get_emoji('cross')} Voting has already ended for this round — your vote wasn't counted.", footer_text=""))
 
 
-class VerdictUISelectView(discord.ui.View):
+
+class VerdictUISelectView(MafiosoLayoutView):
     def __init__(self, game_id: str, engine: GameEngine) -> None:
         super().__init__(timeout=None)
+
         self.game_id = game_id
         self.engine = engine
 
@@ -1208,7 +1220,9 @@ class VerdictUISelectView(discord.ui.View):
                 async def normal_cb(inter: discord.Interaction) -> None:
                     verdicts = session.metadata.setdefault("verdicts", {})
                     verdicts[str(inter.user.id)] = "innocent"
-                    await inter.response.edit_message(content="Registered normal Innocent verdict.", view=None)
+                    await inter.response.edit_message(view=build_v2_layout(description="Registered normal Innocent verdict.", footer_text=""))
+
+
 
                 async def retrial_cb(inter: discord.Interaction) -> None:
                     async with self.engine._lock:
@@ -1222,7 +1236,7 @@ class VerdictUISelectView(discord.ui.View):
                         mafia_channel,
                         f"{get_emoji('trial')} <@{inter.user.id}> (Hiromi Higuruma) has activated **Retrial** for this case!"
                     )
-                    await inter.response.edit_message(content=f"{get_emoji('trial')} **Retrial Activated!**", view=None)
+                    await inter.response.edit_message(view=build_v2_layout(description=f"{get_emoji('trial')} **Retrial Activated!**", footer_text=""))
 
                 btn_normal.callback = normal_cb
                 btn_retrial.callback = retrial_cb

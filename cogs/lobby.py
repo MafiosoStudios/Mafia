@@ -30,25 +30,8 @@ class LobbyCog(commands.Cog):
             )
             return
 
-        from utils.embeds import build_lobby_embed
-        guild_name = lobby_manager._guild_name(guild_id)
-        roster_lines = lobby_manager._render_roster(lobby)
-
-        embed = build_lobby_embed(
-            guild_name=guild_name,
-            leader_text=f"<@{lobby.leader_id}>",
-            roster_lines=roster_lines,
-            current_players=len(lobby.players),
-            min_players=lobby.min_players,
-            max_players=lobby.max_players,
-            gamemode=lobby.gamemode,
-        )
         view = LobbyView(self.bot, lobby)
-        message = await send_hybrid_response(
-            ctx,
-            embed=embed,
-            view=view,
-        )
+        message = await send_hybrid_response(ctx, view=view)
         if message is not None:
             await lobby_manager.bind_lobby_message(guild_id, message)
 
@@ -67,25 +50,10 @@ class LobbyCog(commands.Cog):
             max_players=config.max_players,
         )
         view = LobbyView(self.bot, lobby)
-        from utils.embeds import build_lobby_embed
-        guild_name = lobby_manager._guild_name(ctx.guild.id if ctx.guild is not None else 0)
-        roster_lines = lobby_manager._render_roster(lobby)
-        embed = build_lobby_embed(
-            guild_name=guild_name,
-            leader_text=f"<@{lobby.leader_id}>",
-            roster_lines=roster_lines,
-            current_players=len(lobby.players),
-            min_players=lobby.min_players,
-            max_players=lobby.max_players,
-            gamemode=lobby.gamemode,
-        )
-        message = await send_hybrid_response(
-            ctx,
-            embed=embed,
-            view=view,
-        )
+        message = await send_hybrid_response(ctx, view=view)
         if message is not None:
             await lobby_manager.bind_lobby_message(ctx.guild.id if ctx.guild is not None else 0, message)
+
 
     @commands.hybrid_command(name="lobby_join", description="Join the active lobby")
     async def join_lobby(self, ctx: commands.Context) -> None:
@@ -491,14 +459,14 @@ class LobbyCog(commands.Cog):
                 roles_str = roles_str[:97] + "..."
             lines.append(f"• **{item['name']}** ({len(item['roles'])} roles):\n  *{roles_str}*")
 
-        await send_hybrid_response(
-            ctx,
-            embed=discord.Embed(
-                title=f"📜 Custom Role Lists — {ctx.guild.name}",
-                description="\n\n".join(lines),
-                color=discord.Color.blue()
-            )
+        from ui import build_v2_layout
+        custom_roles_view = build_v2_layout(
+            title=f"📜 Custom Role Lists — {ctx.guild.name}",
+            description="\n\n".join(lines),
+            color=discord.Color.blue(),
         )
+        await send_hybrid_response(ctx, view=custom_roles_view)
+
 
     @add_role.autocomplete("role")
     async def add_role_autocomplete(self, interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:

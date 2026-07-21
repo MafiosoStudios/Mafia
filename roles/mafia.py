@@ -200,18 +200,19 @@ class LightYagamiKill(NightAction):
                     from roles import ROLES_METADATA
                     guessed_display = ROLES_METADATA.get(guessed_role, {}).get("name", guessed_role)
 
-                    import discord as _discord
-                    embed = _discord.Embed(
+                    from ui import build_v2_layout
+                    kira_view = build_v2_layout(
                         title=f"{get_emoji('light_yagami')} Kira Has Been Exposed!",
                         description=(
                             f"**{ly_name}** (<@{context.user_id}>) wrote **{target_name}**'s (<@{target_id}>) name "
                             f"in the Death Note, guessing they were **{guessed_display}**.\n\n"
                             f"{get_emoji('cross')} **The guess was wrong.** The Death Note is powerless and now everyone knows who Kira is."
                         ),
-                        color=_discord.Color.red()
+                        color=_discord.Color.red(),
+                        footer_text="The pen may lie, but the truth never stays hidden.",
                     )
-                    embed.set_footer(text="The pen may lie, but the truth never stays hidden.")
-                    await context.bot.message_queue.send(ch, embed=embed)
+                    await context.bot.message_queue.send(ch, view=kira_view)
+
 
 
 @role_registry.register

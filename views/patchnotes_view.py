@@ -51,11 +51,33 @@ PATCHES: list[dict] = [
             "**Visual Polish** — Multiple interface alignments, custom emojis, and interaction locks for command authors",
         ],
     },
+    {
+        "version": "1.0.2",
+        "date": "July 20, 2026",
+        "title": "Version 1.0.2 — Components V2 Overhaul, Design System & Engine Hardening",
+        "description": (
+            "A comprehensive system-wide upgrade introducing Discord's Components V2 layout "
+            "architecture, a unified anime design system, 100% embed elimination, "
+            "and complete interaction stability across all commands and game phases."
+        ),
+        "changes": [
+            "**Components V2 Overhaul** — Migrated the entire bot messaging layer to Discord Components V2 LayoutViews with zero legacy embeds",
+            "**Sleek Card Design** — Every button, select menu, and text block is enclosed inside unified HSL Container cards across the entire bot",
+            "**Image & Media Parity** — Full-width media gallery placement for event banners and side thumbnail accessories for role character icons",
+            "**Interaction Stability** — Automated ActionRow component wrapping and interaction deferrals eliminating 400 Bad Request and 404 Not Found errors",
+            "**Server Settings Overhaul** — Upgraded `/settings` command to display formatted game parameters with descriptions and quick configuration tools",
+            "**Profile & Status Polish** — Restructured `/profile` and `/game status` into sleek V2 cards showing rank, level, XP, coins, and win rates",
+        ],
+    },
 ]
 
 
-class PatchNotesView(discord.ui.View):
-    """Paginated patch notes view. Previous/Next buttons navigate between versions."""
+
+from ui import MafiosoLayoutView, build_v2_layout
+
+
+class PatchNotesView(MafiosoLayoutView):
+    """Paginated patch notes view using V2 LayoutView."""
 
     PATCHES: list[dict] = PATCHES
 
@@ -64,31 +86,29 @@ class PatchNotesView(discord.ui.View):
         self.index = index
         self._update_buttons()
 
-    # ------------------------------------------------------------------
-    # Embed builder
-    # ------------------------------------------------------------------
     @staticmethod
-    def build_embed(index: int) -> discord.Embed:
+    def build_layout_view(index: int) -> MafiosoLayoutView:
         patch = PATCHES[index]
         total = len(PATCHES)
 
         changes_text = "\n".join(f"> {line}" for line in patch["changes"])
-
-        embed = discord.Embed(
-            title=f"{patch['title']}",
-            description=(
-                f"**Version {patch['version']}** — {patch['date']}\n\n"
-                f"{patch['description']}\n\n"
-                f"**What's New:**\n{changes_text}"
-            ),
-            color=discord.Color.from_rgb(0, 0, 0),
+        description = (
+            f"**Version {patch['version']}** — {patch['date']}\n\n"
+            f"{patch['description']}\n\n"
+            f"**What's New:**\n{changes_text}"
         )
-        embed.set_footer(text=f"Mafioso Patch Notes  •  Version {patch['version']}  •  {index + 1} of {total}")
-        return embed
+        footer_text = f"Mafioso Patch Notes  •  Version {patch['version']}  •  {index + 1} of {total}"
 
-    # ------------------------------------------------------------------
-    # Button state helpers
-    # ------------------------------------------------------------------
+        view = PatchNotesView(index)
+        layout = build_v2_layout(
+            title=patch["title"],
+            description=description,
+            color=discord.Color.from_rgb(0, 0, 0),
+            footer_text=footer_text,
+            view=view,
+        )
+        return layout
+
     def _update_buttons(self) -> None:
         total = len(PATCHES)
         for item in self.children:
@@ -98,19 +118,16 @@ class PatchNotesView(discord.ui.View):
                 elif item.custom_id == "patch_next":
                     item.disabled = self.index >= total - 1
 
-    # ------------------------------------------------------------------
-    # Buttons
-    # ------------------------------------------------------------------
     @discord.ui.button(
         label="◀ Previous",
         style=discord.ButtonStyle.secondary,
         custom_id="patch_prev",
-        disabled=True,  # will be corrected by _update_buttons in __init__
+        disabled=True,
     )
     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         self.index -= 1
-        self._update_buttons()
-        await interaction.response.edit_message(embed=self.build_embed(self.index), view=self)
+        new_layout = self.build_layout_view(self.index)
+        await interaction.response.edit_message(view=new_layout)
 
     @discord.ui.button(
         label="Next ▶",
@@ -119,5 +136,6 @@ class PatchNotesView(discord.ui.View):
     )
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         self.index += 1
-        self._update_buttons()
-        await interaction.response.edit_message(embed=self.build_embed(self.index), view=self)
+        new_layout = self.build_layout_view(self.index)
+        await interaction.response.edit_message(view=new_layout)
+
