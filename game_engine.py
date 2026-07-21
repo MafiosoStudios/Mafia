@@ -947,33 +947,36 @@ class GameEngine:
                         # Mute all in #mafia for night
                         await self._update_channel_mute(mafia_channel, session, mute=True)
 
-                        # Announce Night
                         night_num = session.metadata["night_num"]
-                        night_embed = discord.Embed(
-                            title=f"Night {night_num}",
-                            description=(
-                                "Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n"
-                                "Check your DMs or use the buttons below to take your action before sunrise!"
-                            ),
-                            color=discord.Color.dark_blue()
-                        )
-                        night_image = get_event_image("night")
-                        if night_image:
-                            night_embed.set_image(url=night_image)
-                        await self.bot.message_queue.send(mafia_channel, embed=night_embed)
 
                     night_num = session.metadata["night_num"]
-                    # Send action interface (button that opens ephemeral select menu)
+                    # Send action interface (single embed with image and action button)
                     from views.game_ui import NightActionView
                     action_view = NightActionView(game_id, self)
-                    prompt_text = (
-                        f"{get_emoji('refresh')} **Game Resumed.** {get_emoji('night')} **Night Action Phase**\nClick below to prepare your move. The shadows will hide your secret."
-                        if is_resume else
-                        f"**Night Action Phase**\nClick below to use your role's ability."
+                    
+                    if is_resume:
+                        night_desc = (
+                            f"{get_emoji('refresh')} **Game Resumed.** {get_emoji('night')} **Night Action Phase**\n"
+                            "Click below to prepare your move. The shadows will hide your secret."
+                        )
+                    else:
+                        night_desc = (
+                            "Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n"
+                            "Click below to use your role's ability before sunrise!"
+                        )
+
+                    night_embed = discord.Embed(
+                        title=f"Night {night_num}",
+                        description=night_desc,
+                        color=discord.Color.dark_blue()
                     )
+                    night_image = get_event_image("night")
+                    if night_image:
+                        night_embed.set_image(url=night_image)
+
                     night_msg = await self.bot.message_queue.send(
                         mafia_channel,
-                        prompt_text,
+                        embed=night_embed,
                         view=action_view
                     )
 
@@ -1677,7 +1680,10 @@ class GameEngine:
         if image_url:
             victory_embed.set_image(url=image_url)
 
-        await self.bot.message_queue.send(channel, embed=victory_embed)
+        try:
+            await self.bot.message_queue.send(channel, embed=victory_embed)
+        except Exception as err:
+            logger.error(f"Failed to send victory embed: {err}")
 
     async def _send_death_and_status_embeds(
         self,
@@ -1723,7 +1729,10 @@ class GameEngine:
         death_image = get_event_image("death" if mafia_deaths else "day")
         if death_image:
             death_embed.set_image(url=death_image)
-        await self.bot.message_queue.send(channel, embed=death_embed)
+        try:
+            await self.bot.message_queue.send(channel, embed=death_embed)
+        except Exception as err:
+            logger.error(f"Failed to send death embed: {err}")
         await asyncio.sleep(2.5)  # Wait 2.5 seconds between embeds to prevent spam
 
         # 2. Other Casualties Report
@@ -1737,7 +1746,10 @@ class GameEngine:
             other_image = get_event_image("death")
             if other_image:
                 other_embed.set_image(url=other_image)
-            await self.bot.message_queue.send(channel, embed=other_embed)
+            try:
+                await self.bot.message_queue.send(channel, embed=other_embed)
+            except Exception as err:
+                logger.error(f"Failed to send other casualties embed: {err}")
             await asyncio.sleep(2.5)  # Wait 2.5 seconds between embeds to prevent spam
 
         alive_list = []
