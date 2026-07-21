@@ -69,6 +69,27 @@ PATCHES: list[dict] = [
             "**Profile & Status Polish** — Restructured `/profile` and `/game status` into sleek V2 cards showing rank, level, XP, coins, and win rates",
         ],
     },
+    {
+        "version": "1.0.3",
+        "date": "July 21, 2026",
+        "title": "Version 1.0.3 — Higuruma Aura, Lobby Queue System & Defense DM Notifications",
+        "description": (
+            "An action-packed update introducing anonymous attacker feedback for nullified attacks, "
+            "Hiromi Higuruma cinematic animations & courtroom limits, channel lockdown removal during trials, "
+            "persistent game lobbies with join/leave queues, and developer global role management."
+        ),
+        "changes": [
+            "**Anonymous Defense DMs** — Fixed issue where attackers were left uninformed when attacks were nullified (e.g. Tobirama counter, Frieren barrier, Doctor Tenma heal, Muzan/Mahoraga passives)",
+            "**Hiromi Higuruma Aura** — Added custom animations and cinematic domain expansion GIF reveals for Retrials and Deadly Sentencing",
+            "**Higuruma Ability Limit** — Hiromi Higuruma is now limited to using at most 1 courtroom ability (Retrial or Deadly Sentencing) per day",
+            "**Trial Channel Unlocked** — The main game channel no longer locks during defendant plea; everyone can now speak during trials",
+            "**Clear Lobby Command** — Added `/clear` (or `!clear`) command allowing lobby hosts, leaders, and admins to clear out lobbies",
+            "**Global Role Control** — Added `/globalroledisable` and `/globalroleenable` commands for bot developers to unload roles globally across all servers",
+            "**Persistent Lobbies** — Game lobbies no longer auto-clear after matches; streamlined lobby command names to `/join`, `/lobby`, `/leave`, `/start`, `/clear`",
+            "**Lobby Join & Leave Queues** — Players joining or leaving during an active match are added to live Join/Leave queues that resolve automatically after the game",
+            "**UI Fixes** — Multiple visual polish improvements, silent real-time lobby updates, and layout refinements",
+        ],
+    },
 ]
 
 
