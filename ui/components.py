@@ -8,6 +8,7 @@ from ui.theme import (
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SYSTEM,
+    COLOR_BLACK,
     heading,
     subheading,
     small_footer,
@@ -80,7 +81,7 @@ def build_v2_layout(
     title: str | None = None,
     description: str | None = None,
     *,
-    color: discord.Color = COLOR_SYSTEM,
+    color: discord.Color = COLOR_BLACK,
     image_url: str | None = None,
     thumbnail_url: str | None = None,
     footer_text: str = "",
@@ -163,6 +164,8 @@ def build_lobby_card(
     max_players: int,
     started: bool = False,
     gamemode: str = "chaos",
+    join_queue_lines: Sequence[str] = (),
+    leave_queue_lines: Sequence[str] = (),
 ) -> ui.Container:
     """Builds the main V2 Container card for game lobbies, replacing build_lobby_embed."""
     color = discord.Color.from_rgb(255, 255, 255)
@@ -190,6 +193,14 @@ def build_lobby_card(
         details_md += "\n".join(roster_lines)
     else:
         details_md += "*No players joined yet.*"
+
+    if join_queue_lines:
+        details_md += f"\n\n{subheading('📥 Join Queue (Next Match)')}\n"
+        details_md += "\n".join(join_queue_lines)
+
+    if leave_queue_lines:
+        details_md += f"\n\n{subheading('📤 Leave Queue (After Match)')}\n"
+        details_md += "\n".join(leave_queue_lines)
         
     details_md += (
         f"\n\n{subheading('Start Rule')}\n"

@@ -370,13 +370,36 @@ class DatabaseManager:
             upsert=True,
         )
 
+    async def get_global_disabled_roles(self) -> list[str]:
+        """Returns globally disabled role_keys (disabled by bot developers across all servers)."""
+        doc = await self.global_db.system_config.find_one({"_id": "global_disabled_roles"})
+        return list(doc.get("roles", [])) if doc else []
+
+    async def set_global_role_disabled(self, role_key: str, disabled: bool) -> list[str]:
+        """Globally disables or enables a role_key across all servers."""
+        current = set(await self.get_global_disabled_roles())
+        if disabled:
+            current.add(role_key)
+        else:
+            current.discard(role_key)
+        updated = sorted(current)
+        await self.global_db.system_config.update_one(
+            {"_id": "global_disabled_roles"},
+            {"$set": {"roles": updated}},
+            upsert=True,
+        )
+        return updated
+
     async def get_disabled_roles(self, guild_id: int) -> list[str]:
         settings = await self.get_guild_settings(guild_id)
-        return list(settings.get("disabled_roles", []))
+        guild_disabled = set(settings.get("disabled_roles", []))
+        global_disabled = set(await self.get_global_disabled_roles())
+        return sorted(guild_disabled | global_disabled)
 
     async def set_role_disabled(self, guild_id: int, role_key: str, disabled: bool) -> list[str]:
         """Adds/removes role_key from the guild's disabled_roles list and returns the new list."""
-        current = set(await self.get_disabled_roles(guild_id))
+        settings = await self.get_guild_settings(guild_id)
+        current = set(settings.get("disabled_roles", []))
         if disabled:
             current.add(role_key)
         else:

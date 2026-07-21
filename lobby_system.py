@@ -29,6 +29,8 @@ class LobbySession:
     max_players: int
     created_at: datetime = field(default_factory=utcnow)
     players: list[int] = field(default_factory=list)
+    join_queue: list[int] = field(default_factory=list)
+    leave_queue: list[int] = field(default_factory=list)
     locked: bool = False
     message_id: int | None = None
     notes: dict[str, Any] = field(default_factory=dict)
@@ -92,42 +94,87 @@ class LobbyManager:
         async with self._lock:
             return self._lobbies_by_guild.get(guild_id)
 
-    async def join_lobby(self, guild_id: int, user_id: int) -> LobbySession:
+    async def join_lobby(self, guild_id: int, user_id: int) -> tuple[LobbySession, str]:
+        status_msg = "Joined the lobby."
         async with self._lock:
             lobby = self._lobbies_by_guild.get(guild_id)
             if lobby is None:
                 raise KeyError("Lobby not found.")
-            if not lobby.can_join(user_id):
-                raise ValueError("Lobby is full, locked, or the player already joined.")
-            lobby.players.append(user_id)
+
+            if user_id in lobby.leave_queue:
+                lobby.leave_queue.remove(user_id)
+                status_msg = "Cancelled your request to leave after the match!"
+
+            if lobby.locked:
+                if user_id in lobby.players:
+                    status_msg = "You are in the active match! Request to leave was cancelled."
+                elif user_id in lobby.join_queue:
+                    status_msg = "You are already in the Join Queue for the next match!"
+                else:
+                    lobby.join_queue.append(user_id)
+                    status_msg = "Added to the **Join Queue**! You will automatically join when the match ends."
+            else:
+                if user_id in lobby.players:
+                    raise ValueError("You are already in the lobby.")
+                if len(lobby.players) >= lobby.max_players:
+                    raise ValueError("Lobby is full.")
+                lobby.players.append(user_id)
+                if user_id in lobby.join_queue:
+                    lobby.join_queue.remove(user_id)
+
             lobby_snapshot = lobby
         await self.refresh_lobby_message(guild_id)
-        return lobby_snapshot
+        return lobby_snapshot, status_msg
 
-    async def leave_lobby(self, guild_id: int, user_id: int) -> LobbySession | None:
+    async def leave_lobby(self, guild_id: int, user_id: int) -> tuple[LobbySession | None, str]:
+        status_msg = "Left the lobby."
         closed_lobby: LobbySession | None = None
+        lobby_snapshot: LobbySession | None = None
+
         async with self._lock:
             lobby = self._lobbies_by_guild.get(guild_id)
             if lobby is None:
-                return None
+                return None, "No active lobby found."
+
             if lobby.locked:
-                raise ValueError("Lobby is starting right now.")
-            if user_id not in lobby.players:
-                return lobby
-            lobby.players.remove(user_id)
-            if not lobby.players:
-                closed_lobby = self._lobbies_by_guild.pop(guild_id, None)
-            else:
-                if lobby.leader_id == user_id:
-                    lobby.leader_id = random.choice(lobby.players)
-                if lobby.host_id == user_id:
-                    lobby.host_id = lobby.leader_id
+                if user_id in lobby.join_queue:
+                    lobby.join_queue.remove(user_id)
+                    status_msg = "Removed from the Join Queue."
+                elif user_id in lobby.players:
+                    if user_id in lobby.leave_queue:
+                        status_msg = "You are already in the Leave Queue for after the match!"
+                    else:
+                        lobby.leave_queue.append(user_id)
+                        status_msg = "Added to the **Leave Queue**! You will leave the lobby when the match ends."
+                else:
+                    status_msg = "You are not in the active match or join queue."
                 lobby_snapshot = lobby
+            else:
+                if user_id in lobby.join_queue:
+                    lobby.join_queue.remove(user_id)
+
+                if user_id not in lobby.players:
+                    return lobby, "You are not in the lobby."
+
+                lobby.players.remove(user_id)
+                if user_id in lobby.leave_queue:
+                    lobby.leave_queue.remove(user_id)
+
+                if not lobby.players:
+                    closed_lobby = self._lobbies_by_guild.pop(guild_id, None)
+                else:
+                    if lobby.leader_id == user_id:
+                        lobby.leader_id = random.choice(lobby.players)
+                    if lobby.host_id == user_id:
+                        lobby.host_id = lobby.leader_id
+                    lobby_snapshot = lobby
+
         if closed_lobby is not None:
             await self._delete_lobby_message(closed_lobby)
-            return None
+            return None, "Lobby was closed because all players left."
+
         await self.refresh_lobby_message(guild_id)
-        return lobby_snapshot
+        return lobby_snapshot, status_msg
 
     async def start_lobby(self, guild_id: int, starter: discord.Member) -> ActiveGameHandle:
         lobby: LobbySession
@@ -197,9 +244,38 @@ class LobbyManager:
             raise
 
         await self._update_lobby_message(lobby, started=True, game_id=game_handle.game_id)
-        async with self._lock:
-            self._lobbies_by_guild.pop(guild_id, None)
         return game_handle
+
+    async def reset_lobby_after_game(self, guild_id: int) -> None:
+        """Called when a match finishes to process leave/join queues and unlock the lobby."""
+        async with self._lock:
+            lobby = self._lobbies_by_guild.get(guild_id)
+            if lobby is None:
+                return
+
+            # 1. Process Leave Queue first
+            for uid in list(lobby.leave_queue):
+                if uid in lobby.players:
+                    lobby.players.remove(uid)
+            lobby.leave_queue.clear()
+
+            # Reassign leader/host if left
+            if lobby.players:
+                if lobby.leader_id not in lobby.players:
+                    lobby.leader_id = random.choice(lobby.players)
+                if lobby.host_id not in lobby.players:
+                    lobby.host_id = lobby.leader_id
+
+            # 2. Process Join Queue next
+            for uid in list(lobby.join_queue):
+                if uid not in lobby.players and len(lobby.players) < lobby.max_players:
+                    lobby.players.append(uid)
+            lobby.join_queue.clear()
+
+            # Unlock lobby for next match
+            lobby.locked = False
+
+        await self.refresh_lobby_message(guild_id)
 
     async def bind_lobby_message(self, guild_id: int, message: discord.Message) -> None:
         async with self._lock:
@@ -217,19 +293,27 @@ class LobbyManager:
                 return
         await self._update_lobby_message(lobby)
 
-    async def close_lobby(self, guild_id: int, *, delete_message: bool = True) -> LobbySession | None:
+    async def clear_lobby(self, guild_id: int, member: discord.Member) -> LobbySession:
         async with self._lock:
-            lobby = self._lobbies_by_guild.pop(guild_id, None)
-        if lobby is None:
-            return None
-        if delete_message:
-            await self._delete_lobby_message(lobby)
-        return lobby
+            lobby = self._lobbies_by_guild.get(guild_id)
+            if lobby is None:
+                raise KeyError("No active lobby found in this server.")
+            if not self._can_start_lobby(lobby, member):
+                raise PermissionError("Only the lobby leader, host, or an admin can clear the lobby.")
+
+            cleared_lobby = self._lobbies_by_guild.pop(guild_id, None)
+
+        if cleared_lobby is not None:
+            await self._delete_lobby_message(cleared_lobby)
+        return cleared_lobby
 
     def _can_start_lobby(self, lobby: LobbySession, starter: discord.Member) -> bool:
+        import config
+        if starter.id in config.ADMIN_IDS:
+            return True
         if starter.guild_permissions.administrator:
             return True
-        if starter.id == lobby.leader_id:
+        if starter.id in (lobby.leader_id, lobby.host_id):
             return True
         return any(role.id in self._config.lobby_leader_bypass_role_ids for role in starter.roles)
 
@@ -237,26 +321,31 @@ class LobbyManager:
         message = await self._fetch_lobby_message(lobby)
         if message is None:
             return
-        if started:
-            from discord import ui
-            from ui.components import build_lobby_card
-            container = build_lobby_card(
-                guild_name=self._guild_name(lobby.guild_id),
-                leader_text=f"<@{lobby.leader_id}>",
-                roster_lines=self._render_roster(lobby),
-                current_players=len(lobby.players),
-                min_players=lobby.min_players,
-                max_players=lobby.max_players,
-                started=True,
-                gamemode=lobby.gamemode,
-            )
-            started_view = ui.LayoutView()
-            started_view.add_item(container)
-            await message.edit(view=started_view)
-            return
+        
+        from discord import ui
+        from ui.components import build_lobby_card
 
-        view = self._build_lobby_view(lobby)
-        await message.edit(view=view)
+        is_active = started or lobby.locked
+        container = build_lobby_card(
+            guild_name=self._guild_name(lobby.guild_id),
+            leader_text=f"<@{lobby.leader_id}>",
+            roster_lines=self._render_roster(lobby),
+            current_players=len(lobby.players),
+            min_players=lobby.min_players,
+            max_players=lobby.max_players,
+            started=is_active,
+            gamemode=lobby.gamemode,
+            join_queue_lines=self._render_join_queue(lobby),
+            leave_queue_lines=self._render_leave_queue(lobby),
+        )
+        card_view = ui.LayoutView()
+        card_view.add_item(container)
+
+        if is_active:
+            await message.edit(view=card_view)
+        else:
+            view = self._build_lobby_view(lobby)
+            await message.edit(view=view)
 
 
     async def _delete_lobby_message(self, lobby: LobbySession) -> None:
@@ -298,3 +387,21 @@ class LobbyManager:
             crown = f"{get_emoji('crown')} " if user_id == lobby.leader_id else ""
             roster_lines.append(f"{crown}`{index}.` {display_name}")
         return roster_lines
+
+    def _render_join_queue(self, lobby: LobbySession) -> list[str]:
+        guild = self._bot.get_guild(lobby.guild_id)
+        lines: list[str] = []
+        for index, user_id in enumerate(lobby.join_queue, start=1):
+            member = guild.get_member(user_id) if guild is not None else None
+            display_name = member.display_name if member is not None else f"<@{user_id}>"
+            lines.append(f"`{index}.` {display_name}")
+        return lines
+
+    def _render_leave_queue(self, lobby: LobbySession) -> list[str]:
+        guild = self._bot.get_guild(lobby.guild_id)
+        lines: list[str] = []
+        for index, user_id in enumerate(lobby.leave_queue, start=1):
+            member = guild.get_member(user_id) if guild is not None else None
+            display_name = member.display_name if member is not None else f"<@{user_id}>"
+            lines.append(f"`{index}.` {display_name}")
+        return lines

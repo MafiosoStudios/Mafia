@@ -12,6 +12,7 @@ COLOR_SECONDARY = discord.Color.from_rgb(19, 16, 28)   # Dark Slate / Neutral Sy
 
 COLOR_SUCCESS = discord.Color.from_rgb(46, 139, 87)     # Emerald / Positive Output
 COLOR_ERROR = discord.Color.from_rgb(178, 34, 34)      # Dark Crimson / Error Card
+COLOR_BLACK = discord.Color.from_rgb(0, 0, 0)          # Black / Night Action & Dark Theme Card
 
 # House Markdown Typography Helpers
 def heading(text: str) -> str:

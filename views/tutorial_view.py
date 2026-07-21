@@ -89,8 +89,8 @@ TUTORIAL_TOPICS: tuple[TutorialTopic, ...] = (
         body=(
             "Navigate the arena and manage your progression using these core commands:\n\n"
             f"{get_emoji('pushpin')} **Lobby & Matches:**\n"
-            "• `/lobby` - View active lobby status, join/leave a lobby.\n"
-            "• `/lobby_create` - Create a new match lobby.\n"
+            "• `/join` - Create or join an active match lobby.\n"
+            "• `/lobby` - View active lobby status and player roster.\n"
             "• `/game status` - View the active match's player list and alive status.\n\n"
             f"{get_emoji('moneybag')} **Economy & Shop:**\n"
             "• `/profile` - View your global level, XP, coins, favorite character, and stats.\n"

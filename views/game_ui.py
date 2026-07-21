@@ -453,7 +453,7 @@ class TwoTargetSelectStep2(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{self.ability.name}** registered on <@{self.target1}> and <@{target2}>.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to use **{self.ability.name}** on <@{self.target1}> and <@{target2}>.", footer_text=""))
 
 
 
@@ -549,7 +549,7 @@ class TextureSurpriseStep3(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{self.ability.name}** registered. Target <@{self.target_id}> will appear as faction **{self.faction_choice}** and category **{category_choice}** tonight.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to use **{self.ability.name}**. <@{self.target_id}> will appear as **{self.faction_choice}** and category **{category_choice}** tonight.", footer_text=""))
 
 
 class MaomaoBrewPotionStep1(discord.ui.Select):
@@ -698,7 +698,7 @@ class FrierenDemonDetectionStep3(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{self.ability.name}** registered on <@{self.target1}>, <@{self.target2}>, and <@{target3}>.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to use **{self.ability.name}** on <@{self.target1}>, <@{self.target2}>, and <@{target3}>.", footer_text=""))
 
 
 class StandardActionSelect(discord.ui.Select):
@@ -711,7 +711,7 @@ class StandardActionSelect(discord.ui.Select):
         target_id = int(self.values[0])
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id}):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Night action registered on <@{target_id}>.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to use your ability on <@{target_id}>.", footer_text=""))
 
 
 class DoctorTenmaActionSelect(discord.ui.Select):
@@ -764,7 +764,7 @@ class TenmaHealSelect(discord.ui.Select):
         target_id = int(self.values[0])
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "heal"}):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Night action registered: Healing <@{target_id}>.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to heal <@{target_id}>.", footer_text=""))
 
 
 class TenmaReviveSelect(discord.ui.Select):
@@ -777,7 +777,7 @@ class TenmaReviveSelect(discord.ui.Select):
         target_id = int(self.values[0])
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "revive"}):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Night action registered: Reviving <@{target_id}>.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to revive <@{target_id}>.", footer_text=""))
 
 
 class LightYagamiActionSelect(discord.ui.Select):
@@ -843,7 +843,7 @@ class LightYagamiRoleGuessSelect(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Death Note guess registered on <@{self.target_id}> for role '{guessed_role}'.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to use the Death Note on <@{self.target_id}> for role '{guessed_role}'.", footer_text=""))
 
 
 class LightYagamiPenSelect(discord.ui.Select):
@@ -860,7 +860,7 @@ class LightYagamiPenSelect(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Devil's Pen registered on <@{target_id}>.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to use Devil's Pen on <@{target_id}>.", footer_text=""))
 
 
 class MakimaSelect(discord.ui.Select):
@@ -907,7 +907,7 @@ class MakimaRedirectTargetSelect(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Control Devil registered: Redirecting <@{self.target1}> to target <@{target2}>.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to control Devil: Redirecting <@{self.target1}> to target <@{target2}>.", footer_text=""))
 
 
 class HisokaBungeeSelect(discord.ui.Select):
@@ -941,7 +941,7 @@ class HisokaBungeeLinkSelect(discord.ui.Select):
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Bungee Gum registered: linking <@{self.target1}> with <@{target2}>.", footer_text=""))
+        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to link <@{self.target1}> with <@{target2}>.", footer_text=""))
 
 
 class VoteUISelectView(MafiosoLayoutView):
@@ -986,8 +986,10 @@ class VoteUISelectView(MafiosoLayoutView):
                 options.append(discord.SelectOption(label=name, value=str(pid)))
 
         if player.role_key == "hiromi_higuruma":
+            day_num = session.metadata.get("day_num", 1)
             deadly_uses = player.metadata.setdefault("deadly_sentencing_uses", 2)
-            if deadly_uses > 0:
+            used_today = (player.metadata.get("higuruma_used_ability_day") == day_num)
+            if deadly_uses > 0 and not used_today:
                 view = discord.ui.View(timeout=30)
                 btn_normal = discord.ui.Button(label="Cast Normal Vote", style=discord.ButtonStyle.secondary)
                 btn_deadly = discord.ui.Button(label=f"Deadly Sentencing ({deadly_uses} left)", style=discord.ButtonStyle.danger)
@@ -1046,6 +1048,11 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         if not player or player.role_key != "hiromi_higuruma":
             return
 
+        day_num = session.metadata.get("day_num", 1)
+        if player.metadata.get("higuruma_used_ability_day") == day_num:
+            await interaction.followup.send("You have already used a courtroom ability today!", ephemeral=True)
+            return
+
         deadly_uses = player.metadata.get("deadly_sentencing_uses", 2)
         if deadly_uses <= 0:
             await interaction.followup.send("You have no uses left.", ephemeral=True)
@@ -1053,6 +1060,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
 
         async with self.engine._lock:
             player.metadata["deadly_sentencing_uses"] = deadly_uses - 1
+            player.metadata["higuruma_used_ability_day"] = day_num
             session.metadata["deadly_sentencing_triggered"] = True
             session.metadata["deadly_sentencing_active"] = True
             session.metadata["deadly_sentencing_run"] = True
@@ -1063,8 +1071,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         mafia_channel = interaction.channel
         await self.engine.bot.message_queue.send(
             mafia_channel,
-            f"{get_emoji('court')} **Hiromi Higuruma has declared Deadly Sentencing!**\n"
-            f"Hiromi Higuruma decided to put <@{target_id}> on the stand!"
+            f"{get_emoji('court')} **Hiromi Higuruma has declared Deadly Sentencing on <@{target_id}>!**\n"
         )
 
         await asyncio.sleep(3)
@@ -1078,7 +1085,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         ):
             from ui import build_v2_layout
             mahoraga_null_view = build_v2_layout(
-                title="🌀 Deadly Sentencing Nullified!",
+                title="Deadly Sentencing Nullified!",
                 description=(
                     f"**Hiromi Higuruma's** judgment could not be carried out!\n\n"
                     f"<@{target_id}> has **adapted to the Protagonist faction** — "
@@ -1097,6 +1104,11 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
             await interaction.edit_original_response(view=build_v2_layout(description=f"Deadly Sentencing failed — target has Protagonist adaptation.", footer_text=""))
             return
 
+        # Send Deadly Sentencing animation GIF and wait 12 seconds
+        sentencing_gif = "https://static2.klipy.com/ii/4493325008d34b7bf8cd6813cd5c1619/c1/fe/jpjrHLS0LwS0xMqN.gif"
+        await self.engine.bot.message_queue.send(mafia_channel, sentencing_gif)
+        await asyncio.sleep(8)
+
         faction_display = "Town (Hero)"
         if target_faction == RoleFaction.VILLAIN.value:
             faction_display = "Mafia (Villain)"
@@ -1105,7 +1117,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
 
         await self.engine.bot.message_queue.send(
             mafia_channel,
-            f"{get_emoji('trial')} The defendant <@{target_id}> was aligned with the **{faction_display}** faction!"
+            f"The defendant <@{target_id}> was aligned with the **{faction_display}** faction!"
         )
 
         await asyncio.sleep(3)
@@ -1113,7 +1125,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         await self.engine.eliminate_player(self.game_id, target_id, "deadly_sentencing")
         await self.engine.bot.message_queue.send(
             mafia_channel,
-            f"{get_emoji('zap')} Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
+            f"Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
         )
 
         if target_faction == RoleFaction.HERO.value:
@@ -1212,8 +1224,10 @@ class VerdictUISelectView(MafiosoLayoutView):
 
         # Hiromi Higuruma Retrial check
         if decision == "innocent" and player.role_key == "hiromi_higuruma":
+            day_num = session.metadata.get("day_num", 1)
             retrial_uses = player.metadata.setdefault("retrial_uses", 2)
-            if retrial_uses > 0:
+            used_today = (player.metadata.get("higuruma_used_ability_day") == day_num)
+            if retrial_uses > 0 and not used_today:
                 view = discord.ui.View(timeout=30)
                 btn_normal = discord.ui.Button(label="Vote Innocent Normally", style=discord.ButtonStyle.secondary)
                 btn_retrial = discord.ui.Button(label=f"Trigger Retrial ({retrial_uses} left)", style=discord.ButtonStyle.danger)
@@ -1223,11 +1237,10 @@ class VerdictUISelectView(MafiosoLayoutView):
                     verdicts[str(inter.user.id)] = "innocent"
                     await inter.response.edit_message(view=build_v2_layout(description="Registered normal Innocent verdict.", footer_text=""))
 
-
-
                 async def retrial_cb(inter: discord.Interaction) -> None:
                     async with self.engine._lock:
                         player.metadata["retrial_uses"] = retrial_uses - 1
+                        player.metadata["higuruma_used_ability_day"] = day_num
                         session.metadata["retrial_triggered"] = True
                         session.metadata["retrial_defendant"] = defendant_id
                         session.metadata["retrial_by"] = inter.user.id

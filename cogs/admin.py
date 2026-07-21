@@ -85,6 +85,73 @@ class RoleToggleView(MafiosoLayoutView):
         return True
 
 
+class _GlobalRoleSelect(discord.ui.Select):
+    def __init__(self, view_ref: "GlobalRoleToggleView", role_keys: list[str], placeholder: str) -> None:
+        self.view_ref = view_ref
+        options = []
+        for rkey in sorted(role_keys, key=lambda k: roles.ROLES_METADATA.get(k, {}).get("name", k)):
+            meta = roles.ROLES_METADATA.get(rkey, {})
+            name = meta.get("name", rkey.replace("_", " ").title())
+            emoji = get_emoji(rkey)
+            select_emoji = None
+            if emoji:
+                if emoji.startswith("<"):
+                    try:
+                        select_emoji = discord.PartialEmoji.from_str(emoji)
+                    except Exception:
+                        pass
+                else:
+                    select_emoji = emoji
+            options.append(discord.SelectOption(label=name, value=rkey, emoji=select_emoji))
+
+        super().__init__(placeholder=placeholder, min_values=1, max_values=len(options), options=options)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        database = getattr(self.view_ref.bot, "db", None)
+        if database is None:
+            await interaction.response.send_message(f"{get_emoji('cross')} Database connection is not available.", ephemeral=True)
+            return
+
+        changed = []
+        for role_key in self.values:
+            await database.set_global_role_disabled(role_key, self.view_ref.disable)
+            changed.append(roles.ROLES_METADATA.get(role_key, {}).get("name", role_key))
+
+        verb = "Globally Disabled" if self.view_ref.disable else "Globally Enabled"
+        await interaction.response.send_message(
+            f"{get_emoji('check')} **{verb}:** " + ", ".join(f"`{n}`" for n in changed),
+            ephemeral=True,
+        )
+
+
+class GlobalRoleToggleView(MafiosoLayoutView):
+    """Lets a bot developer pick one or more roles to disable/enable globally across all servers."""
+
+    def __init__(self, bot: commands.Bot, author_id: int, disable: bool, eligible_roles: list[str]) -> None:
+        super().__init__(timeout=120)
+
+        self.bot = bot
+        self.author_id = author_id
+        self.disable = disable
+
+        town_roles = [rk for rk in eligible_roles if _role_faction_group(rk) == "town"]
+        other_roles = [rk for rk in eligible_roles if _role_faction_group(rk) == "mafia_neutral"]
+
+        verb = "globally disable" if disable else "globally enable"
+        if town_roles:
+            self.add_item(_GlobalRoleSelect(self, town_roles, f"Select Town character(s) to {verb}..."))
+        if other_roles:
+            self.add_item(_GlobalRoleSelect(self, other_roles, f"Select Mafia/Neutral character(s) to {verb}..."))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                f"{get_emoji('cross')} You are not authorized to interact with this menu.", ephemeral=True
+            )
+            return False
+        return True
+
+
 class AdminCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -330,6 +397,61 @@ class AdminCog(commands.Cog):
         await send_hybrid_response(
             ctx,
             f"{get_emoji('roster')} **Enable Characters**\nPick any character(s) below to add them back into the random role pool for this server.",
+            view=view,
+            ephemeral=True,
+        )
+
+    @commands.hybrid_command(name="globalroledisable", description="Globally disable a character across all servers (Developer only)")
+    async def globalroledisable(self, ctx: commands.Context) -> None:
+        import config
+        if ctx.author.id not in config.ADMIN_IDS:
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** Only bot developers can run this command.", ephemeral=True)
+            return
+
+        database = getattr(self.bot, "db", None)
+        if database is None:
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} Database connection is not available.", ephemeral=True)
+            return
+
+        global_disabled = set(await database.get_global_disabled_roles())
+        all_roles = [rk for rk in roles.ROLES_METADATA if rk not in SPAWN_ONLY_ROLES]
+        eligible_roles = [rk for rk in all_roles if rk not in global_disabled]
+
+        if not eligible_roles:
+            await send_hybrid_response(ctx, f"{get_emoji('warning')} Every character is already globally disabled.", ephemeral=True)
+            return
+
+        view = GlobalRoleToggleView(self.bot, ctx.author.id, disable=True, eligible_roles=eligible_roles)
+        await send_hybrid_response(
+            ctx,
+            f"{get_emoji('roster')} **Globally Disable Characters**\nPick any character(s) below to remove them from the random role pool across all servers.",
+            view=view,
+            ephemeral=True,
+        )
+
+    @commands.hybrid_command(name="globalroleenable", description="Globally re-enable a previously disabled character (Developer only)")
+    async def globalroleenable(self, ctx: commands.Context) -> None:
+        import config
+        if ctx.author.id not in config.ADMIN_IDS:
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** Only bot developers can run this command.", ephemeral=True)
+            return
+
+        database = getattr(self.bot, "db", None)
+        if database is None:
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} Database connection is not available.", ephemeral=True)
+            return
+
+        global_disabled = await database.get_global_disabled_roles()
+        disabled_roles = [rk for rk in global_disabled if rk in roles.ROLES_METADATA]
+
+        if not disabled_roles:
+            await send_hybrid_response(ctx, f"{get_emoji('warning')} No characters are currently globally disabled.", ephemeral=True)
+            return
+
+        view = GlobalRoleToggleView(self.bot, ctx.author.id, disable=False, eligible_roles=disabled_roles)
+        await send_hybrid_response(
+            ctx,
+            f"{get_emoji('roster')} **Globally Enable Characters**\nPick any character(s) below to add them back into the random role pool across all servers.",
             view=view,
             ephemeral=True,
         )

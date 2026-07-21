@@ -442,12 +442,10 @@ class GameEngine:
                         death_view = build_v2_layout(
                             title=f"{get_emoji('death')} You Have Died",
                             description=(
-                                f"You were eliminated during the game.\n\n"
-                                f"**Role:** {role_display}\n"
-                                f"**Cause of Death:** {cause.replace('_', ' ').title()}\n\n"
+                                f"How unfortunate.."
                                 f"You may continue spectating, but you can no longer act or vote."
                             ),
-                            color=discord.Color.dark_grey(),
+                            color=discord.Color.red(),
                         )
                         self.bot.message_queue.send(member, view=death_view)
                     except Exception:
@@ -1095,7 +1093,6 @@ class GameEngine:
                                     "Click the button below to nominate someone to face judgment, or vote to skip today's trial."
                                 ),
                                 color=discord.Color.red(),
-                                image_url=get_event_image("vote") or "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTkzVOSwfpSbFQmCQiOFDVQ6HYJZSlaPFTif988sFYfU5mV6F7x3SpsAas&s=10",
                                 view=vote_view,
                             )
 
@@ -1367,13 +1364,18 @@ class GameEngine:
                                 # wait a bit
                                 await asyncio.sleep(2)
 
-                                # send "WE ARE HAVING A RETRIAL!!!" 3 times delayed by like 1s
+                                # send "WE ARE HAVING A RETRIAL!!!" 3 times delayed by 1s
                                 for _ in range(3):
-                                    await self.bot.message_queue.send(mafia_channel, f"**WE ARE HAVING A RETRIAL!!!**")
+                                    await self.bot.message_queue.send(mafia_channel, "**WE ARE HAVING A RETRIAL!!!**")
                                     await asyncio.sleep(1)
 
-                                # wait a bit
-                                await asyncio.sleep(2)
+                                # wait 1 second then send Retrial GIF
+                                await asyncio.sleep(1)
+                                retrial_gif = "https://static2.klipy.com/ii/4493325008d34b7bf8cd6813cd5c1619/6d/44/upJlwYCqZprJYwrjpfL.gif"
+                                await self.bot.message_queue.send(mafia_channel, retrial_gif)
+
+                                # wait 3 seconds then proceed normally
+                                await asyncio.sleep(3)
 
                                 def_player = session.players.get(retrial_defendant)
                                 if def_player and def_player.faction == RoleFaction.HERO.value:
@@ -1381,7 +1383,7 @@ class GameEngine:
                                     acquittal_layout = build_v2_layout(
                                         title=f"{get_emoji('trial')} RETRIAL: SUCCESSFUL ACQUITTAL",
                                         description=(
-                                            f"Defendant <@{retrial_defendant}> has been proven beyond a reasonable doubt to be a **Protagonist**!\n"
+                                            f"Defendant <@{retrial_defendant}> has been proven to be a **Protagonist**!\n"
                                             f"Their execution is canceled. The court has released them.\n\n"
                                             f"Returning to the Nomination/Voting phase to choose a new target."
                                         ),
@@ -1562,6 +1564,14 @@ class GameEngine:
         logger.info("Match ended for game_id: %s", game_id)
         winner_faction = session.winner_faction or "Draw"
         history = await self.end_game(game_id, winner_faction)
+
+        # Reset and restore lobby for next match
+        lobby_mgr = getattr(self.bot, "lobby_manager", None)
+        if lobby_mgr:
+            try:
+                await lobby_mgr.reset_lobby_after_game(session.game_handle.guild_id)
+            except Exception:
+                logger.exception("Failed to reset lobby after game %s", game_id)
 
         # Build the Victory embed and send it in the channel where the game was started from
         original_channel_id = session.game_handle.channel_id
@@ -2292,14 +2302,28 @@ class GameEngine:
                     has_unstoppable = True
                     
                 if not has_unstoppable:
-                    # Also notify the target player they were saved
+                    # Notify target and attackers of Flying Thunder Counter
                     if self.bot:
                         target_member = guild.get_member(target_id) if guild else None
                         if target_member:
-                            self.bot.message_queue.send(
-                                target_member,
-                                f"{get_emoji('zap')} **Flying Thunder Counter!** You were targeted for an attack tonight, but Tobirama Senju intercepted and nullified it!"
-                            )
+                            try:
+                                self.bot.message_queue.send(
+                                    target_member,
+                                    f"{get_emoji('zap')} **Flying Thunder Counter!** You were targeted for an attack tonight, but Tobirama Senju intercepted and nullified it!"
+                                )
+                            except Exception:
+                                pass
+                        # Notify attacker(s) anonymously that an unusual force intercepted their attack
+                        for atk_id in attackers:
+                            atk_member = guild.get_member(atk_id) if guild else None
+                            if atk_member:
+                                try:
+                                    self.bot.message_queue.send(
+                                        atk_member,
+                                        f"**Attack Nullified!** An unusual force intercepted and countered your attack tonight."
+                                    )
+                                except Exception:
+                                    pass
                     # Register the save in heals history and skip further damage processing
                     session.metadata.setdefault("heals_history", {}).setdefault(night_num, {})[target_id] = True
                     continue
@@ -2350,6 +2374,18 @@ class GameEngine:
 
             # 1. Frieren's Hidden status
             if target_state.metadata.get("hidden_until_night") == night_num and not ignore_protection:
+                if self.bot:
+                    for pid, action in session.night_actions.items():
+                        if action.get("target_id") == target_id or target_id in action.get("targets", ()):
+                            atk_mem = guild.get_member(pid) if guild else None
+                            if atk_mem:
+                                try:
+                                    self.bot.message_queue.send(
+                                        atk_mem,
+                                        f"**Attack Nullified!** Your target was hidden and could not be targeted tonight."
+                                    )
+                                except Exception:
+                                    pass
                 continue
 
             # 2. Frieren's Magical Barrier
@@ -2373,6 +2409,18 @@ class GameEngine:
             
             if opposite_barrier:
                 session.metadata.setdefault("heals_history", {}).setdefault(night_num, {})[target_id] = True
+                if self.bot:
+                    for pid, action in session.night_actions.items():
+                        if action.get("target_id") == target_id or target_id in action.get("targets", ()):
+                            atk_mem = guild.get_member(pid) if guild else None
+                            if atk_mem:
+                                try:
+                                    self.bot.message_queue.send(
+                                        atk_mem,
+                                        f"**Attack Nullified!** Your target was protected by a magical barrier tonight."
+                                    )
+                                except Exception:
+                                    pass
                 continue
 
             # (Water Wall check removed, now handled by Flying Thunder Counter above)
@@ -2400,6 +2448,19 @@ class GameEngine:
                                         )
                                     except Exception:
                                         pass
+                # Notify attacker(s) anonymously that the attack was protected by healing
+                if self.bot:
+                    for pid, action in session.night_actions.items():
+                        if action.get("target_id") == target_id or target_id in action.get("targets", ()):
+                            atk_mem = guild.get_member(pid) if guild else None
+                            if atk_mem:
+                                try:
+                                    self.bot.message_queue.send(
+                                        atk_mem,
+                                        f"**Attack Nullified!** Your target was healed and protected from your attack tonight."
+                                    )
+                                except Exception:
+                                    pass
                 continue
 
             # 5. Doctor Tenma Emergency Surgery link save (prevents death via medical link)
@@ -2432,6 +2493,19 @@ class GameEngine:
                                     )
                                 except Exception:
                                     pass
+                # Notify attacker(s) anonymously that emergency surgery saved the target
+                if self.bot:
+                    for pid, action in session.night_actions.items():
+                        if action.get("target_id") == target_id or target_id in action.get("targets", ()):
+                            atk_mem = guild.get_member(pid) if guild else None
+                            if atk_mem:
+                                try:
+                                    self.bot.message_queue.send(
+                                        atk_mem,
+                                        f"**Attack Nullified!** Your target was saved from fatal injuries tonight."
+                                    )
+                                except Exception:
+                                    pass
                 continue
 
             # Check modular role-specific survival passives (Muzan, Mahoraga)
@@ -2452,6 +2526,19 @@ class GameEngine:
                     bot=self.bot
                 )
                 if await target_role_inst.resolve_protection(target_ctx, sources):
+                    # Notify attacker(s) anonymously that the target survived via innate passive protection
+                    if self.bot:
+                        for pid, action in session.night_actions.items():
+                            if action.get("target_id") == target_id or target_id in action.get("targets", ()):
+                                atk_mem = guild.get_member(pid) if guild else None
+                                if atk_mem:
+                                    try:
+                                        self.bot.message_queue.send(
+                                            atk_mem,
+                                            f"**Attack Nullified!** Your target survived your attack tonight due to an innate defensive power."
+                                        )
+                                    except Exception:
+                                        pass
                     continue
 
             # Eliminate player — pick the flavor line for whichever kill source landed
@@ -2522,7 +2609,7 @@ class GameEngine:
                                 m = g.get_member(t_id) if g else None
                                 if m:
                                     try:
-                                        eng.bot.message_queue.send(m, f"🌑 **Execution Complete.** Executions remaining: **{ex}/3**.")
+                                        eng.bot.message_queue.send(m, f"**Execution Complete.** Executions remaining: **{ex}/3**.")
                                     except Exception:
                                         pass
                             asyncio.create_task(_notify_tosen_exec())
@@ -2777,79 +2864,8 @@ class GameEngine:
             logger.exception("Failed to update channel mute overrides.")
 
     async def _update_channel_mute_trial(self, channel: discord.TextChannel, session: GameSession, defendant_id: int) -> None:
-        """Mutes everyone except the player currently defending on the stand."""
-        try:
-            guild = channel.guild
-            day_num = session.metadata.get("day_num", 1)
-            import config
-            
-            # 1. Mute default_role
-            default_ow = channel.overwrites.get(guild.default_role)
-            if not default_ow or default_ow.send_messages != False or default_ow.read_messages != False:
-                await channel.set_permissions(guild.default_role, read_messages=False, send_messages=False)
-
-            # 2. Setup standard players to inherit from default_role (send_messages=None)
-            for pid, pstate in session.players.items():
-                if pstate.alive and pid != defendant_id:
-                    member = guild.get_member(pid)
-                    if not member:
-                        try:
-                            member = await guild.fetch_member(pid)
-                        except discord.NotFound:
-                            continue
-                    
-                    current_ow = channel.overwrites.get(member)
-                    if pid in config.ADMIN_IDS:
-                        if not current_ow or current_ow.send_messages != True:
-                            await channel.set_permissions(member, read_messages=True, send_messages=True)
-                    else:
-                        is_wounded = pstate.metadata.get("wounded_until_day") == day_num
-                        is_exhausted = pstate.metadata.get("exhausted_until_day") == day_num
-                        if is_wounded or is_exhausted:
-                            if not current_ow or current_ow.send_messages != False:
-                                await channel.set_permissions(member, read_messages=True, send_messages=False)
-                        else:
-                            if not current_ow or current_ow.send_messages != False:
-                                await channel.set_permissions(member, read_messages=True, send_messages=False)
-
-            # 3. Unmute the defendant explicitly
-            defendant = guild.get_member(defendant_id)
-            if not defendant:
-                try:
-                    defendant = await guild.fetch_member(defendant_id)
-                except discord.NotFound:
-                    defendant = None
-            if defendant:
-                def_state = session.players.get(defendant_id)
-                is_wounded = def_state.metadata.get("wounded_until_day") == day_num if def_state else False
-                is_exhausted = def_state.metadata.get("exhausted_until_day") == day_num if def_state else False
-                
-                current_ow = channel.overwrites.get(defendant)
-                if defendant_id in config.ADMIN_IDS:
-                    if not current_ow or current_ow.send_messages != True:
-                        await channel.set_permissions(defendant, read_messages=True, send_messages=True)
-                elif is_wounded or is_exhausted:
-                    if not current_ow or current_ow.send_messages != False:
-                        await channel.set_permissions(defendant, read_messages=True, send_messages=False)
-                else:
-                    if not current_ow or current_ow.send_messages != True:
-                        await channel.set_permissions(defendant, read_messages=True, send_messages=True)
-
-            # Non-player admins can also speak
-            for admin_id in config.ADMIN_IDS:
-                if admin_id not in session.players:
-                    admin_member = guild.get_member(admin_id)
-                    if not admin_member:
-                        try:
-                            admin_member = await guild.fetch_member(admin_id)
-                        except discord.HTTPException:
-                            continue
-                    if admin_member:
-                        current_ow = channel.overwrites.get(admin_member)
-                        if not current_ow or current_ow.send_messages != True:
-                            await channel.set_permissions(admin_member, read_messages=True, send_messages=True)
-        except Exception:
-            logger.exception("Failed to set trial mute overrides.")
+        """Keeps the channel open for everyone to talk during the trial phase."""
+        await self._update_channel_mute(channel, session, mute=False)
 
 
 def _stringify_keys(obj: Any) -> Any:
