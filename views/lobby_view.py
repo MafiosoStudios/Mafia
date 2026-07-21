@@ -35,7 +35,6 @@ class JoinLobbyButton(ui.Button):
         except Exception as exc:
             await interaction.followup.send(str(exc), ephemeral=True)
             return
-        await interaction.followup.send("You joined the lobby.", ephemeral=True)
 
 
 class LeaveLobbyButton(ui.Button):
@@ -60,7 +59,6 @@ class LeaveLobbyButton(ui.Button):
             guild_id=interaction.guild_id or lobby.guild_id,
             user_id=interaction.user.id,
         )
-        await interaction.followup.send("You left the lobby.", ephemeral=True)
 
 
 class StartMatchButton(ui.Button):

@@ -60,7 +60,8 @@ class LobbyCog(commands.Cog):
             message = await send_hybrid_response(ctx, view=view)
             if message is not None:
                 await lobby_manager.bind_lobby_message(guild_id, message)
-            await send_hybrid_response(ctx, f"{get_emoji('check')} Lobby created! You joined the lobby.", ephemeral=True)
+            if ctx.interaction and not ctx.interaction.response.is_done():
+                await ctx.interaction.response.defer(ephemeral=True)
         else:
             # Join existing lobby
             try:
@@ -71,7 +72,8 @@ class LobbyCog(commands.Cog):
             except Exception as exc:
                 await send_hybrid_response(ctx, str(exc), ephemeral=True)
                 return
-            await send_hybrid_response(ctx, f"{get_emoji('check')} {status_msg}", ephemeral=True)
+            if ctx.interaction and not ctx.interaction.response.is_done():
+                await ctx.interaction.response.defer(ephemeral=True)
 
     @commands.hybrid_command(name="leave", aliases=["lobby_leave"], description="Leave the active lobby")
     async def leave(self, ctx: commands.Context) -> None:
@@ -80,7 +82,8 @@ class LobbyCog(commands.Cog):
             await send_hybrid_response(ctx, "Lobby system is not ready yet.", ephemeral=True)
             return
         _, status_msg = await lobby_manager.leave_lobby(guild_id=ctx.guild.id if ctx.guild is not None else 0, user_id=ctx.author.id)
-        await send_hybrid_response(ctx, status_msg, ephemeral=True)
+        if ctx.interaction and not ctx.interaction.response.is_done():
+            await ctx.interaction.response.defer(ephemeral=True)
 
     @commands.hybrid_command(name="start", aliases=["lobby_start"], description="Start the game match")
     async def start(self, ctx: commands.Context) -> None:
