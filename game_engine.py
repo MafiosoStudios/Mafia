@@ -954,26 +954,6 @@ class GameEngine:
                         await self._update_channel_mute(mafia_channel, session, mute=True)
 
                         night_num = session.metadata["night_num"]
-<<<<<<< HEAD
-=======
-                        from views.game_ui import NightActionView
-                        night_action_view = NightActionView(game_id, self)
-                        night_view = build_v2_layout(
-                            title=f"Night {night_num}",
-                            description=(
-                                "Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n"
-                                "Check your DMs or use the buttons below to take your action before sunrise!"
-                            ),
-                            color=discord.Color.dark_blue(),
-                            image_url=get_event_image("night"),
-                            view=night_action_view,
-                        )
-                        await self.bot.message_queue.send(mafia_channel, view=night_view)
-
->>>>>>> 01295486b513b5003fdd1a0c792bf0e1055fa7f5
-
-                    night_num = session.metadata["night_num"]
-                    # Send action interface (single embed with image and action button)
                     from views.game_ui import NightActionView
                     action_view = NightActionView(game_id, self)
                     
@@ -988,20 +968,19 @@ class GameEngine:
                             "Click below to use your role's ability before sunrise!"
                         )
 
-                    night_embed = discord.Embed(
+                    night_view = build_v2_layout(
                         title=f"Night {night_num}",
                         description=night_desc,
-                        color=discord.Color.dark_blue()
+                        color=discord.Color.dark_blue(),
+                        image_url=get_event_image("night"),
+                        view=action_view,
                     )
-                    night_image = get_event_image("night")
-                    if night_image:
-                        night_embed.set_image(url=night_image)
 
-                    night_msg = await self.bot.message_queue.send(
-                        mafia_channel,
-                        embed=night_embed,
-                        view=action_view
-                    )
+                    try:
+                        night_msg = await self.bot.message_queue.send(mafia_channel, view=night_view)
+                    except Exception as err:
+                        logger.error(f"Failed to send night view: {err}")
+                        night_msg = None
 
                     # Wait for Night timeout (or all actions completed)
                     if not is_resume:
@@ -1690,12 +1669,6 @@ class GameEngine:
         }.get(winner_faction, "victory_neutral")
         image_url = get_event_image(image_key)
 
-<<<<<<< HEAD
-        try:
-            await self.bot.message_queue.send(channel, embed=victory_embed)
-        except Exception as err:
-            logger.error(f"Failed to send victory embed: {err}")
-=======
         victory_view = build_v2_layout(
             title=title,
             description="\n\n".join(desc_sections),
@@ -1704,8 +1677,10 @@ class GameEngine:
             footer_text=footer_text,
         )
 
-        await self.bot.message_queue.send(channel, view=victory_view)
->>>>>>> 01295486b513b5003fdd1a0c792bf0e1055fa7f5
+        try:
+            await self.bot.message_queue.send(channel, view=victory_view)
+        except Exception as err:
+            logger.error(f"Failed to send victory view: {err}")
 
     async def _send_death_and_status_embeds(
         self,
@@ -1749,19 +1724,11 @@ class GameEngine:
             color=discord.Color.dark_red() if mafia_deaths else discord.Color.gold(),
             image_url=get_event_image("death" if mafia_deaths else "day"),
         )
-<<<<<<< HEAD
-        death_image = get_event_image("death" if mafia_deaths else "day")
-        if death_image:
-            death_embed.set_image(url=death_image)
         try:
-            await self.bot.message_queue.send(channel, embed=death_embed)
+            await self.bot.message_queue.send(channel, view=death_layout)
         except Exception as err:
-            logger.error(f"Failed to send death embed: {err}")
-        await asyncio.sleep(2.5)  # Wait 2.5 seconds between embeds to prevent spam
-=======
-        await self.bot.message_queue.send(channel, view=death_layout)
+            logger.error(f"Failed to send death layout: {err}")
         await asyncio.sleep(2.5)
->>>>>>> 01295486b513b5003fdd1a0c792bf0e1055fa7f5
 
         # 2. Other Casualties Report
         if other_deaths:
@@ -1772,19 +1739,11 @@ class GameEngine:
                 color=discord.Color.dark_orange(),
                 image_url=get_event_image("death"),
             )
-<<<<<<< HEAD
-            other_image = get_event_image("death")
-            if other_image:
-                other_embed.set_image(url=other_image)
             try:
-                await self.bot.message_queue.send(channel, embed=other_embed)
+                await self.bot.message_queue.send(channel, view=other_layout)
             except Exception as err:
-                logger.error(f"Failed to send other casualties embed: {err}")
-            await asyncio.sleep(2.5)  # Wait 2.5 seconds between embeds to prevent spam
-=======
-            await self.bot.message_queue.send(channel, view=other_layout)
+                logger.error(f"Failed to send other casualties layout: {err}")
             await asyncio.sleep(2.5)
->>>>>>> 01295486b513b5003fdd1a0c792bf0e1055fa7f5
 
         alive_list = []
         dead_list = []

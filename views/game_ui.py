@@ -12,6 +12,7 @@ from config import get_emoji
 from utils.constants import GamePhase, RoleFaction
 from ui.base import MafiosoLayoutView
 from ui.theme import heading, small_footer
+from ui import build_v2_layout
 
 logger = logging.getLogger(__name__)
 
