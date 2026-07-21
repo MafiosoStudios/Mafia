@@ -474,7 +474,7 @@ class AdminCog(commands.Cog):
             git_output = f"Git pull failed:\n{e}"
 
         # Send git output and starting indicator
-        await ctx.send(f"**Git Pull Output:**\n```\n{git_output[:1800]}\n```\n**Yeah ok sybau and wait like a good boy.")
+        await ctx.send(f"**Git Pull Output:**\n```\n{git_output[:1800]}\n```\n**Yeah ok sybau and wait like a good boy.**")
 
         import os
         import sys
