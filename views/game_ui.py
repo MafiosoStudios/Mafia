@@ -1149,11 +1149,18 @@ class VoteSelector(discord.ui.Select):
         self.engine = engine
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
+
         value = self.values[0]
         voter_id = interaction.user.id
 
         session = await self.engine.get_session(self.game_id)
         if not session:
+            await interaction.followup.send("This game is no longer active.", ephemeral=True)
             return
 
         try:
@@ -1162,17 +1169,22 @@ class VoteSelector(discord.ui.Select):
                 # Store skip in session metadata
                 skips = session.metadata.setdefault("skip_votes", set())
                 skips.add(voter_id)
-                await interaction.response.edit_message(view=build_v2_layout(description="You voted to Skip.", footer_text=""))
+                await interaction.edit_original_response(view=build_v2_layout(description="You voted to Skip.", footer_text=""))
             else:
                 target_id = int(value)
                 await self.engine.register_vote(self.game_id, voter_id, target_id)
                 # Remove from skips
                 skips = session.metadata.setdefault("skip_votes", set())
                 skips.discard(voter_id)
-                await interaction.response.edit_message(view=build_v2_layout(description=f"You voted for <@{target_id}>.", footer_text=""))
+                await interaction.edit_original_response(view=build_v2_layout(description=f"You voted for <@{target_id}>.", footer_text=""))
         except RuntimeError:
-            await interaction.response.edit_message(view=build_v2_layout(description=f"{get_emoji('cross')} Voting has already ended for this round — your vote wasn't counted.", footer_text=""))
-
+            await interaction.edit_original_response(view=build_v2_layout(description=f"{get_emoji('cross')} Voting has already ended for this round — your vote wasn't counted.", footer_text=""))
+        except Exception as exc:
+            logger.exception("Error during vote registration")
+            try:
+                await interaction.edit_original_response(view=build_v2_layout(description=f"{get_emoji('cross')} Failed to register vote: {exc}", footer_text=""))
+            except Exception:
+                pass
 
 
 class VerdictUISelectView(MafiosoLayoutView):
@@ -1191,28 +1203,34 @@ class VerdictUISelectView(MafiosoLayoutView):
         await self._register_verdict(interaction, "innocent")
 
     async def _register_verdict(self, interaction: discord.Interaction, decision: str) -> None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
+
         session = await self.engine.get_session(self.game_id)
         if not session:
-            await interaction.response.send_message("This game is no longer active.", ephemeral=True)
+            await interaction.followup.send("This game is no longer active.", ephemeral=True)
             return
 
         user_id = interaction.user.id
         if user_id not in session.players:
-            await interaction.response.send_message("You are not part of this game.", ephemeral=True)
+            await interaction.followup.send("You are not part of this game.", ephemeral=True)
             return
 
         player = session.players[user_id]
         if not player.alive:
-            await interaction.response.send_message("Dead players cannot vote on verdict.", ephemeral=True)
+            await interaction.followup.send("Dead players cannot vote on verdict.", ephemeral=True)
             return
             
         defendant_id = session.metadata.get("defendant_id")
         if user_id == defendant_id:
-            await interaction.response.send_message("You cannot vote on your own trial!", ephemeral=True)
+            await interaction.followup.send("You cannot vote on your own trial!", ephemeral=True)
             return
 
         if session.phase != GamePhase.EXECUTION:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"{get_emoji('cross')} The trial has already ended — your verdict wasn't counted.",
                 ephemeral=True,
             )
@@ -1233,11 +1251,21 @@ class VerdictUISelectView(MafiosoLayoutView):
                 btn_retrial = discord.ui.Button(label=f"Trigger Retrial ({retrial_uses} left)", style=discord.ButtonStyle.danger)
 
                 async def normal_cb(inter: discord.Interaction) -> None:
+                    try:
+                        if not inter.response.is_done():
+                            await inter.response.defer(ephemeral=True)
+                    except Exception:
+                        pass
                     verdicts = session.metadata.setdefault("verdicts", {})
                     verdicts[str(inter.user.id)] = "innocent"
-                    await inter.response.edit_message(view=build_v2_layout(description="Registered normal Innocent verdict.", footer_text=""))
+                    await inter.edit_original_response(view=build_v2_layout(description="Registered normal Innocent verdict.", footer_text=""))
 
                 async def retrial_cb(inter: discord.Interaction) -> None:
+                    try:
+                        if not inter.response.is_done():
+                            await inter.response.defer(ephemeral=True)
+                    except Exception:
+                        pass
                     async with self.engine._lock:
                         player.metadata["retrial_uses"] = retrial_uses - 1
                         player.metadata["higuruma_used_ability_day"] = day_num
@@ -1250,15 +1278,15 @@ class VerdictUISelectView(MafiosoLayoutView):
                         mafia_channel,
                         f"{get_emoji('trial')} <@{inter.user.id}> (Hiromi Higuruma) has activated **Retrial** for this case!"
                     )
-                    await inter.response.edit_message(view=build_v2_layout(description=f"{get_emoji('trial')} **Retrial Activated!**", footer_text=""))
+                    await inter.edit_original_response(view=build_v2_layout(description=f"{get_emoji('trial')} **Retrial Activated!**", footer_text=""))
 
                 btn_normal.callback = normal_cb
                 btn_retrial.callback = retrial_cb
                 view.add_item(btn_normal)
                 view.add_item(btn_retrial)
-                await interaction.response.send_message("Choose whether to trigger Retrial:", view=view, ephemeral=True)
+                await interaction.followup.send("Choose whether to trigger Retrial:", view=view, ephemeral=True)
                 return
 
         verdicts = session.metadata.setdefault("verdicts", {})
         verdicts[str(user_id)] = decision
-        await interaction.response.send_message(f"You cast a verdict of **{decision.upper()}**.", ephemeral=True)
+        await interaction.followup.send(f"You cast a verdict of **{decision.upper()}**.", ephemeral=True)

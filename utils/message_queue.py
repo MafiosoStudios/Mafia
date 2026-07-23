@@ -75,28 +75,45 @@ class DiscordMessageQueue:
                 logger.exception("Error reading from message queue.")
                 continue
 
-            try:
-                # Add a small spacing delay before every API call
-                await asyncio.sleep(self._delay)
-                clean_args, clean_kwargs = _sanitize_v2_kwargs(args, kwargs)
+            attempts = 0
+            while attempts < 3:
+                try:
+                    # Add a small spacing delay before every API call
+                    await asyncio.sleep(self._delay)
+                    clean_args, clean_kwargs = _sanitize_v2_kwargs(args, kwargs)
 
-                if action == "send":
-                    res = await target.send(*clean_args, **clean_kwargs)
-                elif action == "edit":
-                    res = await target.edit(*clean_args, **clean_kwargs)
-                else:
-                    res = None
+                    if action == "send":
+                        res = await target.send(*clean_args, **clean_kwargs)
+                    elif action == "edit":
+                        res = await target.edit(*clean_args, **clean_kwargs)
+                    else:
+                        res = None
 
-                if not fut.done():
-                    fut.set_result(res)
-            except asyncio.CancelledError:
-                if not fut.done():
-                    fut.cancel()
-                break
-            except Exception as e:
-                logger.error("Failed to run queued message action %s: %s", action, e)
-                if not fut.done():
-                    fut.set_exception(e)
-            finally:
-                self._queue.task_done()
+                    if not fut.done():
+                        fut.set_result(res)
+                    break
+                except asyncio.CancelledError:
+                    if not fut.done():
+                        fut.cancel()
+                    return
+                except discord.HTTPException as http_exc:
+                    if http_exc.status == 429:
+                        retry_after = getattr(http_exc, "retry_after", 1.5) or 1.5
+                        logger.warning("Discord Rate Limit hit (429). Retrying action %s in %.2fs (attempt %d/3)", action, retry_after, attempts + 1)
+                        attempts += 1
+                        await asyncio.sleep(retry_after)
+                        if attempts >= 3:
+                            if not fut.done():
+                                fut.set_exception(http_exc)
+                    else:
+                        logger.error("Failed to run queued message action %s: %s", action, http_exc)
+                        if not fut.done():
+                            fut.set_exception(http_exc)
+                        break
+                except Exception as e:
+                    logger.error("Failed to run queued message action %s: %s", action, e)
+                    if not fut.done():
+                        fut.set_exception(e)
+                    break
+            self._queue.task_done()
 
