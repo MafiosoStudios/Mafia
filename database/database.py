@@ -457,6 +457,10 @@ class DatabaseManager:
         cursor = self.db.custom_role_lists.find({"guild_id": guild_id}).sort("name", 1)
         return [{"name": doc["name"], "roles": doc["roles"]} async for doc in cursor]
 
+    async def get_custom_role_lists(self, guild_id: int) -> dict[str, list[str]]:
+        lists = await self.list_custom_role_lists(guild_id)
+        return {item["name"]: item["roles"] for item in lists}
+
     # ---- Indexes ---------------------------------------------------------
 
     async def _create_indexes(self) -> None:

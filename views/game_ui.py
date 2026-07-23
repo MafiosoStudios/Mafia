@@ -423,10 +423,10 @@ class NightAbilityButtonsView(MafiosoLayoutView):
                 select = MaomaoBrewPotionStep1(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
             elif ability.name == "Demon Detection":
-                select = FrierenDemonDetectionStep1(self.game_id, self.engine, ability, idx, options)
+                select = FrierenDemonDetectionMultiSelect(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
             elif ability.num_targets == 2:
-                select = TwoTargetSelectStep1(self.game_id, self.engine, ability, idx, options)
+                select = TwoTargetMultiSelect(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
             else:
                 select = AbilityTargetSelect(self.game_id, self.engine, ability, idx, options)
@@ -513,14 +513,20 @@ class AbilityTargetSelect(discord.ui.Select):
         await _safe_respond_or_edit(interaction, description=f"Ability **{self.ability.name}** registered on <@{target_id}>.")
 
 
-class TwoTargetSelectStep1(discord.ui.Select):
+class TwoTargetMultiSelect(discord.ui.Select):
     def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select first target...", options=options[:25])
+        min_vals = min(2, len(options))
+        max_vals = min(2, len(options))
+        super().__init__(
+            placeholder="Select exactly 2 target players...",
+            min_values=min_vals,
+            max_values=max_vals,
+            options=options[:25],
+        )
         self.game_id = game_id
         self.engine = engine
         self.ability = ability
         self.action_index = action_index
-        self.target_options = options
 
     async def callback(self, interaction: discord.Interaction) -> None:
         if not interaction.response.is_done():
@@ -528,39 +534,20 @@ class TwoTargetSelectStep1(discord.ui.Select):
                 await interaction.response.defer(ephemeral=True)
             except Exception:
                 pass
+        if len(self.values) < 2:
+            await _safe_respond_or_edit(interaction, description="⚠️ You must select 2 targets.")
+            return
         target1 = int(self.values[0])
-        options2 = [opt for opt in self.target_options if opt.value != str(target1)]
-        view = discord.ui.View(timeout=120)
-        select2 = TwoTargetSelectStep2(self.game_id, self.engine, self.ability, self.action_index, target1, options2)
-        view.add_item(select2)
-        await _safe_respond_or_edit(interaction, view=view, description=f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:")
-
-
-class TwoTargetSelectStep2(discord.ui.Select):
-    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target1: int, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select second target...", options=options[:25])
-        self.game_id = game_id
-        self.engine = engine
-        self.ability = ability
-        self.action_index = action_index
-        self.target1 = target1
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if not interaction.response.is_done():
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
-        target2 = int(self.values[0])
+        target2 = int(self.values[1])
         payload = {
             "action_index": self.action_index,
-            "target_id": self.target1,
+            "target_id": target1,
             "controlled_vote_target": target2,
-            "targets": (self.target1, target2)
+            "targets": (target1, target2)
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await _safe_respond_or_edit(interaction, description=f"You have decided to use **{self.ability.name}** on <@{self.target1}> and <@{target2}>.")
+        await _safe_respond_or_edit(interaction, description=f"✅ You have selected <@{target1}> and <@{target2}> for **{self.ability.name}**.")
 
 
 
@@ -766,14 +753,20 @@ class MaomaoBrewPotionStep2(discord.ui.Select):
         await _safe_respond_or_edit(interaction, description=f"Successfully queued **{potion_name}** on <@{target_id}>.")
 
 
-class FrierenDemonDetectionStep1(discord.ui.Select):
+class FrierenDemonDetectionMultiSelect(discord.ui.Select):
     def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select first target...", options=options[:25])
+        min_vals = min(3, len(options))
+        max_vals = min(3, len(options))
+        super().__init__(
+            placeholder="Select exactly 3 target players for Demon Detection...",
+            min_values=min_vals,
+            max_values=max_vals,
+            options=options[:25],
+        )
         self.game_id = game_id
         self.engine = engine
         self.ability = ability
         self.action_index = action_index
-        self.target_options = options
 
     async def callback(self, interaction: discord.Interaction) -> None:
         if not interaction.response.is_done():
@@ -781,97 +774,18 @@ class FrierenDemonDetectionStep1(discord.ui.Select):
                 await interaction.response.defer(ephemeral=True)
             except Exception:
                 pass
-        target1 = int(self.values[0])
-        options2 = [opt for opt in self.target_options if opt.value != str(target1)]
-        view = discord.ui.View(timeout=120)
-        select2 = FrierenDemonDetectionStep2(self.game_id, self.engine, self.ability, self.action_index, target1, options2, self.target_options)
-        view.add_item(select2)
-        
-        back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
-        async def back_callback(inter: discord.Interaction) -> None:
-            if not inter.response.is_done():
-                try:
-                    await inter.response.defer(ephemeral=True)
-                except Exception:
-                    pass
-            session = await self.engine.get_session(self.game_id)
-            if session:
-                from views.game_ui import NightAbilityButtonsView
-                role_inst = session.players[interaction.user.id].role_inst
-                orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
-                await _safe_respond_or_edit(inter, view=orig_view, description="Select an ability to use tonight:")
-        back_btn.callback = back_callback
-        view.add_item(back_btn)
-        
-        await _safe_respond_or_edit(interaction, view=view, description=f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:")
-
-
-class FrierenDemonDetectionStep2(discord.ui.Select):
-    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target1: int, options: list[discord.SelectOption], original_options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select second target...", options=options[:25])
-        self.game_id = game_id
-        self.engine = engine
-        self.ability = ability
-        self.action_index = action_index
-        self.target1 = target1
-        self.original_options = original_options
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if not interaction.response.is_done():
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
-        target2 = int(self.values[0])
-        options3 = [opt for opt in self.original_options if opt.value != str(self.target1) and opt.value != str(target2)]
-        view = discord.ui.View(timeout=120)
-        select3 = FrierenDemonDetectionStep3(self.game_id, self.engine, self.ability, self.action_index, self.target1, target2, options3)
-        view.add_item(select3)
-        
-        back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
-        async def back_callback(inter: discord.Interaction) -> None:
-            if not inter.response.is_done():
-                try:
-                    await inter.response.defer(ephemeral=True)
-                except Exception:
-                    pass
-            session = await self.engine.get_session(self.game_id)
-            if session:
-                from views.game_ui import NightAbilityButtonsView
-                role_inst = session.players[interaction.user.id].role_inst
-                orig_view = NightAbilityButtonsView(self.game_id, self.engine, interaction.user.id, role_inst, session)
-                await _safe_respond_or_edit(inter, view=orig_view, description="Select an ability to use tonight:")
-        back_btn.callback = back_callback
-        view.add_item(back_btn)
-        
-        await _safe_respond_or_edit(interaction, view=view, description=f"Using **{self.ability.name}**.\nSelect the third target to pair with <@{self.target1}> and <@{target2}>:")
-
-
-class FrierenDemonDetectionStep3(discord.ui.Select):
-    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target1: int, target2: int, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select third target...", options=options[:25])
-        self.game_id = game_id
-        self.engine = engine
-        self.ability = ability
-        self.action_index = action_index
-        self.target1 = target1
-        self.target2 = target2
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if not interaction.response.is_done():
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
-        target3 = int(self.values[0])
+        if len(self.values) < 3:
+            await _safe_respond_or_edit(interaction, description="⚠️ You must select 3 targets.")
+            return
+        t1, t2, t3 = int(self.values[0]), int(self.values[1]), int(self.values[2])
         payload = {
             "action_index": self.action_index,
-            "target_id": self.target1,
-            "targets": (self.target1, self.target2, target3)
+            "target_id": t1,
+            "targets": (t1, t2, t3)
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await _safe_respond_or_edit(interaction, description=f"You have decided to use **{self.ability.name}** on <@{self.target1}>, <@{self.target2}>, and <@{target3}>.")
+        await _safe_respond_or_edit(interaction, description=f"✨ **Demon Detection** queued on <@{t1}>, <@{t2}>, and <@{t3}>.")
 
 
 class StandardActionSelect(discord.ui.Select):
@@ -1027,7 +941,11 @@ class LightYagamiTargetSelect(discord.ui.Select):
         view = discord.ui.View(timeout=120)
         select = LightYagamiRoleGuessSelect(self.game_id, self.engine, target_id, role_options)
         view.add_item(select)
-        await _safe_respond_or_edit(interaction, view=view, description=f"Select the guessed role for <@{target_id}>:")
+        await interaction.followup.send(
+            content=f"📓 **Death Note — Step 2:** Select the guessed role for <@{target_id}>:",
+            view=view,
+            ephemeral=True,
+        )
 
 
 class LightYagamiRoleGuessSelect(discord.ui.Select):

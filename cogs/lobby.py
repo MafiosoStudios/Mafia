@@ -7,6 +7,7 @@ from config import BotConfig, get_emoji
 from utils.embeds import build_status_embed
 from utils.helpers import send_hybrid_response
 from views.lobby_view import LobbyView
+from views.custom_gamemode_ui import CustomRoleListMenuView, CustomRoleListCreateView, CustomRoleListDeleteView
 
 
 class LobbyCog(commands.Cog):
@@ -157,14 +158,36 @@ class LobbyCog(commands.Cog):
             return
 
         lobby.gamemode = mode_clean
-        warning = ""
         if mode_clean == "custom":
-            active_list = lobby_manager._active_custom_role_lists.get(ctx.guild.id)
+            active_list = getattr(lobby_manager, "_active_custom_role_lists", {}).get(ctx.guild.id)
             if not active_list:
-                warning = f"\n{get_emoji('warning')} *Note: No custom role list is currently loaded. Use `/customrolelist load <name>` to load one, or the bot will fallback to chaos behavior.*"
+                db = getattr(self.bot, "db", None) or getattr(lobby_manager, "_database", None)
+                if db:
+                    saved_lists = await db.get_custom_role_lists(ctx.guild.id)
+                    if saved_lists:
+                        menu_view = CustomRoleListMenuView(db, ctx.guild.id, ctx.author.id)
+                        await menu_view.init_data()
+                        embed = menu_view.build_embed()
+                        await send_hybrid_response(
+                            ctx,
+                            content="⚠️ **No Custom Role List Loaded!** Select a saved list below or create a new one to enable Custom mode:",
+                            embed=embed,
+                            view=menu_view,
+                            ephemeral=True,
+                        )
+                    else:
+                        create_view = CustomRoleListCreateView(db, ctx.guild.id, ctx.author.id)
+                        embed = create_view.build_embed()
+                        await send_hybrid_response(
+                            ctx,
+                            content="⚠️ **No saved custom role lists found.** Use the builder below to create your custom role list:",
+                            embed=embed,
+                            view=create_view,
+                            ephemeral=True,
+                        )
 
         await lobby_manager.refresh_lobby_message(ctx.guild.id)
-        await send_hybrid_response(ctx, f"🔮 **Reality has shifted.** Game mode set to **{mode_clean.upper()}** for this lobby.{warning}")
+        await send_hybrid_response(ctx, f"🔮 **Reality has shifted.** Game mode set to **{mode_clean.upper()}** for this lobby.")
 
     @commands.hybrid_command(name="kick", description="Kick a player from the pre-game lobby")
     @discord.app_commands.describe(player="The player to kick")
@@ -210,7 +233,27 @@ class LobbyCog(commands.Cog):
     @commands.hybrid_group(name="customrolelist", description="Manage custom role lists for the guild")
     async def customrolelist(self, ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
-            await send_hybrid_response(ctx, "Try `/customrolelist list` or `/customrolelist create`.", ephemeral=True)
+            if ctx.guild is None:
+                await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
+                return
+            db = getattr(self.bot, "db", None)
+            if db is None:
+                await send_hybrid_response(ctx, "Database system is not ready yet.", ephemeral=True)
+                return
+            active_name = None
+            lobby_manager = getattr(self.bot, "lobby_manager", None)
+            if lobby_manager:
+                active_list = getattr(lobby_manager, "_active_custom_role_lists", {}).get(ctx.guild.id)
+                saved = await db.get_custom_role_lists(ctx.guild.id)
+                for name, r_list in saved.items():
+                    if r_list == active_list:
+                        active_name = name
+                        break
+
+            menu_view = CustomRoleListMenuView(db, ctx.guild.id, ctx.author.id, active_name=active_name)
+            await menu_view.init_data()
+            embed = menu_view.build_embed()
+            await send_hybrid_response(ctx, embed=embed, view=menu_view)
 
     @customrolelist.command(name="create", description="Start editing a new custom role list draft")
     @discord.app_commands.describe(name="Name of the custom role list")
@@ -466,30 +509,20 @@ class LobbyCog(commands.Cog):
             await send_hybrid_response(ctx, "Database system is not ready yet.", ephemeral=True)
             return
 
-        saved_lists = await database.list_custom_role_lists(ctx.guild.id)
-        if not saved_lists:
-            await send_hybrid_response(ctx, f"{get_emoji('empty')} **No saved custom role lists** in this server yet.")
-            return
+        active_name = None
+        lobby_manager = getattr(self.bot, "lobby_manager", None)
+        if lobby_manager:
+            active_list = getattr(lobby_manager, "_active_custom_role_lists", {}).get(ctx.guild.id)
+            saved = await database.get_custom_role_lists(ctx.guild.id)
+            for name, r_list in saved.items():
+                if r_list == active_list:
+                    active_name = name
+                    break
 
-        import roles
-        lines = []
-        for item in saved_lists:
-            role_names = []
-            for rk in item["roles"]:
-                rmeta = roles.ROLES_METADATA.get(rk, {})
-                role_names.append(rmeta.get("name", rk.replace("_", " ").title()))
-            roles_str = ", ".join(role_names)
-            if len(roles_str) > 100:
-                roles_str = roles_str[:97] + "..."
-            lines.append(f"• **{item['name']}** ({len(item['roles'])} roles):\n  *{roles_str}*")
-
-        from ui import build_v2_layout
-        custom_roles_view = build_v2_layout(
-            title=f"📜 Custom Role Lists — {ctx.guild.name}",
-            description="\n\n".join(lines),
-            color=discord.Color.blue(),
-        )
-        await send_hybrid_response(ctx, view=custom_roles_view)
+        menu_view = CustomRoleListMenuView(database, ctx.guild.id, ctx.author.id, active_name=active_name)
+        await menu_view.init_data()
+        embed = menu_view.build_embed()
+        await send_hybrid_response(ctx, embed=embed, view=menu_view)
 
 
     @add_role.autocomplete("role")
