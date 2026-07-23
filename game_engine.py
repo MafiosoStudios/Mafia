@@ -16,6 +16,7 @@ from utils.helpers import utcnow
 from utils.roles import BaseRole, RoleContext, role_registry, NightAction
 import roles
 from ui import build_v2_layout
+from utils.progression import ProgressionManager
 from config import (
     get_emoji, get_death_message, get_inaction_message, get_event_image, get_role_image,
     GAME_CATEGORY_NAME_TEMPLATE, GAME_CHANNEL_NAME_TEMPLATE,
@@ -730,6 +731,80 @@ class GameEngine:
                     winner_faction=winner_faction,
                     has_won=is_winner,
                 )
+
+                # Automated Progression & Rewards DM
+                try:
+                    profile = await self._database.get_player_profile(user_id)
+                    old_xp = profile.xp if profile else 0
+                    old_coins = profile.coins if profile else 0
+
+                    reward_res = ProgressionManager.calculate_match_rewards(
+                        old_xp=old_xp,
+                        old_coins=old_coins,
+                        is_winner=is_winner,
+                        is_alive=player.alive,
+                        votes_cast=player.votes_cast,
+                        actions_performed=player.night_actions_used,
+                        is_mvp=(history.mvp_user_id == user_id),
+                    )
+
+                    user_member = guild.get_member(user_id) if guild else None
+                    user_obj = user_member or self.bot.get_user(user_id)
+                    username = user_obj.display_name if user_obj else (profile.username if profile else f"User_{user_id}")
+
+                    updated_profile = await self._database.add_player_rewards(
+                        user_id=user_id,
+                        xp_gained=reward_res.xp_gained,
+                        coins_gained=reward_res.gold_gained,
+                        new_level=reward_res.new_level,
+                        new_rank=reward_res.new_rank,
+                        username=username,
+                    )
+
+                    if user_obj:
+                        rank_info = ProgressionManager.get_rank_info(reward_res.new_xp)
+                        rank_emoji = get_emoji(rank_info.get("emoji_key", "rank_bronze")) or "🥉"
+                        gold_emoji = get_emoji("gold") or "🪙"
+                        xp_emoji = get_emoji("xp") or "✨"
+                        level_up_emoji = get_emoji("level_up") or "⚡"
+                        rank_up_emoji = get_emoji("rank_up") or "👑"
+
+                        outcome_header = f"{get_emoji('victory')} **MATCH VICTORY!**" if is_winner else (f"{get_emoji('draw')} **MATCH DRAW**" if winner_faction == "Draw" else f"{get_emoji('death')} **MATCH DEFEAT**")
+                        
+                        lvl_info = ProgressionManager.calculate_level_info(reward_res.new_xp)
+                        progress_bar_str = ProgressionManager.format_progress_bar(lvl_info.xp_in_level, lvl_info.xp_for_next)
+
+                        dm_desc = (
+                            f"{outcome_header}\n\n"
+                            f"## Reward Breakdown\n"
+                            + "\n".join(reward_res.breakdown_lines) + "\n\n"
+                            f"## Total Earned\n"
+                            f"• {xp_emoji} **+{reward_res.xp_gained} XP** | {gold_emoji} **+{reward_res.gold_gained} Gold**\n\n"
+                            f"## Progression Update\n"
+                            f"• **Rank**: {rank_emoji} `{reward_res.new_rank}`\n"
+                            f"• **Level**: `{reward_res.new_level}` | {progress_bar_str}\n"
+                            f"• **Total Gold**: {gold_emoji} `{updated_profile.coins}`"
+                        )
+
+                        if reward_res.leveled_up:
+                            dm_desc += f"\n\n{level_up_emoji} **LEVEL UP!** You advanced to Level `{reward_res.new_level}`!"
+                        if reward_res.ranked_up:
+                            dm_desc += f"\n\n{rank_up_emoji} **RANK UP!** You promoted to `{reward_res.new_rank}`!"
+
+                        dm_layout = build_v2_layout(
+                            title="Match Rewards Summary",
+                            description=dm_desc,
+                            color=discord.Color.from_str(rank_info.get("color", "#FFD700")),
+                            thumbnail_url=user_obj.display_avatar.url if hasattr(user_obj, "display_avatar") else None,
+                        )
+
+                        try:
+                            self.bot.message_queue.send(user_obj, view=dm_layout)
+                        except Exception:
+                            logger.exception("Failed to send reward DM to user %s", user_id)
+                except Exception:
+                    logger.exception("Error processing match rewards for user %s", user_id)
+
             await self._database.save_match_history(history)
             await self._database.clear_active_game_state(game_id)
             self._sessions.pop(game_id, None)
