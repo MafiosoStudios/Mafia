@@ -167,19 +167,17 @@ class LobbyCog(commands.Cog):
                     if saved_lists:
                         menu_view = CustomRoleListMenuView(db, ctx.guild.id, ctx.author.id)
                         await menu_view.init_data()
-                        v2_card = menu_view.build_v2_card()
+                        v2_card = menu_view.build_v2_card(note="⚠️ **No Custom Role List Loaded!** Select a saved list below or create a new one to enable Custom mode:")
                         await send_hybrid_response(
                             ctx,
-                            content="⚠️ **No Custom Role List Loaded!** Select a saved list below or create a new one to enable Custom mode:",
                             view=v2_card,
                             ephemeral=True,
                         )
                     else:
                         create_view = CustomRoleListCreateView(db, ctx.guild.id, ctx.author.id)
-                        v2_card = create_view.build_v2_card()
+                        v2_card = create_view.build_v2_card(note="⚠️ **No saved custom role lists found.** Use the builder below to create your custom role list:")
                         await send_hybrid_response(
                             ctx,
-                            content="⚠️ **No saved custom role lists found.** Use the builder below to create your custom role list:",
                             view=v2_card,
                             ephemeral=True,
                         )

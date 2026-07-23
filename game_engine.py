@@ -201,7 +201,6 @@ class GameEngine:
 
             status_desc = (
                 f"Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n\n"
-                f"🌙 **Submitted Actions:** {submitted_count} / {active_count} active roles\n\n"
                 "Click below to use your role's ability before sunrise!"
             )
 
@@ -3081,11 +3080,17 @@ class GameEngine:
 
 
 def _stringify_keys(obj: Any) -> Any:
-    """Recursively convert any dict with non-string keys to string keys (MongoDB requirement)."""
+    """Recursively convert dict keys to strings and non-BSON types (sets, discord objects, tuples) to serializable primitives."""
     if isinstance(obj, dict):
         return {str(k): _stringify_keys(v) for k, v in obj.items()}
-    if isinstance(obj, list):
+    if isinstance(obj, (list, tuple, set)):
         return [_stringify_keys(i) for i in obj]
+    if hasattr(obj, "id") and isinstance(getattr(obj, "id"), int):
+        return getattr(obj, "id")
+    if hasattr(obj, "value"):
+        return obj.value
+    if type(obj).__module__.startswith("discord") or type(obj).__name__ in ("Message", "Member", "User", "TextChannel", "Guild", "Role", "Interaction"):
+        return None
     return obj
 
 

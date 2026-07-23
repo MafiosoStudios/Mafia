@@ -25,22 +25,22 @@ async def _safe_respond_or_edit(
     description: str = "",
     ephemeral: bool = True,
 ) -> None:
-    """Safely responds to or edits an interaction message regardless of deferral state."""
+    """Safely sends a new ephemeral followup response so original interaction menus remain intact."""
     layout = build_v2_layout(description=description, view=view, footer_text="")
     if interaction.response.is_done():
         try:
-            await interaction.edit_original_response(view=layout)
+            await interaction.followup.send(view=layout, ephemeral=ephemeral)
+        except Exception:
+            try:
+                await interaction.edit_original_response(view=layout)
+            except Exception as e:
+                logger.debug("Failed to send response: %s", e)
+    else:
+        try:
+            await interaction.response.send_message(view=layout, ephemeral=ephemeral)
         except Exception:
             try:
                 await interaction.followup.send(view=layout, ephemeral=ephemeral)
-            except Exception as e:
-                logger.debug("Failed to send followup response: %s", e)
-    else:
-        try:
-            await interaction.response.edit_message(view=layout)
-        except Exception:
-            try:
-                await interaction.response.send_message(view=layout, ephemeral=ephemeral)
             except Exception as e:
                 logger.debug("Failed to send response: %s", e)
 
@@ -1234,7 +1234,6 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
             and target_player.role_key == "mahoraga"
             and "Protagonist" in target_player.metadata.get("mahoraga_adapted_factions", [])
         ):
-            from ui import build_v2_layout
             mahoraga_null_view = build_v2_layout(
                 title="Deadly Sentencing Nullified!",
                 description=(
@@ -1252,7 +1251,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
 
             async with self.engine._lock:
                 session.metadata["deadly_sentencing_active"] = False
-            await interaction.edit_original_response(view=build_v2_layout(description=f"Deadly Sentencing failed — target has Protagonist adaptation.", footer_text=""))
+            await _safe_respond_or_edit(interaction, description="Deadly Sentencing failed — target has Protagonist adaptation.")
             return
 
         # Send Deadly Sentencing animation GIF and wait 12 seconds
@@ -1290,7 +1289,7 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         async with self.engine._lock:
             session.metadata["deadly_sentencing_active"] = False
 
-        await interaction.edit_original_response(view=build_v2_layout(description=f"Deadly Sentencing declared on <@{target_id}>.", footer_text=""))
+        await _safe_respond_or_edit(interaction, description=f"Deadly Sentencing declared on <@{target_id}>.")
 
 
 class VoteSelector(discord.ui.Select):
@@ -1317,23 +1316,23 @@ class VoteSelector(discord.ui.Select):
         try:
             if value == "skip":
                 await self.engine.register_vote(self.game_id, voter_id, None)
-                # Store skip in session metadata
-                skips = session.metadata.setdefault("skip_votes", set())
-                skips.add(voter_id)
-                await interaction.edit_original_response(view=build_v2_layout(description="You voted to Skip.", footer_text=""))
+                skips = session.metadata.setdefault("skip_votes", [])
+                if voter_id not in skips:
+                    skips.append(voter_id)
+                await _safe_respond_or_edit(interaction, description="You voted to Skip.")
             else:
                 target_id = int(value)
                 await self.engine.register_vote(self.game_id, voter_id, target_id)
-                # Remove from skips
-                skips = session.metadata.setdefault("skip_votes", set())
-                skips.discard(voter_id)
-                await interaction.edit_original_response(view=build_v2_layout(description=f"You voted for <@{target_id}>.", footer_text=""))
+                skips = session.metadata.setdefault("skip_votes", [])
+                if voter_id in skips:
+                    skips.remove(voter_id)
+                await _safe_respond_or_edit(interaction, description=f"Voted for <@{target_id}>.")
         except RuntimeError:
-            await interaction.edit_original_response(view=build_v2_layout(description=f"{get_emoji('cross')} Voting has already ended for this round — your vote wasn't counted.", footer_text=""))
+            await _safe_respond_or_edit(interaction, description=f"{get_emoji('cross')} Voting has already ended for this round — your vote wasn't counted.")
         except Exception as exc:
             logger.exception("Error during vote registration")
             try:
-                await interaction.edit_original_response(view=build_v2_layout(description=f"{get_emoji('cross')} Failed to register vote: {exc}", footer_text=""))
+                await _safe_respond_or_edit(interaction, description=f"{get_emoji('cross')} Failed to register vote: {exc}")
             except Exception:
                 pass
 

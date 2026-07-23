@@ -114,7 +114,13 @@ def build_v2_layout(
     if view is not None:
         items_to_add = []
         if hasattr(view, "children"):
-            items_to_add = [c for c in view.children if not isinstance(c, ui.Container)]
+            for c in view.children:
+                if isinstance(c, ui.Container):
+                    for sub in c.children:
+                        if not isinstance(sub, (ui.TextDisplay, ui.Separator, ui.Section, ui.Thumbnail, ui.MediaGallery)):
+                            items_to_add.append(sub)
+                else:
+                    items_to_add.append(c)
             
         if items_to_add:
             container.add_item(ui.Separator())

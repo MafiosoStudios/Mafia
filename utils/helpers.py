@@ -34,15 +34,10 @@ async def send_hybrid_response(
     from ui.components import build_v2_layout
     final_view = view or embed
 
-    if final_view is not None:
-        if isinstance(final_view, discord.ui.LayoutView):
-            if content:
-                final_view = build_v2_layout(description=content, view=final_view, footer_text="")
-        else:
-            if content:
-                final_view = build_v2_layout(description=content, view=final_view, footer_text="")
-    elif content is not None:
+    if final_view is None and content is not None:
         final_view = build_v2_layout(description=content, footer_text="")
+    elif final_view is not None and content is not None:
+        final_view = build_v2_layout(description=content, view=final_view, footer_text="")
 
     if ctx.interaction is not None:
         if ctx.interaction.response.is_done():

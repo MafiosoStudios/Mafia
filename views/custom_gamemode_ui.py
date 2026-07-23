@@ -57,11 +57,14 @@ class CustomRoleListMenuView(MafiosoLayoutView):
             self.saved_lists = {}
         self.build_components()
 
-    def build_v2_card(self) -> MafiosoLayoutView:
+    def build_v2_card(self, note: str | None = None) -> MafiosoLayoutView:
         color = COLOR_PRIMARY
         header_text = f"{heading('Guild Custom Role Lists')}\nManage and select custom gamemode role lists for your server."
 
         lines: list[str] = []
+        if note:
+            lines.append(note + "\n")
+
         if not self.saved_lists:
             lines.append(f"{get_emoji('roster')} *No saved custom role lists found for this server.*")
             lines.append("Click **Create Rolelist** below to build one!")
@@ -239,9 +242,11 @@ class CustomRoleListCreateView(MafiosoLayoutView):
         self.draft_roles: list[str] = []
         self.build_components()
 
-    def build_v2_card(self) -> MafiosoLayoutView:
+    def build_v2_card(self, note: str | None = None) -> MafiosoLayoutView:
         color = COLOR_PRIMARY
         header_text = f"{heading(f'Role List Builder: {self.list_name}')}\nAdd roles using the dropdowns below. You can select the same role multiple times."
+        if note:
+            header_text = f"{note}\n\n{header_text}"
 
         counts: dict[str, int] = {}
         for r in self.draft_roles:
