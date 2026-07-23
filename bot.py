@@ -86,6 +86,22 @@ class AnimeMafiaBot(commands.Bot):
 
         asyncio.create_task(sync_bg())
 
+    async def _safe_send_ctx(self, ctx: commands.Context, content: str) -> None:
+        try:
+            if ctx.interaction is not None:
+                if ctx.interaction.response.is_done():
+                    await ctx.interaction.followup.send(content, ephemeral=True)
+                else:
+                    await ctx.interaction.response.send_message(content, ephemeral=True)
+            else:
+                await ctx.send(content)
+        except Exception:
+            try:
+                if ctx.channel:
+                    await ctx.channel.send(content)
+            except Exception:
+                pass
+
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
         logger.exception("App command failed: %s", error)
         msg = "Something went wrong processing that command. Try again."
@@ -98,10 +114,13 @@ class AnimeMafiaBot(commands.Bot):
         elif isinstance(error, discord.app_commands.TransformerError):
             msg = "Invalid parameters provided for this command."
 
-        if interaction.response.is_done():
-            await interaction.followup.send(msg, ephemeral=True)
-        else:
-            await interaction.response.send_message(msg, ephemeral=True)
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
+        except Exception:
+            pass
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError) -> None:
         if isinstance(error, commands.CommandInvokeError) and error.original:
@@ -110,27 +129,27 @@ class AnimeMafiaBot(commands.Bot):
         logger.exception("Prefix command failed: %s", error)
 
         if isinstance(error, commands.CommandNotFound):
-            await ctx.send("That command doesn't exist. Check your spelling or type !help.")
+            await self._safe_send_ctx(ctx, "That command doesn't exist. Check your spelling or type !help.")
             return
 
         if isinstance(error, commands.MissingRequiredArgument):
             param = error.param.name if hasattr(error, "param") and error.param else "value"
-            await ctx.send(f"You missed the required parameter '{param}' for this command. Check parameter usage and try again.")
+            await self._safe_send_ctx(ctx, f"You missed the required parameter '{param}' for this command. Check parameter usage and try again.")
             return
 
         if isinstance(error, (commands.BadArgument, commands.BadLiteralArgument)):
-            await ctx.send("Invalid parameters provided for this command. Check your input and try again.")
+            await self._safe_send_ctx(ctx, "Invalid parameters provided for this command. Check your input and try again.")
             return
 
         if isinstance(error, (commands.MissingPermissions, commands.CheckFailure, commands.MissingRole)):
-            await ctx.send("You don't have permission to use this command.")
+            await self._safe_send_ctx(ctx, "You don't have permission to use this command.")
             return
 
         if isinstance(error, commands.NoPrivateMessage):
-            await ctx.send("This command can only be used inside a server.")
+            await self._safe_send_ctx(ctx, "This command can only be used inside a server.")
             return
 
-        await ctx.send("Something went wrong processing that command. Try again.")
+        await self._safe_send_ctx(ctx, "Something went wrong processing that command. Try again.")
 
     async def _load_extensions(self) -> None:
         extensions = (

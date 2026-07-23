@@ -7,13 +7,15 @@ import discord
 
 from roles import ROLES_METADATA
 
+from ui.base import MafiosoLayoutView
+
 if TYPE_CHECKING:
     from database import Database
 
 logger = logging.getLogger(__name__)
 
 
-class CustomRoleListMenuView(discord.ui.LayoutView):
+class CustomRoleListMenuView(MafiosoLayoutView):
     """All-in-One Custom Role List Menu View.
     Displays saved role lists, active list status, selection dropdown, and action buttons.
     """
@@ -183,7 +185,7 @@ class CustomListNameModal(discord.ui.Modal, title="Set Custom Role List Name"):
         await interaction.edit_original_response(embed=embed, view=self.create_view)
 
 
-class CustomRoleListCreateView(discord.ui.LayoutView):
+class CustomRoleListCreateView(MafiosoLayoutView):
     """Interactive Builder View for creating/editing a custom role list.
     Supports real-time embed updates and selecting multiple copies of the same role.
     """
@@ -361,7 +363,7 @@ class CustomRoleListCreateView(discord.ui.LayoutView):
         )
 
 
-class CustomRoleListDeleteView(discord.ui.LayoutView):
+class CustomRoleListDeleteView(MafiosoLayoutView):
     """Ephemeral view to select and delete a saved custom role list."""
 
     def __init__(
