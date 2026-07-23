@@ -48,17 +48,15 @@ class ProfileCog(commands.Cog):
             )
             await database.upsert_player_profile(profile_record)
 
-        rank_emoji = get_emoji(rank_info.get("emoji_key", "rank_bronze")) or "🥉"
-        gold_emoji = get_emoji("gold") or "🪙"
         progress_bar_str = ProgressionManager.format_progress_bar(lvl_info.xp_in_level, lvl_info.xp_for_next)
 
         total_games = statistics.games_played
         win_rate = 0.0 if total_games == 0 else (statistics.wins / total_games) * 100
 
         desc = (
-            f"• **Rank**: {rank_emoji} `{profile_record.rank}` ({rank_info.get('badge', 'Tier')})\n"
+            f"• **Rank**: `{profile_record.rank}` ({rank_info.get('badge', 'Tier')})\n"
             f"• **Level**: `{lvl_info.level}` | {progress_bar_str}\n"
-            f"• **Gold**: {gold_emoji} `{profile_record.coins}`\n"
+            f"• **Gold**: `{profile_record.coins}`\n"
             f"• **Favorite Character**: {profile_record.favorite_character or '*None set*'}\n\n"
             f"## Global Match Statistics\n"
             f"• **Wins:** `{statistics.wins}` | **Losses:** `{statistics.losses}` | **Draws:** `{statistics.draws}`\n"

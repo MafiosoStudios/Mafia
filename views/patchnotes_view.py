@@ -110,13 +110,16 @@ PATCHES: list[dict] = [
     {
         "version": "1.0.5",
         "date": "July 23, 2026",
-        "title": "Version 1.0.5 — Custom Rolelists, Non-Destructive Actions & Rate Limit Fixes",
+        "title": "Version 1.0.5 — Progression System, Custom Rolelists & UI Hardening",
         "description": (
-            "A feature and stability update introducing the All-in-One Custom Gamemode Suite, "
-            "duplicate role list building, non-destructive ephemeral action/vote menus, "
-            "and instant rate-limit mitigation across all UI components."
+            "A major feature and progression update introducing root `rank.json` configuration, "
+            "automated Level/XP/Gold calculation, post-match V2 Container DM reward notifications, "
+            "the All-in-One Custom Gamemode Suite, and system-wide UI stability."
         ),
         "changes": [
+            "**Global Progression & Ranks** — Added `rank.json` configuration with 8 customizable rank tiers (Bronze to Mafia Legend), level curves, and global MongoDB synchronization",
+            "**Match Reward DMs** — Automatically calculates XP, Gold, Level, and Rank after every match and sends an itemized V2 Container DM with level-up/rank-up alerts",
+            "**Profile UI Overhaul** — Restructured `/profile` to render player rank, visual progress bar, gold, and global match statistics inside a clean V2 Container card",
             "**Custom Rolelist Suite** — Interactive menu (`/customrolelist`) to create, name, load, and delete custom role lists with real-time role breakdown displays",
             "**Multi-Copy & Balanced Custom Pools** — Full support for duplicate roles in custom lists (e.g. 5x Higuruma) with guaranteed Mafia assignment and balanced role filler",
             "**Non-Destructive Ephemeral UX** — Selecting targets or votes now sends fresh ephemeral notifications instead of overwriting selection dropdowns",
