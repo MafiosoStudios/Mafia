@@ -90,6 +90,23 @@ PATCHES: list[dict] = [
             "**UI Fixes** — Multiple visual polish improvements, silent real-time lobby updates, and layout refinements",
         ],
     },
+    {
+        "version": "1.0.4",
+        "date": "July 23, 2026",
+        "title": "Version 1.0.4 — Antagonist Conversion, Role Priorities & Night Engine Stability",
+        "description": (
+            "A major mechanical balance and stability update introducing the Antagonist Conversion System, "
+            "a strict 1-to-19 role priority resolution engine, the `/priorities` command, "
+            "and critical fixes for night end announcements and Muzan Kibutsuji cooldowns."
+        ),
+        "changes": [
+            "**Antagonist Conversion System** — If the primary killing role (Frieza) dies by any means, the highest-priority living Antagonist is stripped of all former abilities/passives and given the Antagonist Base Kill power",
+            "**Role Priorities System** — Assigned explicit 1-to-19 priority numbers to every active role across the engine to prevent resolution clashes and ensure smooth night processing",
+            "**`/priorities` Command** — Added `/priorities` (or `!priorities`) command to display the exact 1-to-19 execution order of all roles, featuring an interactive red Antagonist Conversion rules button",
+            "**Night Action Phase Embed Fix** — Modified the night resolution engine so that when the night phase ends, a brand new notification embed is posted instead of editing the prompt",
+            "**Muzan Kibutsuji Cooldown & Infection Fix** — Fixed Muzan Kibutsuji converting from Night 1 and doing it repeatedly without cooldown; strictly enforced Night 3 requirement (every 3 nights)",
+        ],
+    },
 ]
 
 

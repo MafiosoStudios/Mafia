@@ -23,12 +23,10 @@ class BackToPrioritiesButton(discord.ui.Button):
 
 class AntagonistConversionButton(discord.ui.Button):
     def __init__(self) -> None:
-        emoji_val = get_emoji("mafia") or "⚔️"
         super().__init__(
             label="Antagonist Conversion",
-            style=discord.ButtonStyle.secondary,
+            style=discord.ButtonStyle.danger,
             custom_id="antagonist_conversion_btn",
-            emoji=emoji_val if emoji_val else None,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
