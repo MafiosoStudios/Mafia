@@ -10,18 +10,37 @@ import roles
 
 class AntagonistConversionButton(discord.ui.Button):
     def __init__(self) -> None:
+        emoji_val = get_emoji("mafia") or "⚔️"
         super().__init__(
             label="Antagonist Conversion",
             style=discord.ButtonStyle.secondary,
             custom_id="antagonist_conversion_btn",
-            emoji=get_emoji("mafia"),
+            emoji=emoji_val if emoji_val else None,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_message(
-            f"{get_emoji('info')} **Antagonist Conversion**\nWhen the main killing role (e.g. Frieza) is eliminated, a random Mafia member inherits the base kill ability.",
-            ephemeral=True,
+        e_bb = get_emoji("blackbeard") or "🏴‍☠️"
+        e_ly = get_emoji("light_yagami") or "📓"
+        e_mk = get_emoji("makima") or "⛓️"
+        e_mz = get_emoji("muzan_kibutsuji") or "👹"
+
+        layout = build_v2_layout(
+            title=f"{get_emoji('mafia')} Antagonist Conversion Rules",
+            description=(
+                "The Antagonist (Mafia) faction must **ALWAYS** maintain an active killing threat.\n\n"
+                "If the primary Antagonist killer (**Frieza**) dies by any means, the highest-priority "
+                "living Antagonist is stripped of all former powers/abilities and inherits the **Base Kill** power.\n\n"
+                "### 🩸 Inheritance Priority Order:\n"
+                f"`1.` {e_bb} **Blackbeard**\n"
+                f"`2.` {e_ly} **Light Yagami**\n"
+                f"`3.` {e_mk} **Makima**\n"
+                f"`4.` {e_mz} **Muzan Kibutsuji**\n\n"
+                "*(If none of the above exist in the match, any remaining living Antagonist receives the Base Kill).*"
+            ),
+            color=discord.Color.red(),
+            footer_text="Mafioso Conversion Engine",
         )
+        await interaction.response.send_message(view=layout, ephemeral=True)
 
 
 class PrioritiesView(MafiosoLayoutView):

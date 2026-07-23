@@ -416,6 +416,7 @@ class GameEngine:
                 )
             )
             await self.save_session_state(session)
+            await self._check_antagonist_conversion(session)
 
         # Broadcast day death or suicide immediately to the mafia channel (outside the lock)
         if session.state == GameState.DAY or cause == "declared_peace":
@@ -451,6 +452,67 @@ class GameEngine:
                     except Exception:
 
                         logger.exception("Failed to send death DM to %s", user_id)
+
+    async def _check_antagonist_conversion(self, session: GameSession) -> None:
+        """Checks if the Antagonist faction currently lacks a living killer.
+        If the primary killer (Frieza or current killer) is dead, the highest-priority
+        living Antagonist is stripped of their powers and converted to the Base Kill role."""
+        alive_villains = [
+            p for p in session.players.values()
+            if p.alive and p.faction == RoleFaction.VILLAIN.value
+        ]
+        if not alive_villains:
+            return
+
+        # Check if any living villain is already an active killer
+        has_active_killer = any(
+            p.role_key == "frieza" or p.metadata.get("is_converted_antagonist_killer")
+            for p in alive_villains
+        )
+        if has_active_killer:
+            return
+
+        # Priority order for Antagonist conversion
+        priority_order = ["blackbeard", "light_yagami", "makima", "muzan_kibutsuji"]
+
+        chosen_player: GamePlayerState | None = None
+        for r_key in priority_order:
+            for p in alive_villains:
+                if p.role_key == r_key:
+                    chosen_player = p
+                    break
+            if chosen_player:
+                break
+
+        # Fallback to first available living villain if none match priority list
+        if not chosen_player and alive_villains:
+            chosen_player = alive_villains[0]
+
+        if chosen_player:
+            chosen_player.metadata["is_converted_antagonist_killer"] = True
+            chosen_player.metadata["converted_from_role"] = chosen_player.role_key
+
+            # Send DM notification to converted player
+            if self.bot and session.game_handle:
+                guild = self.bot.get_guild(session.game_handle.guild_id)
+                if guild:
+                    member = guild.get_member(chosen_player.user_id)
+                    if member:
+                        from ui import build_v2_layout
+                        conv_layout = build_v2_layout(
+                            title=f"{get_emoji('mafia')} Antagonist Inheritance!",
+                            description=(
+                                f"Your primary killing leader has been eliminated!\n\n"
+                                f"You have been stripped of your former abilities and powers, "
+                                f"and inherited the **Antagonist Base Kill** ability.\n\n"
+                                f"During Night phases, your sole action will now be to choose a target to **Kill**."
+                            ),
+                            color=discord.Color.red(),
+                        )
+                        try:
+                            self.bot.message_queue.send(member, view=conv_layout)
+                        except Exception:
+                            pass
 
     async def mark_disconnected(self, game_id: str, user_id: int) -> None:
         async with self._lock:

@@ -7,6 +7,37 @@ from utils.constants import RoleFaction
 from config import get_emoji
 
 
+class AntagonistBaseKill(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Kill",
+            description="Eliminate a target player at night for the Antagonist faction.",
+            priority=4
+        )
+
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        targets = super().get_eligible_targets(session, actor_id)
+        return [
+            pid for pid in targets
+            if pid != actor_id and session.players[pid].faction != RoleFaction.VILLAIN.value
+        ]
+
+    async def execute(self, context: RoleContext) -> None:
+        target_id = context.target_id
+        session = context.payload.get("session")
+        if not target_id or not session:
+            return
+
+        target_player = session.players.get(target_id)
+        if target_player and target_player.alive:
+            context.payload["attack"] = {
+                "target_id": target_id,
+                "attacker_id": context.user_id,
+                "attack_source": "antagonist_base_kill",
+                "pierces_basic": False,
+            }
+
+
 class BlackbeardDarknessLogia(NightAction):
     def __init__(self) -> None:
         super().__init__(
@@ -219,7 +250,7 @@ class LightYagamiKill(NightAction):
 class LightYagami(BaseRole):
     role_key: ClassVar[str] = "light_yagami"
     priority: ClassVar[int] = 4
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
     cooldown_text: ClassVar[str] = "3 nights cooldown (Devil's Pen)"
     limitations_text: ClassVar[str] = "Death Note guess only kills on correct guesses."
 

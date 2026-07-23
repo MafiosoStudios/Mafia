@@ -187,14 +187,18 @@ class NightActionView(MafiosoLayoutView):
             return
 
         role_inst = role_cls()
+        if player.metadata.get("is_converted_antagonist_killer"):
+            from roles.mafia import AntagonistBaseKill
+            role_inst.abilities = [AntagonistBaseKill()]
+            role_inst.passives = []
+
         active_abilities = [a for a in role_inst.abilities if isinstance(a, NightAction)]
         if not active_abilities:
             await interaction.response.send_message("You do not have an active night ability.", ephemeral=True)
             return
 
         # Handle legacy role-specific custom views (e.g. Light Yagami)
-        # Note: Kenzo Tenma is now fully updated, but Light Yagami uses a special guess panel
-        if role_key == "light_yagami":
+        if role_key == "light_yagami" and not player.metadata.get("is_converted_antagonist_killer"):
             living_targets = [pid for pid, pstate in session.players.items() if pstate.alive and pstate.faction != "Villain"]
             options = []
             guild = interaction.guild
