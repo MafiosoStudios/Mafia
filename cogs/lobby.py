@@ -230,7 +230,7 @@ class LobbyCog(commands.Cog):
         await lobby_manager.leave_lobby(ctx.guild.id, player.id)
         await send_hybrid_response(ctx, f"🚪 **{player.display_name}** was banished from the lobby.")
 
-    @commands.hybrid_group(name="customrolelist", description="Manage custom role lists for the guild")
+    @commands.hybrid_group(name="customrolelist", fallback="menu", description="Manage custom role lists for the guild")
     async def customrolelist(self, ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
             if ctx.guild is None:
