@@ -167,22 +167,20 @@ class LobbyCog(commands.Cog):
                     if saved_lists:
                         menu_view = CustomRoleListMenuView(db, ctx.guild.id, ctx.author.id)
                         await menu_view.init_data()
-                        embed = menu_view.build_embed()
+                        v2_card = menu_view.build_v2_card()
                         await send_hybrid_response(
                             ctx,
                             content="⚠️ **No Custom Role List Loaded!** Select a saved list below or create a new one to enable Custom mode:",
-                            embed=embed,
-                            view=menu_view,
+                            view=v2_card,
                             ephemeral=True,
                         )
                     else:
                         create_view = CustomRoleListCreateView(db, ctx.guild.id, ctx.author.id)
-                        embed = create_view.build_embed()
+                        v2_card = create_view.build_v2_card()
                         await send_hybrid_response(
                             ctx,
                             content="⚠️ **No saved custom role lists found.** Use the builder below to create your custom role list:",
-                            embed=embed,
-                            view=create_view,
+                            view=v2_card,
                             ephemeral=True,
                         )
 
@@ -252,8 +250,8 @@ class LobbyCog(commands.Cog):
 
             menu_view = CustomRoleListMenuView(db, ctx.guild.id, ctx.author.id, active_name=active_name)
             await menu_view.init_data()
-            embed = menu_view.build_embed()
-            await send_hybrid_response(ctx, embed=embed, view=menu_view)
+            v2_card = menu_view.build_v2_card()
+            await send_hybrid_response(ctx, view=v2_card)
 
     @customrolelist.command(name="create", description="Start editing a new custom role list draft")
     @discord.app_commands.describe(name="Name of the custom role list")
@@ -521,8 +519,8 @@ class LobbyCog(commands.Cog):
 
         menu_view = CustomRoleListMenuView(database, ctx.guild.id, ctx.author.id, active_name=active_name)
         await menu_view.init_data()
-        embed = menu_view.build_embed()
-        await send_hybrid_response(ctx, embed=embed, view=menu_view)
+        v2_card = menu_view.build_v2_card()
+        await send_hybrid_response(ctx, view=v2_card)
 
 
     @add_role.autocomplete("role")

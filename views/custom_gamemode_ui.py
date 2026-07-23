@@ -4,10 +4,19 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import discord
+from discord import ui
 
+from config import get_emoji
 from roles import ROLES_METADATA
-
 from ui.base import MafiosoLayoutView
+from ui.theme import (
+    COLOR_PRIMARY,
+    COLOR_SUCCESS,
+    COLOR_ERROR,
+    heading,
+    subheading,
+    small_footer,
+)
 
 if TYPE_CHECKING:
     from database import Database
@@ -15,10 +24,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def parse_option_emoji(emoji_str: str) -> discord.PartialEmoji | str | None:
+    """Parses custom Discord emojis (<:name:id>) or unicode strings into PartialEmoji or str for UI controls."""
+    if not emoji_str:
+        return None
+    emoji_str = emoji_str.strip()
+    if emoji_str.startswith("<") and emoji_str.endswith(">"):
+        try:
+            return discord.PartialEmoji.from_str(emoji_str)
+        except Exception:
+            return None
+    return emoji_str
+
+
 class CustomRoleListMenuView(MafiosoLayoutView):
-    """All-in-One Custom Role List Menu View.
-    Displays saved role lists, active list status, selection dropdown, and action buttons.
-    """
+    """All-in-One Custom Role List Menu View using pure Components V2 Container layout."""
 
     def __init__(self, db: Database, guild_id: int, user_id: int, active_name: str | None = None):
         super().__init__(timeout=180.0)
@@ -37,24 +57,18 @@ class CustomRoleListMenuView(MafiosoLayoutView):
             self.saved_lists = {}
         self.build_components()
 
-    def build_embed(self) -> discord.Embed:
-        embed = discord.Embed(
-            title="🎮 Guild Custom Role Lists",
-            description="Manage and select custom gamemode role lists for your server.",
-            color=discord.Color.gold(),
-        )
+    def build_v2_card(self) -> MafiosoLayoutView:
+        color = COLOR_PRIMARY
+        header_text = f"{heading('Guild Custom Role Lists')}\nManage and select custom gamemode role lists for your server."
 
+        lines: list[str] = []
         if not self.saved_lists:
-            embed.add_field(
-                name="📋 Saved Role Lists",
-                value="*No saved custom role lists found for this server.*\nClick **🟢 Create Rolelist** below to build one!",
-                inline=False,
-            )
+            lines.append(f"{get_emoji('roster')} *No saved custom role lists found for this server.*")
+            lines.append("Click **Create Rolelist** below to build one!")
         else:
-            list_text = []
+            lines.append(f"{get_emoji('roster')} **Saved Role Lists ({len(self.saved_lists)})**\n")
             for name, r_list in self.saved_lists.items():
-                is_active = " (Active 🟢)" if name == self.active_name else ""
-                # Count frequencies
+                is_active = f" {get_emoji('alive')} (Active)" if name == self.active_name else ""
                 counts: dict[str, int] = {}
                 for r in r_list:
                     counts[r] = counts.get(r, 0) + 1
@@ -63,34 +77,56 @@ class CustomRoleListMenuView(MafiosoLayoutView):
                 for r, count in counts.items():
                     meta = ROLES_METADATA.get(r, {})
                     r_name = meta.get("name", r)
-                    emoji = meta.get("emoji", "")
-                    formatted_roles.append(f"{emoji} {r_name}" + (f" x{count}" if count > 1 else ""))
+                    r_emoji = get_emoji(r) or meta.get("emoji", "")
+                    count_suffix = f" x{count}" if count > 1 else ""
+                    formatted_roles.append(f"{r_emoji} {r_name}{count_suffix}")
 
                 role_summary = ", ".join(formatted_roles[:8])
                 if len(formatted_roles) > 8:
                     role_summary += f" ... (+{len(formatted_roles) - 8} more)"
 
-                list_text.append(
+                lines.append(
                     f"• **{name}**{is_active} — `{len(r_list)} Roles`\n  └ {role_summary or 'Empty'}"
                 )
 
-            embed.add_field(
-                name=f"📋 Saved Role Lists ({len(self.saved_lists)})",
-                value="\n\n".join(list_text),
-                inline=False,
-            )
+        body_md = "\n".join(lines)
+        footer_md = f"Currently Active List: {self.active_name}" if self.active_name else "Select a role list from the dropdown below to set it as active."
 
-        if self.active_name:
-            embed.set_footer(text=f"Currently Active Gamemode List: {self.active_name}")
-        else:
-            embed.set_footer(text="Select a role list from the dropdown to activate it for matches.")
+        container = ui.Container(accent_color=color)
+        container.add_item(ui.TextDisplay(header_text))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(body_md))
 
-        return embed
+        items_to_add = [c for c in self.children if not isinstance(c, ui.Container)]
+        if items_to_add:
+            container.add_item(ui.Separator())
+            current_row = ui.ActionRow()
+            for item in items_to_add:
+                if isinstance(item, ui.Select):
+                    if current_row.children:
+                        container.add_item(current_row)
+                        current_row = ui.ActionRow()
+                    s_row = ui.ActionRow()
+                    s_row.add_item(item)
+                    container.add_item(s_row)
+                elif isinstance(item, ui.Button):
+                    current_row.add_item(item)
+                    if len(current_row.children) == 5:
+                        container.add_item(current_row)
+                        current_row = ui.ActionRow()
+            if current_row.children:
+                container.add_item(current_row)
+
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(small_footer(footer_md)))
+
+        layout = MafiosoLayoutView(timeout=self.timeout or 180.0)
+        layout.add_item(container)
+        return layout
 
     def build_components(self) -> None:
         self.clear_items()
 
-        # Dropdown to select active rolelist
         if self.saved_lists:
             options = []
             for name, r_list in self.saved_lists.items():
@@ -100,7 +136,7 @@ class CustomRoleListMenuView(MafiosoLayoutView):
                         label=name,
                         value=name,
                         description=f"{len(r_list)} custom roles in pool",
-                        emoji="📜",
+                        emoji=parse_option_emoji(get_emoji("roster")),
                         default=is_def,
                     )
                 )
@@ -113,11 +149,10 @@ class CustomRoleListMenuView(MafiosoLayoutView):
             select.callback = self.on_select_active
             self.add_item(select)
 
-        # Action Buttons
         create_btn = discord.ui.Button(
             label="Create Rolelist",
             style=discord.ButtonStyle.success,
-            emoji="🟢",
+            emoji=parse_option_emoji(get_emoji("join")),
             custom_id="custom_list_btn_create",
         )
         create_btn.callback = self.on_click_create
@@ -127,7 +162,7 @@ class CustomRoleListMenuView(MafiosoLayoutView):
             delete_btn = discord.ui.Button(
                 label="Delete Rolelist",
                 style=discord.ButtonStyle.danger,
-                emoji="🗑️",
+                emoji=parse_option_emoji(get_emoji("trash")),
                 custom_id="custom_list_btn_delete",
             )
             delete_btn.callback = self.on_click_delete
@@ -146,22 +181,22 @@ class CustomRoleListMenuView(MafiosoLayoutView):
         chosen_name = select_component[0]
         self.active_name = chosen_name
         self.build_components()
-        embed = self.build_embed()
+        v2_card = self.build_v2_card()
 
-        await interaction.edit_original_response(embed=embed, view=self)
-        await interaction.followup.send(f"✅ Loaded **{chosen_name}** as active custom role list!", ephemeral=True)
+        await interaction.edit_original_response(view=v2_card)
+        await interaction.followup.send(f"Loaded **{chosen_name}** as active custom role list.", ephemeral=True)
 
     async def on_click_create(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
         create_view = CustomRoleListCreateView(self.db, self.guild_id, interaction.user.id, parent_view=self)
-        embed = create_view.build_embed()
-        await interaction.followup.send(embed=embed, view=create_view, ephemeral=True)
+        v2_card = create_view.build_v2_card()
+        await interaction.followup.send(view=v2_card, ephemeral=True)
 
     async def on_click_delete(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
         delete_view = CustomRoleListDeleteView(self.db, self.guild_id, interaction.user.id, self.saved_lists, parent_view=self)
-        embed = delete_view.build_embed()
-        await interaction.followup.send(embed=embed, view=delete_view, ephemeral=True)
+        v2_card = delete_view.build_v2_card()
+        await interaction.followup.send(view=v2_card, ephemeral=True)
 
 
 class CustomListNameModal(discord.ui.Modal, title="Set Custom Role List Name"):
@@ -181,14 +216,12 @@ class CustomListNameModal(discord.ui.Modal, title="Set Custom Role List Name"):
         await interaction.response.defer(ephemeral=True)
         self.create_view.list_name = self.name_input.value.strip()
         self.create_view.build_components()
-        embed = self.create_view.build_embed()
-        await interaction.edit_original_response(embed=embed, view=self.create_view)
+        v2_card = self.create_view.build_v2_card()
+        await interaction.edit_original_response(view=v2_card)
 
 
 class CustomRoleListCreateView(MafiosoLayoutView):
-    """Interactive Builder View for creating/editing a custom role list.
-    Supports real-time embed updates and selecting multiple copies of the same role.
-    """
+    """Interactive Builder View for creating/editing a custom role list using V2 Container card layout."""
 
     def __init__(
         self,
@@ -206,104 +239,121 @@ class CustomRoleListCreateView(MafiosoLayoutView):
         self.draft_roles: list[str] = []
         self.build_components()
 
-    def build_embed(self) -> discord.Embed:
-        embed = discord.Embed(
-            title=f"🛠️ Creating Role List: {self.list_name}",
-            description="Add roles to your list using the dropdowns below. You can add the same role multiple times!",
-            color=discord.Color.blue(),
-        )
+    def build_v2_card(self) -> MafiosoLayoutView:
+        color = COLOR_PRIMARY
+        header_text = f"{heading(f'Role List Builder: {self.list_name}')}\nAdd roles using the dropdowns below. You can select the same role multiple times."
 
         counts: dict[str, int] = {}
         for r in self.draft_roles:
             counts[r] = counts.get(r, 0) + 1
 
         if not self.draft_roles:
-            role_breakdown = "*No roles added yet. Use the dropdown below to add roles!*"
+            role_breakdown = f"{get_emoji('roster')} *No roles added yet. Use the dropdown below to add roles!*"
         else:
-            role_lines = []
+            role_lines = [f"{get_emoji('roster')} **Current Draft Pool ({len(self.draft_roles)} Roles)**\n"]
             for idx, (r_key, count) in enumerate(counts.items(), 1):
                 meta = ROLES_METADATA.get(r_key, {})
                 name = meta.get("name", r_key)
-                emoji = meta.get("emoji", "")
+                r_emoji = get_emoji(r_key) or meta.get("emoji", "")
                 faction = meta.get("faction", "Unknown")
-                role_lines.append(f"`{idx}.` {emoji} **{name}** ({faction}) — **x{count}**")
+                faction_emoji = get_emoji(faction)
+                role_lines.append(f"`{idx}.` {r_emoji} **{name}** ({faction_emoji} {faction}) — **x{count}**")
             role_breakdown = "\n".join(role_lines)
 
-        embed.add_field(
-            name=f"📦 Current Draft Pool ({len(self.draft_roles)} Roles)",
-            value=role_breakdown,
-            inline=False,
-        )
+        container = ui.Container(accent_color=color)
+        container.add_item(ui.TextDisplay(header_text))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(role_breakdown))
 
-        embed.set_footer(text="Click 'Save Rolelist' when finished to activate and store for your server.")
-        return embed
+        items_to_add = [c for c in self.children if not isinstance(c, ui.Container)]
+        if items_to_add:
+            container.add_item(ui.Separator())
+            current_row = ui.ActionRow()
+            for item in items_to_add:
+                if isinstance(item, ui.Select):
+                    if current_row.children:
+                        container.add_item(current_row)
+                        current_row = ui.ActionRow()
+                    s_row = ui.ActionRow()
+                    s_row.add_item(item)
+                    container.add_item(s_row)
+                elif isinstance(item, ui.Button):
+                    current_row.add_item(item)
+                    if len(current_row.children) == 5:
+                        container.add_item(current_row)
+                        current_row = ui.ActionRow()
+            if current_row.children:
+                container.add_item(current_row)
+
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(small_footer("Click 'Save Rolelist' when finished to store for your server.")))
+
+        layout = MafiosoLayoutView(timeout=self.timeout or 300.0)
+        layout.add_item(container)
+        return layout
 
     def build_components(self) -> None:
         self.clear_items()
 
-        # Button: Set Name
         name_btn = discord.ui.Button(
             label=f"Name: {self.list_name[:15]}",
             style=discord.ButtonStyle.secondary,
-            emoji="📝",
+            emoji=parse_option_emoji(get_emoji("settings")),
             custom_id="create_btn_set_name",
         )
         name_btn.callback = self.on_set_name
         self.add_item(name_btn)
 
-        # Dropdown: Add Role (Includes all available roles)
         add_options = []
         for r_key, meta in ROLES_METADATA.items():
             name = meta.get("name", r_key)
-            emoji = meta.get("emoji", "🎭")
+            r_emoji = get_emoji(r_key) or meta.get("emoji", "")
             faction = meta.get("faction", "")
             add_options.append(
                 discord.SelectOption(
                     label=name,
                     value=r_key,
                     description=f"{faction} faction",
-                    emoji=emoji if len(emoji) <= 2 else None,
+                    emoji=parse_option_emoji(r_emoji),
                 )
             )
 
         if add_options:
             add_select = discord.ui.Select(
-                placeholder="➕ Select a role to add (can add multiple)...",
+                placeholder="Select a role to add (can add multiple)...",
                 options=add_options[:25],
                 custom_id="create_select_add_role",
             )
             add_select.callback = self.on_add_role
             self.add_item(add_select)
 
-        # Dropdown: Remove Role (Only roles currently in draft)
         if self.draft_roles:
             unique_draft = list(dict.fromkeys(self.draft_roles))
             rem_options = []
             for r_key in unique_draft:
                 meta = ROLES_METADATA.get(r_key, {})
                 name = meta.get("name", r_key)
-                emoji = meta.get("emoji", "🎭")
+                r_emoji = get_emoji(r_key) or meta.get("emoji", "")
                 rem_options.append(
                     discord.SelectOption(
                         label=f"Remove 1x {name}",
                         value=r_key,
-                        emoji=emoji if len(emoji) <= 2 else None,
+                        emoji=parse_option_emoji(r_emoji),
                     )
                 )
 
             rem_select = discord.ui.Select(
-                placeholder="➖ Select a role to remove 1x...",
+                placeholder="Select a role to remove 1x...",
                 options=rem_options[:25],
                 custom_id="create_select_rem_role",
             )
             rem_select.callback = self.on_remove_role
             self.add_item(rem_select)
 
-        # Save Button
         save_btn = discord.ui.Button(
             label="Save Rolelist",
             style=discord.ButtonStyle.success,
-            emoji="💾",
+            emoji=parse_option_emoji(get_emoji("save")),
             custom_id="create_btn_save",
         )
         save_btn.callback = self.on_save
@@ -320,8 +370,8 @@ class CustomRoleListCreateView(MafiosoLayoutView):
             r_key = values[0]
             self.draft_roles.append(r_key)
             self.build_components()
-            embed = self.build_embed()
-            await interaction.edit_original_response(embed=embed, view=self)
+            v2_card = self.build_v2_card()
+            await interaction.edit_original_response(view=v2_card)
 
     async def on_remove_role(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
@@ -331,40 +381,40 @@ class CustomRoleListCreateView(MafiosoLayoutView):
             if r_key in self.draft_roles:
                 self.draft_roles.remove(r_key)
                 self.build_components()
-                embed = self.build_embed()
-                await interaction.edit_original_response(embed=embed, view=self)
+                v2_card = self.build_v2_card()
+                await interaction.edit_original_response(view=v2_card)
 
     async def on_save(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
         if not self.draft_roles:
-            await interaction.followup.send("⚠️ You must add at least 1 role before saving!", ephemeral=True)
+            await interaction.followup.send("You must add at least 1 role before saving.", ephemeral=True)
             return
 
         try:
             await self.db.save_custom_role_list(self.guild_id, self.list_name, self.draft_roles)
         except Exception:
             logger.exception("Failed to save custom role list %s for guild %s", self.list_name, self.guild_id)
-            await interaction.followup.send("❌ Failed to save role list to database.", ephemeral=True)
+            await interaction.followup.send("Failed to save role list to database.", ephemeral=True)
             return
 
         if self.parent_view:
             await self.parent_view.init_data()
             self.parent_view.active_name = self.list_name
             self.parent_view.build_components()
-            parent_embed = self.parent_view.build_embed()
+            parent_v2 = self.parent_view.build_v2_card()
             try:
-                await interaction.edit_original_response(embed=parent_embed, view=self.parent_view)
+                await interaction.edit_original_response(view=parent_v2)
             except Exception:
                 pass
 
         await interaction.followup.send(
-            f"✅ Saved **{self.list_name}** with `{len(self.draft_roles)}` roles and set it as active!",
+            f"Saved **{self.list_name}** with `{len(self.draft_roles)}` roles and set it as active.",
             ephemeral=True,
         )
 
 
 class CustomRoleListDeleteView(MafiosoLayoutView):
-    """Ephemeral view to select and delete a saved custom role list."""
+    """Ephemeral view to select and delete a saved custom role list using V2 Container card layout."""
 
     def __init__(
         self,
@@ -382,12 +432,39 @@ class CustomRoleListDeleteView(MafiosoLayoutView):
         self.parent_view = parent_view
         self.build_components()
 
-    def build_embed(self) -> discord.Embed:
-        return discord.Embed(
-            title="🗑️ Delete Custom Role List",
-            description="Select a custom role list from the dropdown below to permanently delete it from this server.",
-            color=discord.Color.red(),
-        )
+    def build_v2_card(self) -> MafiosoLayoutView:
+        color = COLOR_ERROR
+        header_text = f"{heading('Delete Custom Role List')}\nSelect a custom role list from the dropdown below to permanently delete it."
+
+        container = ui.Container(accent_color=color)
+        container.add_item(ui.TextDisplay(header_text))
+        container.add_item(ui.Separator())
+
+        items_to_add = [c for c in self.children if not isinstance(c, ui.Container)]
+        if items_to_add:
+            current_row = ui.ActionRow()
+            for item in items_to_add:
+                if isinstance(item, ui.Select):
+                    if current_row.children:
+                        container.add_item(current_row)
+                        current_row = ui.ActionRow()
+                    s_row = ui.ActionRow()
+                    s_row.add_item(item)
+                    container.add_item(s_row)
+                elif isinstance(item, ui.Button):
+                    current_row.add_item(item)
+                    if len(current_row.children) == 5:
+                        container.add_item(current_row)
+                        current_row = ui.ActionRow()
+            if current_row.children:
+                container.add_item(current_row)
+
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(small_footer("Warning: Deletion is permanent and cannot be undone.")))
+
+        layout = MafiosoLayoutView(timeout=self.timeout or 120.0)
+        layout.add_item(container)
+        return layout
 
     def build_components(self) -> None:
         self.clear_items()
@@ -399,7 +476,7 @@ class CustomRoleListDeleteView(MafiosoLayoutView):
                 label=name,
                 value=name,
                 description=f"Delete {name} ({len(r_list)} roles)",
-                emoji="🗑️",
+                emoji=parse_option_emoji(get_emoji("trash")),
             )
             for name, r_list in self.saved_lists.items()
         ]
@@ -423,7 +500,7 @@ class CustomRoleListDeleteView(MafiosoLayoutView):
             await self.db.delete_custom_role_list(self.guild_id, target_name)
         except Exception:
             logger.exception("Failed to delete custom role list %s", target_name)
-            await interaction.followup.send("❌ Failed to delete role list.", ephemeral=True)
+            await interaction.followup.send("Failed to delete role list.", ephemeral=True)
             return
 
         if self.parent_view:
@@ -431,10 +508,10 @@ class CustomRoleListDeleteView(MafiosoLayoutView):
             if self.parent_view.active_name == target_name:
                 self.parent_view.active_name = None
             self.parent_view.build_components()
-            parent_embed = self.parent_view.build_embed()
+            parent_v2 = self.parent_view.build_v2_card()
             try:
-                await interaction.edit_original_response(embed=parent_embed, view=self.parent_view)
+                await interaction.edit_original_response(view=parent_v2)
             except Exception:
                 pass
 
-        await interaction.followup.send(f"🗑️ Successfully deleted custom role list **{target_name}**.", ephemeral=True)
+        await interaction.followup.send(f"Successfully deleted custom role list **{target_name}**.", ephemeral=True)
