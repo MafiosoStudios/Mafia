@@ -100,8 +100,121 @@ class GameEngine:
     def __init__(self, database: DatabaseManager) -> None:
         self._database = database
         self._sessions: dict[str, GameSession] = {}
+        self._session_debouncers: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()
         self.bot: discord.Client | None = None
+
+    def request_vote_tally_update(self, game_id: str) -> None:
+        debouncers = self._session_debouncers.setdefault(game_id, {})
+        if "vote_tally" not in debouncers:
+            from utils.debouncer import DebouncedUpdater
+
+            async def _do_update() -> None:
+                await self._update_vote_tally(game_id)
+
+            debouncers["vote_tally"] = DebouncedUpdater(_do_update, delay=1.2)
+        debouncers["vote_tally"].request_update()
+
+    async def _update_vote_tally(self, game_id: str) -> None:
+        async with self._lock:
+            session = self._sessions.get(game_id)
+            if not session or session.phase != GamePhase.VOTING:
+                return
+
+            alive_count = sum(1 for p in session.players.values() if p.alive)
+            skips_count = len(session.metadata.get("skip_votes", set()))
+
+            tally: dict[int, int] = {}
+            geass_target = session.metadata.get("geass_target")
+            for voter_id, nominated_id in session.votes.items():
+                voter_state = session.players.get(voter_id)
+                weight = voter_state.vote_weight if voter_state else 1
+                if nominated_id == geass_target:
+                    weight *= 2
+                tally[nominated_id] = tally.get(nominated_id, 0) + weight
+
+            tally_lines = []
+            for target_id, count in sorted(tally.items(), key=lambda x: x[1], reverse=True):
+                pstate = session.players.get(target_id)
+                if pstate:
+                    tally_lines.append(f"• <@{target_id}>: **{count}** vote(s)")
+
+            if skips_count > 0:
+                tally_lines.append(f"• **Skip Vote**: **{skips_count}** vote(s)")
+
+            total_voted = len(session.votes) + skips_count
+            day_num = session.metadata.get("day_num", 1)
+            vote_msg = session.metadata.get("vote_message")
+            if not vote_msg:
+                return
+
+            status_desc = (
+                f"Accusations are flying, friendship is a myth! It's time to choose who gets dragged onto the stand.\n\n"
+                f"📊 **Ballots Cast:** {total_voted} / {alive_count}\n\n"
+                + ("\n".join(tally_lines) if tally_lines else "No votes cast yet.")
+            )
+
+        try:
+            from views.game_ui import VoteUISelectView
+            vote_view = VoteUISelectView(game_id, self)
+            layout = build_v2_layout(
+                title=f"Day {day_num} - Nomination Phase",
+                description=status_desc,
+                color=discord.Color.red(),
+                view=vote_view,
+            )
+            await vote_msg.edit(view=layout)
+        except Exception as e:
+            logger.debug("Failed to update vote tally: %s", e)
+
+    def request_night_status_update(self, game_id: str) -> None:
+        debouncers = self._session_debouncers.setdefault(game_id, {})
+        if "night_status" not in debouncers:
+            from utils.debouncer import DebouncedUpdater
+
+            async def _do_update() -> None:
+                await self._update_night_status(game_id)
+
+            debouncers["night_status"] = DebouncedUpdater(_do_update, delay=1.2)
+        debouncers["night_status"].request_update()
+
+    async def _update_night_status(self, game_id: str) -> None:
+        async with self._lock:
+            session = self._sessions.get(game_id)
+            if not session or session.phase != GamePhase.NIGHT_ACTIONS:
+                return
+
+            active_count = sum(1 for p in session.players.values() if p.alive and p.role_key not in ["villager", "demon", "mahoraga"])
+            submitted_count = len(session.night_actions)
+            night_num = session.metadata.get("night_num", 1)
+            night_msg = session.metadata.get("night_message")
+            if not night_msg:
+                return
+
+            status_desc = (
+                f"Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n\n"
+                f"🌙 **Submitted Actions:** {submitted_count} / {active_count} active roles\n\n"
+                "Click below to use your role's ability before sunrise!"
+            )
+
+        try:
+            from views.game_ui import NightActionView
+            action_view = NightActionView(game_id, self)
+            night_view = build_v2_layout(
+                title=f"Night {night_num}",
+                description=status_desc,
+                color=discord.Color.dark_blue(),
+                image_url=get_event_image("night"),
+                view=action_view,
+            )
+            await night_msg.edit(view=night_view)
+        except Exception as e:
+            logger.debug("Failed to update night status: %s", e)
+
+    def clear_session_debouncers(self, game_id: str) -> None:
+        debouncers = self._session_debouncers.pop(game_id, {})
+        for deb in debouncers.values():
+            asyncio.create_task(deb.flush())
 
     async def create_session(
         self,
@@ -222,6 +335,7 @@ class GameEngine:
                 session.votes[voter_id] = target_id
                 session.players[voter_id].votes_cast += 1
             await self.save_session_state(session)
+        self.request_vote_tally_update(game_id)
 
     async def queue_night_action(
         self,
@@ -282,6 +396,7 @@ class GameEngine:
             session.night_actions[user_id] = payload
             session.players[user_id].night_actions_used += 1
             await self.save_session_state(session)
+        self.request_night_status_update(game_id)
 
     async def resolve_night(self, game_id: str) -> None:
         async with self._lock:
@@ -1038,6 +1153,7 @@ class GameEngine:
 
                     try:
                         night_msg = await self.bot.message_queue.send(mafia_channel, view=night_view)
+                        session.metadata["night_message"] = night_msg
                     except Exception as err:
                         logger.error(f"Failed to send night view: {err}")
                         night_msg = None
@@ -1051,6 +1167,9 @@ class GameEngine:
                         if await self._all_active_submitted(session):
                             break
                         await asyncio.sleep(2)
+
+                    self.clear_session_debouncers(game_id)
+                    session.metadata.pop("night_message", None)
 
                     # Send Night Action Phase Ended as a new embed
                     try:
@@ -1171,6 +1290,7 @@ class GameEngine:
                                 mafia_channel,
                                 view=vote_layout
                             )
+                            session.metadata["vote_message"] = vote_msg
 
                         if is_resume:
                             from views.game_ui import VoteUISelectView
@@ -1188,6 +1308,7 @@ class GameEngine:
                                 mafia_channel,
                                 view=vote_layout
                             )
+                            session.metadata["vote_message"] = vote_msg
 
                         # Wait for Voting timeout
                         if not is_resume:
@@ -1202,6 +1323,9 @@ class GameEngine:
                             if total_votes >= alive_count_check:
                                 break
                             await asyncio.sleep(2)
+
+                        self.clear_session_debouncers(game_id)
+                        session.metadata.pop("vote_message", None)
 
                         # Remove vote view
                         try:
