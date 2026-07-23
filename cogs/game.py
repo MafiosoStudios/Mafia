@@ -388,6 +388,12 @@ class GameCog(commands.Cog):
         view = PatchNotesView.build_layout_view(index)
         await send_hybrid_response(ctx, view=view, ephemeral=False)
 
+    @commands.hybrid_command(name="priorities", aliases=["priority", "rolepriorities"], description="View role action execution order and priorities")
+    async def priorities(self, ctx: commands.Context) -> None:
+        from views.priorities_view import PrioritiesView
+        view = PrioritiesView.build_layout()
+        await send_hybrid_response(ctx, view=view, ephemeral=False)
+
 
 
 async def setup(bot: commands.Bot) -> None:

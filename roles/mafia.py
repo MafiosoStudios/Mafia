@@ -255,6 +255,12 @@ class MuzanInfect(NightAction):
             priority=4
         )
 
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        night_num = session.metadata.get("night_num", 1)
+        if night_num < 3 or night_num % 3 != 0:
+            return False, f"Blood Demon Art can only be used starting from Night 3, every 3 nights (Night 3, 6, 9, etc.). It is currently Night {night_num}."
+        return True, None
+
     async def execute(self, context: RoleContext) -> None:
         session = context.payload.get("session")
         if not session:

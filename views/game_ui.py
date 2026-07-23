@@ -284,7 +284,12 @@ class NightAbilityButtonsView(MafiosoLayoutView):
                 await interaction.response.send_message("You cannot use abilities tonight.", ephemeral=True)
                 return
 
-            # Check if this ability can be used yet
+            # Check if this role or ability can be used yet
+            can_act, act_reason = self.role_inst.can_act_tonight(session, player_state)
+            if not can_act:
+                await interaction.response.send_message(f"{get_emoji('cross')} **You cannot act tonight.**\nReason: {act_reason or 'Not available.'}", ephemeral=True)
+                return
+
             can_use, reason = ability.can_use(session, player_state)
             if not can_use:
                 # If they have someone selected, remove/clear that selection!

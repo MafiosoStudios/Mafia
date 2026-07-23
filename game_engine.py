@@ -260,6 +260,10 @@ class GameEngine:
                 role_cls = role_registry.get(actor_p.role_key)
                 role_inst = role_cls()
                 
+                can_act, reason = role_inst.can_act_tonight(session, actor_p)
+                if not can_act:
+                    raise ValueError(reason or "Your ability is currently unavailable.")
+
                 action_index = payload.get("action_index")
                 if action_index is not None and action_index < len(role_inst.abilities):
                     ability = role_inst.abilities[action_index]
@@ -274,10 +278,6 @@ class GameEngine:
                         can_use, reason = ability.can_use(session, actor_p)
                         if not can_use:
                             raise ValueError(reason or "This ability is currently unavailable.")
-                else:
-                    can_act, reason = role_inst.can_act_tonight(session, actor_p)
-                    if not can_act:
-                        raise ValueError(reason or "Your ability is currently unavailable.")
 
             session.night_actions[user_id] = payload
             session.players[user_id].night_actions_used += 1
@@ -990,9 +990,18 @@ class GameEngine:
                             break
                         await asyncio.sleep(2)
 
-                    # Delete night actions prompt view
+                    # Send Night Action Phase Ended as a new embed
                     try:
-                        await night_msg.edit(view=build_v2_layout(description=f"{get_emoji('night')} **Night Action Phase Ended**", footer_text=""))
+                        if night_msg:
+                            await night_msg.edit(view=None)
+                    except Exception:
+                        pass
+
+                    try:
+                        await self.bot.message_queue.send(
+                            mafia_channel,
+                            view=build_v2_layout(description=f"{get_emoji('night')} **Night Action Phase Ended**", footer_text="")
+                        )
                     except Exception:
                         pass
 
