@@ -43,41 +43,45 @@ class PrioritiesView(MafiosoLayoutView):
 
     @staticmethod
     def build_layout() -> discord.ui.LayoutView:
-        all_roles = sorted(role_registry.all(), key=lambda c: (c.priority, c.role_key))
-
-        priority_labels = {
-            1: "Priority 1 — Roleblockers & Redirects",
-            2: "Priority 2 — Protective & Shields",
-            3: "Priority 3 — Investigative & Support",
-            4: "Priority 4 — Attacks, Executions & Conversions",
-            5: "Priority 5 — Passives & Special Roles",
-            9: "Priority 9 — Late Phase & Special Triggers",
-        }
-
-        priority_groups: dict[int, list[str]] = {}
-        for role_cls in all_roles:
-            p = role_cls.priority
-            meta = roles.ROLES_METADATA.get(role_cls.role_key, {})
-            emoji_str = get_emoji(role_cls.role_key)
-            name = meta.get("name", role_cls.role_key.capitalize())
-            display = f"{emoji_str} {name}" if emoji_str else name
-            priority_groups.setdefault(p, []).append(display)
-
-        description_lines = [
-            "Roles execute night actions in strict priority order (from top to bottom).\n"
+        ordered_keys = [
+            "blackbeard",
+            "makima",
+            "tosen",
+            "dazai",
+            "asta",
+            "doctor_tenma",
+            "frieren",
+            "tobirama_senju",
+            "l",
+            "kishibe",
+            "ayanokoji_kiyotaka",
+            "maomao",
+            "levi_ackerman",
+            "frieza",
+            "light_yagami",
+            "muzan_kibutsuji",
+            "hisoka",
+            "eren_jaeger",
+            "gilgamesh",
         ]
 
-        for p in sorted(priority_groups.keys()):
-            group_header = priority_labels.get(p, f"Priority {p}")
-            role_list = " • ".join(priority_groups[p])
-            description_lines.append(f"### {group_header}\n{role_list}\n")
+        lines = [
+            "Roles execute night actions in strict priority order from top to bottom:\n"
+        ]
+
+        for idx, key in enumerate(ordered_keys, 1):
+            meta = roles.ROLES_METADATA.get(key, {})
+            name = meta.get("name", key.replace("_", " ").title())
+            emoji_str = get_emoji(key)
+            display_name = f"{emoji_str} **{name}**" if emoji_str else f"**{name}**"
+            lines.append(f"`{idx}.` {display_name}")
 
         view = PrioritiesView()
         view.add_item(AntagonistConversionButton())
 
         return build_v2_layout(
             title=f"{get_emoji('roster')} Role Action Priorities",
-            description="\n".join(description_lines),
+            description="\n".join(lines),
             color=discord.Color.gold(),
             view=view,
             footer_text="Mafioso Priority System",
@@ -109,4 +113,4 @@ class PrioritiesView(MafiosoLayoutView):
             color=discord.Color.red(),
             view=view,
             footer_text="Mafioso Conversion Engine",
-g        )
+        )

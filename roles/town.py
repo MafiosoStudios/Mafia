@@ -15,7 +15,7 @@ class TenmaEmergencySurgery(NightAction):
         super().__init__(
             name="Emergency Surgery",
             description="Choose 2 players tonight. If one survives and the other dies, both survive. You cannot pick the same 2 people again next night.",
-            priority=1
+            priority=6
         )
         self.num_targets = 2
 
@@ -40,7 +40,7 @@ class TenmaEmergencySurgery(NightAction):
 @role_registry.register
 class DoctorTenma(BaseRole):
     role_key: ClassVar[str] = "doctor_tenma"
-    priority: ClassVar[int] = 1
+    priority: ClassVar[int] = 6
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.PROTECTIVE,)
     cooldown_text: ClassVar[str] = "None"
     limitations_text: ClassVar[str] = "Cannot select the same 2 players on consecutive nights"
@@ -62,7 +62,7 @@ class AyanokojiObservation(NightAction):
         super().__init__(
             name="Observation",
             description="Observe a player during the Night. Learn who they visited and who visited them.",
-            priority=9
+            priority=11
         )
 
     def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
@@ -119,7 +119,7 @@ class AyanokojiPublicReveal(NightAction):
         super().__init__(
             name="Public Reveal",
             description="Starting from night 4, publicly reveal the role of your target. Cooldown: 4 Days.",
-            priority=9
+            priority=11
         )
 
     def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
@@ -192,7 +192,7 @@ class AyanokojiPublicReveal(NightAction):
 @role_registry.register
 class AyanokojiKiyotaka(BaseRole):
     role_key: ClassVar[str] = "ayanokoji_kiyotaka"
-    priority: ClassVar[int] = 9
+    priority: ClassVar[int] = 11
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
     cooldown_text: ClassVar[str] = "Public Reveal: 4 Days (Available from Night 4)"
     limitations_text: ClassVar[str] = "Unreadable: Immune to Framing, Forging, Mimicry, and other role/faction deceptions."
@@ -214,7 +214,7 @@ class LDeduction(NightAction):
         super().__init__(
             name="Deduction",
             description="Investigate a player to learn their alignment. Scan them twice to learn exact role.",
-            priority=5
+            priority=9
         )
 
     def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
@@ -252,7 +252,7 @@ class LCrossExamination(NightAction):
         super().__init__(
             name="Cross Examination",
             description="Compare two players' factions. (2 uses)",
-            priority=5
+            priority=9
         )
         self.num_targets = 2
 
@@ -288,7 +288,7 @@ class LCrossExamination(NightAction):
 @role_registry.register
 class L(BaseRole):
     role_key: ClassVar[str] = "l"
-    priority: ClassVar[int] = 5
+    priority: ClassVar[int] = 9
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
     cooldown_text: ClassVar[str] = "None"
     limitations_text: ClassVar[str] = "Cross Examination: 2 uses"
@@ -310,7 +310,7 @@ class TobiramaSensory(NightAction):
         super().__init__(
             name="Sensory Technique",
             description="Observe a player during the night. Learn who visited them.",
-            priority=9
+            priority=8
         )
 
     async def execute(self, context: RoleContext) -> None:
@@ -341,7 +341,7 @@ class TobiramaFlyingThunderCounter(NightAction):
         super().__init__(
             name="Flying Thunder Counter",
             description="Choose a player tonight. If they are attacked, completely nullify that attack even if it's unstoppable, and learn who the attackers were. (2 uses)",
-            priority=1
+            priority=8
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
@@ -367,7 +367,7 @@ class TobiramaFlyingThunderCounter(NightAction):
 @role_registry.register
 class TobiramaSenju(BaseRole):
     role_key: ClassVar[str] = "tobirama_senju"
-    priority: ClassVar[int] = 1
+    priority: ClassVar[int] = 8
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.INVESTIGATIVE,)
     cooldown_text: ClassVar[str] = "None"
     limitations_text: ClassVar[str] = "Flying Thunder Counter: 2 uses"
@@ -387,7 +387,7 @@ class TobiramaSenju(BaseRole):
 @role_registry.register
 class HiromiHiguruma(BaseRole):
     role_key: ClassVar[str] = "hiromi_higuruma"
-    priority: ClassVar[int] = 5
+    priority: ClassVar[int] = 99
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.COUNCIL,)
     cooldown_text: ClassVar[str] = "None"
     limitations_text: ClassVar[str] = "Deadly Sentencing: 2 uses, Retrial: 2 uses"
@@ -409,7 +409,7 @@ class LeviODMExecution(NightAction):
         super().__init__(
             name="ODM Execution",
             description="Perform a lethal ODM strike on a player. (3 uses)",
-            priority=4
+            priority=13
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
@@ -447,7 +447,7 @@ class LeviPrecisionStrike(NightAction):
         super().__init__(
             name="Precision Strike",
             description="Make your next ODM Execution tonight ignore standard protections. (1 use)",
-            priority=1
+            priority=13
         )
         self.num_targets = 0
 
@@ -473,7 +473,7 @@ class LeviPrecisionStrike(NightAction):
 @role_registry.register
 class LeviAckerman(BaseRole):
     role_key: ClassVar[str] = "levi_ackerman"
-    priority: ClassVar[int] = 4
+    priority: ClassVar[int] = 13
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.COUNCIL,)
     cooldown_text: ClassVar[str] = "None"
     limitations_text: ClassVar[str] = "ODM Execution: 3 uses, Precision Strike: 1 use"
@@ -495,7 +495,7 @@ class MaomaoPostmortem(NightAction):
         super().__init__(
             name="Postmortem Analysis",
             description="Examine a corpse to suspect 3 players, one of whom is the killer. Cooldown: 2 Nights.",
-            priority=5
+            priority=12
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
@@ -586,7 +586,7 @@ class MaomaoBrewPotion(NightAction):
         super().__init__(
             name="Brew Potion",
             description="Brew a potion of your choice tonight. Cooldown: 2 Nights.",
-            priority=1
+            priority=12
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
@@ -650,7 +650,7 @@ class MaomaoBrewPotion(NightAction):
 @role_registry.register
 class Maomao(BaseRole):
     role_key: ClassVar[str] = "maomao"
-    priority: ClassVar[int] = 5
+    priority: ClassVar[int] = 12
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
     cooldown_text: ClassVar[str] = "Postmortem Analysis: 2 Nights, Brew Potion: 2 Nights"
     limitations_text: ClassVar[str] = "None"
@@ -672,7 +672,7 @@ class FrierenAncientBinding(NightAction):
         super().__init__(
             name="Ancient Binding",
             description="Bind two players. If one dies tonight, the survivor becomes Hidden. Cooldown: 2 Days after success.",
-            priority=1
+            priority=7
         )
         self.num_targets = 2
 
@@ -697,7 +697,7 @@ class FrierenDemonDetection(NightAction):
         super().__init__(
             name="Demon Detection",
             description="Choose three players. You will learn how many of them belong to the antagonists faction. (No cooldown)",
-            priority=5
+            priority=7
         )
         self.num_targets = 3
 
@@ -726,7 +726,7 @@ class FrierenZoltraakSpecialist(NightAction):
         super().__init__(
             name="Zoltraak Specialist",
             description="Disable the passives of all opposing faction members (Villains and Neutrals) tonight. Cooldown: 2 Nights.",
-            priority=1
+            priority=7
         )
         self.num_targets = 0
 
@@ -753,7 +753,7 @@ class FrierenZoltraakSpecialist(NightAction):
 @role_registry.register
 class Frieren(BaseRole):
     role_key: ClassVar[str] = "frieren"
-    priority: ClassVar[int] = 1
+    priority: ClassVar[int] = 7
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
     cooldown_text: ClassVar[str] = "Ancient Binding: 2 Days on success, Zoltraak Specialist: 2 Nights"
     limitations_text: ClassVar[str] = "None"
@@ -773,7 +773,7 @@ class Frieren(BaseRole):
 @role_registry.register
 class DefaultVillager(BaseRole):
     role_key: ClassVar[str] = "villager"
-    priority: ClassVar[int] = 5
+    priority: ClassVar[int] = 99
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.COUNCIL,)
     is_unique: ClassVar[bool] = False
     cooldown_text: ClassVar[str] = "None"
@@ -789,7 +789,7 @@ class KishibeAlert(NightAction):
         super().__init__(
             name="Veteran's Instinct (Alert)",
             description="Go on Alert tonight. Anyone who visits you will be hit with a Powerful Attack (3 charges total).",
-            priority=1
+            priority=10
         )
 
     def can_use(self, session, player_state):
@@ -822,7 +822,7 @@ class KishibeBrokenScrew(NightAction):
         super().__init__(
             name="Broken Screw",
             description="(Once per game) Choose a player. If they visit you tonight while on Alert, your Alert charge is not consumed.",
-            priority=1
+            priority=10
         )
 
     def can_use(self, session, player_state):
@@ -857,7 +857,7 @@ class KishibeBrokenScrew(NightAction):
 @role_registry.register
 class Kishibe(BaseRole):
     role_key = "kishibe"
-    priority = 1
+    priority = 10
     tags = (RoleCategory.KILLING,)
     is_unique = True
     cooldown_text = "None"
@@ -883,7 +883,7 @@ class TosenBankai(NightAction):
                 "Detain a player inside your Bankai. They cannot act and cannot be targeted by others tonight. "
                 "Communicate privately via DM (prefix with '.'). Next night: release or execute them."
             ),
-            priority=1
+            priority=3
         )
 
     async def execute(self, context):
@@ -951,7 +951,7 @@ class TosenExecute(NightAction):
                 "Abyss/Rogues prisoner: they die, you retain remaining executions. "
                 "Max 3 executions. Bypasses all protection and death-evasion passives."
             ),
-            priority=2
+            priority=3
         )
 
     def can_use(self, session, player_state):
@@ -992,7 +992,7 @@ class TosenExecute(NightAction):
 @role_registry.register
 class KanameTosen(BaseRole):
     role_key = "tosen"
-    priority = 1
+    priority = 3
     tags = (RoleCategory.KILLING,)
     is_unique = True
     cooldown_text = "None"
@@ -1015,7 +1015,7 @@ class DazaiNoLongerHuman(NightAction):
         super().__init__(
             name="No Longer Human",
             description="Nullify target's supernatural abilities for the night. Cooldown: 1 Night.",
-            priority=0  # Runs first to nullify before any action executes
+            priority=4
         )
 
     def can_use(self, session, player_state):
@@ -1068,7 +1068,7 @@ class DazaiNoLongerHuman(NightAction):
 @role_registry.register
 class OsamuDazai(BaseRole):
     role_key = "dazai"
-    priority = 1
+    priority = 4
     tags = (RoleCategory.UTILITY,)
     is_unique = True
     cooldown_text = "1 Night"
@@ -1088,7 +1088,7 @@ class AstaDemonDestroyer(NightAction):
         super().__init__(
             name="Demon Destroyer Sword",
             description="Remove all negative status effects from a player.",
-            priority=1  # Runs early to cleanse targets before they act if possible
+            priority=5
         )
 
     async def execute(self, context):
@@ -1134,7 +1134,7 @@ class AstaBlackDivider(NightAction):
         super().__init__(
             name="Black Divider",
             description="Target a player. If they attempt to act, nullify their ability, bypassing immunity. Cooldown: 1 Night.",
-            priority=1
+            priority=5
         )
 
     def can_use(self, session, player_state):
@@ -1170,7 +1170,7 @@ class AstaDevilUnion(NightAction):
         super().__init__(
             name="Devil Union",
             description="For one night, every hostile ability targeting Town is nullified. (Once per game)",
-            priority=1
+            priority=5
         )
         self.num_targets = 0
 
@@ -1199,7 +1199,7 @@ class AstaDevilUnion(NightAction):
 @role_registry.register
 class Asta(BaseRole):
     role_key = "asta"
-    priority = 1
+    priority = 5
     tags = (RoleCategory.UTILITY,)
     is_unique = True
     cooldown_text = "Black Divider: 1 Night. Devil Union: Once per game."

@@ -12,7 +12,7 @@ class AntagonistBaseKill(NightAction):
         super().__init__(
             name="Kill",
             description="Eliminate a target player at night for the Antagonist faction.",
-            priority=4
+            priority=14
         )
 
     def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
@@ -168,7 +168,7 @@ class LightYagamiKill(NightAction):
         super().__init__(
             name="Death Note / Devil's Pen",
             description="Death Note: Guess target's role; if correct, they are eliminated. Devil's Pen: Targeted player dies unpreventably after 3 nights.",
-            priority=4
+            priority=15
         )
 
     async def execute(self, context: RoleContext) -> None:
@@ -249,7 +249,7 @@ class LightYagamiKill(NightAction):
 @role_registry.register
 class LightYagami(BaseRole):
     role_key: ClassVar[str] = "light_yagami"
-    priority: ClassVar[int] = 4
+    priority: ClassVar[int] = 15
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
     cooldown_text: ClassVar[str] = "3 nights cooldown (Devil's Pen)"
     limitations_text: ClassVar[str] = "Death Note guess only kills on correct guesses."
@@ -283,7 +283,7 @@ class MuzanInfect(NightAction):
         super().__init__(
             name="Blood Demon Art",
             description="Every 3rd night (starting Night 3), transform a Town player into a Demon (85% basic, 10% Lower Moon, 5% Upper Moon).",
-            priority=4
+            priority=16
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
@@ -357,7 +357,7 @@ class MuzanRegen(PassiveEffect):
 @role_registry.register
 class MuzanKibutsuji(BaseRole):
     role_key: ClassVar[str] = "muzan_kibutsuji"
-    priority: ClassVar[int] = 4
+    priority: ClassVar[int] = 16
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.DECEPTION,)
     cooldown_text: ClassVar[str] = "Usable every 3 nights (Nights 3, 6, 9...)"
     limitations_text: ClassVar[str] = "Can only infect living Town (Hero) faction players."
@@ -416,7 +416,7 @@ class MakimaBang(NightAction):
         super().__init__(
             name="Bang.",
             description="Fire an invisible force that deals an Unstoppable Attack to a player. Once per game.",
-            priority=4
+            priority=2
         )
         self.num_targets = 1
 
@@ -456,7 +456,7 @@ class MakimaBang(NightAction):
 @role_registry.register
 class Makima(BaseRole):
     role_key: ClassVar[str] = "makima"
-    priority: ClassVar[int] = 5
+    priority: ClassVar[int] = 2
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.CONTROL,)
     cooldown_text: ClassVar[str] = "Control: None. Bang: Once per game (requires conditions)."
     limitations_text: ClassVar[str] = "Control fails if target doesn't actively visit. Cannot control consecutive nights."
@@ -490,7 +490,7 @@ class Makima(BaseRole):
 @role_registry.register
 class Demon(BaseRole):
     role_key: ClassVar[str] = "demon"
-    priority: ClassVar[int] = 5
+    priority: ClassVar[int] = 99
     cooldown_text: ClassVar[str] = "None"
     limitations_text: ClassVar[str] = "No active night abilities."
 
@@ -547,7 +547,7 @@ class UpperMoonStrike(NightAction):
         super().__init__(
             name="Demon Strike",
             description="Kill a player.",
-            priority=4
+            priority=14
         )
 
     async def execute(self, context: RoleContext) -> None:
@@ -567,7 +567,7 @@ class UpperMoonStrike(NightAction):
 @role_registry.register
 class UpperMoon(BaseRole):
     role_key: ClassVar[str] = "upper_moon"
-    priority: ClassVar[int] = 4
+    priority: ClassVar[int] = 14
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
     cooldown_text: ClassVar[str] = "None"
     limitations_text: ClassVar[str] = "Cannot target Mafia teammates."
@@ -582,7 +582,7 @@ class FriezaDeathBeam(NightAction):
         super().__init__(
             name="Death Beam",
             description="Every night, choose a player to eliminate.",
-            priority=4
+            priority=14
         )
 
     async def execute(self, context: RoleContext) -> None:
@@ -602,7 +602,7 @@ class FriezaDeathBeam(NightAction):
 @role_registry.register
 class Frieza(BaseRole):
     role_key: ClassVar[str] = "frieza"
-    priority: ClassVar[int] = 4
+    priority: ClassVar[int] = 14
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
     is_unique: ClassVar[bool] = False
     cooldown_text: ClassVar[str] = "None"

@@ -34,7 +34,7 @@ class HisokaBungee(NightAction):
         super().__init__(
             name="Bungee Gum",
             description="Bind two living players together. If either wins while both are alive, the other wins too.",
-            priority=4
+            priority=17
         )
         self.num_targets = 2
 
@@ -89,7 +89,7 @@ class HisokaTextureSurprise(NightAction):
         super().__init__(
             name="Texture Surprise",
             description="Disguise a player's faction and category to alignment/category investigations until morning.",
-            priority=3
+            priority=17
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
@@ -127,7 +127,7 @@ class HisokaBloodlust(NightAction):
         super().__init__(
             name="Bloodlust",
             description="Challenge a player. Any active ability they target Hisoka with tonight is turned back onto themselves.",
-            priority=1
+            priority=17
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
@@ -155,7 +155,7 @@ class HisokaBloodlust(NightAction):
 @role_registry.register
 class Hisoka(BaseRole):
     role_key: ClassVar[str] = "hisoka"
-    priority: ClassVar[int] = 4
+    priority: ClassVar[int] = 17
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "chaos")
     continues_game_after_win: ClassVar[bool] = True
     cooldown_text: ClassVar[str] = "None"
@@ -214,7 +214,7 @@ class GilgameshGate(NightAction):
         super().__init__(
             name="Gate of Babylon",
             description="Visit a player to search for your sword.",
-            priority=5
+            priority=19
         )
 
     async def execute(self, context: RoleContext) -> None:
@@ -249,7 +249,7 @@ class GilgameshGate(NightAction):
 @role_registry.register
 class Gilgamesh(BaseRole):
     role_key: ClassVar[str] = "gilgamesh"
-    priority: ClassVar[int] = 5
+    priority: ClassVar[int] = 19
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "apocalypse")
     is_hostile_neutral: ClassVar[bool] = True
     cooldown_text: ClassVar[str] = "None"
@@ -301,7 +301,7 @@ class ErenRumble(NightAction):
         super().__init__(
             name="Founding Vision / The Rumbling",
             description="Founding Vision: Learn player faction. The Rumbling (Night 6+): Crush and kill a target.",
-            priority=4
+            priority=18
         )
 
     async def execute(self, context: RoleContext) -> None:
@@ -332,7 +332,7 @@ class ErenRumble(NightAction):
 @role_registry.register
 class ErenJaeger(BaseRole):
     role_key: ClassVar[str] = "eren_jaeger"
-    priority: ClassVar[int] = 4
+    priority: ClassVar[int] = 18
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "apocalypse")
     is_hostile_neutral: ClassVar[bool] = True
     cooldown_text: ClassVar[str] = "None"
@@ -493,7 +493,7 @@ class MahoragaAdaptation(NightAction):
 @role_registry.register
 class Mahoraga(BaseRole):
     role_key: ClassVar[str] = "mahoraga"
-    priority: ClassVar[int] = 5
+    priority: ClassVar[int] = 99
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "survival")
     is_unique: ClassVar[bool] = False
     cooldown_text: ClassVar[str] = "None — Adaptation can be used every night until all 3 factions are adapted"
@@ -619,7 +619,7 @@ class LelouchGeass(NightAction):
 @role_registry.register
 class LelouchLamperouge(BaseRole):
     role_key: ClassVar[str] = "lelouch"
-    priority: ClassVar[int] = 5
+    priority: ClassVar[int] = 99
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
     cooldown_text: ClassVar[str] = "Geass: 1 Night, Black Knight: Once per game"
     limitations_text: ClassVar[str] = "None"
