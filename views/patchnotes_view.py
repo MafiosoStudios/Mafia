@@ -107,6 +107,24 @@ PATCHES: list[dict] = [
             "**Muzan Kibutsuji Cooldown & Infection Fix** — Fixed Muzan Kibutsuji converting from Night 1 and doing it repeatedly without cooldown; strictly enforced Night 3 requirement (every 3 nights)",
         ],
     },
+    {
+        "version": "1.0.5",
+        "date": "July 23, 2026",
+        "title": "Version 1.0.5 — Custom Rolelists, Non-Destructive Actions & Rate Limit Fixes",
+        "description": (
+            "A feature and stability update introducing the All-in-One Custom Gamemode Suite, "
+            "duplicate role list building, non-destructive ephemeral action/vote menus, "
+            "and instant rate-limit mitigation across all UI components."
+        ),
+        "changes": [
+            "**Custom Rolelist Suite** — Interactive menu (`/customrolelist`) to create, name, load, and delete custom role lists with real-time role breakdown displays",
+            "**Multi-Copy & Balanced Custom Pools** — Full support for duplicate roles in custom lists (e.g. 5x Higuruma) with guaranteed Mafia assignment and balanced role filler",
+            "**Non-Destructive Ephemeral UX** — Selecting targets or votes now sends fresh ephemeral notifications instead of overwriting selection dropdowns",
+            "**Rate Limit & Deferral Hardening** — Instant <3s interaction deferrals and debounced embed updaters preventing 429 rate limits and 404 interaction errors",
+            "**Components V2 Migration** — Upgraded custom gamemode views to pure V2 Container cards with strict `config.py` emoji discipline",
+            "**Database State Stability** — Fixed MongoDB BSON serialization issues with sets and Discord message handles during active game state saves",
+        ],
+    },
 ]
 
 

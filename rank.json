@@ -1,0 +1,79 @@
+{
+  "levels": {
+    "base_xp": 100,
+    "growth_factor": 1.25,
+    "max_level": 100
+  },
+  "ranks": [
+    {
+      "name": "Bronze",
+      "min_xp": 0,
+      "badge": "Bronze Ranks",
+      "emoji_key": "rank_bronze",
+      "color": "#CD7F32"
+    },
+    {
+      "name": "Silver",
+      "min_xp": 1000,
+      "badge": "Silver Ranks",
+      "emoji_key": "rank_silver",
+      "color": "#C0C0C0"
+    },
+    {
+      "name": "Gold",
+      "min_xp": 3000,
+      "badge": "Gold Ranks",
+      "emoji_key": "rank_gold",
+      "color": "#FFD700"
+    },
+    {
+      "name": "Platinum",
+      "min_xp": 6000,
+      "badge": "Platinum Ranks",
+      "emoji_key": "rank_platinum",
+      "color": "#E5E4E2"
+    },
+    {
+      "name": "Diamond",
+      "min_xp": 10000,
+      "badge": "Diamond Ranks",
+      "emoji_key": "rank_diamond",
+      "color": "#B9F2FF"
+    },
+    {
+      "name": "Master",
+      "min_xp": 16000,
+      "badge": "Master Ranks",
+      "emoji_key": "rank_master",
+      "color": "#9932CC"
+    },
+    {
+      "name": "Grandmaster",
+      "min_xp": 25000,
+      "badge": "Grandmaster Ranks",
+      "emoji_key": "rank_grandmaster",
+      "color": "#FF4500"
+    },
+    {
+      "name": "Mafia Legend",
+      "min_xp": 40000,
+      "badge": "Mafia Legend",
+      "emoji_key": "rank_legend",
+      "color": "#FFD700"
+    }
+  ],
+  "rewards": {
+    "base_participation_xp": 100,
+    "base_participation_gold": 40,
+    "win_xp_bonus": 150,
+    "win_gold_bonus": 60,
+    "survival_xp_bonus": 50,
+    "survival_gold_bonus": 25,
+    "vote_xp_per_vote": 10,
+    "vote_gold_per_vote": 5,
+    "action_xp_per_action": 15,
+    "action_gold_per_action": 8,
+    "mvp_xp_bonus": 100,
+    "mvp_gold_bonus": 50
+  }
+}
