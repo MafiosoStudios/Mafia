@@ -14,7 +14,6 @@ class BackToPrioritiesButton(discord.ui.Button):
             label="Back to Priorities",
             style=discord.ButtonStyle.secondary,
             custom_id="back_to_priorities_btn",
-            emoji="⬅️",
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
@@ -74,17 +73,16 @@ class PrioritiesView(MafiosoLayoutView):
             name = meta.get("name", key.replace("_", " ").title())
             emoji_str = get_emoji(key)
             display_name = f"{emoji_str} **{name}**" if emoji_str else f"**{name}**"
-            lines.append(f"`{idx}.` {display_name}")
+            lines.append(f"{idx}. {display_name}")
 
         view = PrioritiesView()
         view.add_item(AntagonistConversionButton())
 
         return build_v2_layout(
-            title=f"{get_emoji('roster')} Role Action Priorities",
+            title="Role Action Priorities",
             description="\n".join(lines),
             color=discord.Color.gold(),
             view=view,
-            footer_text="Mafioso Priority System",
         )
 
     @staticmethod
@@ -104,13 +102,12 @@ class PrioritiesView(MafiosoLayoutView):
                 "If the primary Antagonist killer dies by any means, the highest-priority "
                 "living Antagonist is stripped of all former powers/abilities and inherits the **Base Kill** power.\n\n"
                 "### 🩸 Inheritance Priority Order:\n"
-                f"`1.` {e_bb} **Blackbeard**\n"
-                f"`2.` {e_ly} **Light Yagami**\n"
-                f"`3.` {e_mk} **Makima**\n"
-                f"`4.` {e_mz} **Muzan Kibutsuji**\n\n"
+                f"1. {e_bb} **Blackbeard**\n"
+                f"2. {e_ly} **Light Yagami**\n"
+                f"3. {e_mk} **Makima**\n"
+                f"4. {e_mz} **Muzan Kibutsuji**\n\n"
                 "*(If none of the above exist in the match, any remaining living Antagonist receives the Base Kill).*"
             ),
             color=discord.Color.red(),
             view=view,
-            footer_text="Mafioso Conversion Engine",
         )
