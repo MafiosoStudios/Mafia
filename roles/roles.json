@@ -202,6 +202,16 @@
     "action_prompt": "",
     "footer": "Just a regular person caught in the crossfire."
   },
+  "antagonist_base_killer": {
+    "name": "Antagonist Killer",
+    "faction": "Antagonist",
+    "emoji": "⚔️",
+    "win_condition": "Help the Antagonist (Mafia) faction win.",
+    "description": "Inherited Antagonist leader power. Choose a target player each night to eliminate.",
+    "active_ability": "Kill — Eliminate a targeted player tonight.",
+    "passive_ability": "None",
+    "action_prompt": "Select a player to eliminate tonight."
+  },
   "frieza": {
     "name": "Frieza",
     "faction": "Antagonist",

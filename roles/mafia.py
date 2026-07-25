@@ -28,14 +28,26 @@ class AntagonistBaseKill(NightAction):
         if not target_id or not session:
             return
 
-        target_player = session.players.get(target_id)
-        if target_player and target_player.alive:
-            context.payload["attack"] = {
-                "target_id": target_id,
-                "attacker_id": context.user_id,
-                "attack_source": "antagonist_base_kill",
-                "pierces_basic": False,
-            }
+        kills = session.metadata.setdefault("pending_kills", {})
+        kills[target_id] = kills.get(target_id, []) + ["mafia_strike"]
+        context.payload["log"] = f"Antagonist Base Killer attacked <@{target_id}>."
+
+
+@role_registry.register
+class AntagonistBaseKiller(BaseRole):
+    role_key: ClassVar[str] = "antagonist_base_killer"
+    priority: ClassVar[int] = 14
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.KILLING,)
+    is_unique: ClassVar[bool] = False
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "Cannot target Mafia teammates."
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [AntagonistBaseKill()]
+
+    def is_active_threat(self, session: Any, player_state: Any) -> bool:
+        return player_state.alive
 
 
 class BlackbeardDarknessLogia(NightAction):
@@ -397,7 +409,7 @@ class MakimaControl(NightAction):
             description="Control a player, redirecting their night action to a target of your choice. You cannot target friendly mafia, or the same player on consecutive nights.",
             priority=5
         )
-        self.num_targets = 1
+        self.num_targets = 2
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
         return True, None

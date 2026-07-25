@@ -209,10 +209,6 @@ def build_lobby_card(
     
     container.add_item(ui.TextDisplay(details_md))
 
-    # Full-width lobby banner below text
-    if lobby_image:
-        container.add_item(ui.MediaGallery(discord.MediaGalleryItem(lobby_image)))
-
     return container
 
 

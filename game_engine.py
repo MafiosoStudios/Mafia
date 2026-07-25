@@ -7,9 +7,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+import dataclasses
 import discord
 from database.database import DatabaseManager
-from database.models import GamePlayerRecord, GameRecord, MatchHistoryRecord
+from database.models import GamePlayerRecord, GameRecord, MatchHistoryRecord, PlayerProfileRecord
 from game_manager import ActiveGameHandle
 from utils.constants import GamePhase, GameState, RoleFaction
 from utils.helpers import utcnow
@@ -320,6 +321,10 @@ class GameEngine:
             if killer_id:
                 player.metadata["killer_id"] = killer_id
 
+            # Lelouch Zero Requiem trigger on any daytime execution (lynch, trial, deadly_sentencing)
+            if player.role_key == "lelouch" and cause in ("lynch", "trial", "deadly_sentencing", "execution"):
+                player.metadata["lelouch_lynched"] = True
+
             # Clear Bungee Gum bond if one of the linked players dies
             bond = session.metadata.get("bungee_gum_bond")
             if bond and user_id in bond:
@@ -466,7 +471,7 @@ class GameEngine:
 
         # Check if any living villain is already an active killer
         has_active_killer = any(
-            p.role_key == "frieza" or p.metadata.get("is_converted_antagonist_killer")
+            p.role_key in ("frieza", "antagonist_base_killer") or p.metadata.get("is_converted_antagonist_killer")
             for p in alive_villains
         )
         if has_active_killer:
@@ -489,8 +494,20 @@ class GameEngine:
             chosen_player = alive_villains[0]
 
         if chosen_player:
+            old_role = chosen_player.role_key
             chosen_player.metadata["is_converted_antagonist_killer"] = True
-            chosen_player.metadata["converted_from_role"] = chosen_player.role_key
+            chosen_player.metadata["converted_from_role"] = old_role
+            chosen_player.role_key = "antagonist_base_killer"
+
+            # Strip all former role-specific metadata, passives, and ability flags
+            keys_to_clear = [
+                "muzan_regen", "pm_contract_activated", "controlled_count", "bang_used",
+                "last_controlled_player", "controlled_targets_history", "texture_surprise_uses",
+                "texture_surprise_used", "bloodlust_uses", "bloodlust_used", "last_pen_night",
+                "devils_pen_deaths", "darkness_logia_used", "gura_gura_used", "bungee_gum_used"
+            ]
+            for k in keys_to_clear:
+                chosen_player.metadata.pop(k, None)
 
             # Send DM notification to converted player
             if self.bot and session.game_handle:
@@ -608,10 +625,156 @@ class GameEngine:
                     winner_faction=winner_faction,
                     has_won=is_winner,
                 )
+
+                try:
+                    await self._process_player_endgame_rewards(
+                        session=session,
+                        user_id=user_id,
+                        player=player,
+                        winner_faction=winner_faction,
+                        is_winner=is_winner,
+                    )
+                except Exception as err:
+                    logger.error(f"Failed to process endgame rewards for user {user_id}: {err}")
+
             await self._database.save_match_history(history)
             await self._database.clear_active_game_state(game_id)
             self._sessions.pop(game_id, None)
             return history
+
+    async def _process_player_endgame_rewards(
+        self,
+        session: GameSession,
+        user_id: int,
+        player: GamePlayerState,
+        winner_faction: str | None,
+        is_winner: bool,
+    ) -> None:
+        """Calculates XP, Coins, Level, Rank, updates the DB profile, and sends a single DM Embed to the player."""
+        if winner_faction == "Draw":
+            xp_gained = 40
+            coins_gained = 15
+            match_result_str = "🤝 Draw"
+            embed_color = discord.Color.light_grey()
+        elif is_winner:
+            xp_gained = 150
+            coins_gained = 50
+            match_result_str = "🎉 Victory!"
+            embed_color = discord.Color.green()
+        else:
+            xp_gained = 50
+            coins_gained = 20
+            match_result_str = "💀 Defeat"
+            embed_color = discord.Color.red()
+
+        guild = self.bot.get_guild(session.game_handle.guild_id) if self.bot else None
+        member = guild.get_member(user_id) if guild else None
+        uname = member.name if member else f"User {user_id}"
+        disc = member.discriminator if member and hasattr(member, "discriminator") else "0"
+
+        profile = await self._database.get_player_profile(user_id)
+        if not profile:
+            profile = PlayerProfileRecord(
+                user_id=user_id,
+                username=uname,
+                discriminator=disc,
+                guild_id=session.game_handle.guild_id,
+                level=1,
+                xp=0,
+                coins=0,
+                rank="Bronze",
+                wins=0,
+                losses=0,
+                draws=0,
+                games_played=0,
+            )
+
+        old_level = profile.level
+        new_xp = profile.xp + xp_gained
+        new_coins = profile.coins + coins_gained
+        new_games = profile.games_played + 1
+
+        if winner_faction == "Draw":
+            new_wins, new_losses, new_draws = profile.wins, profile.losses, profile.draws + 1
+        elif is_winner:
+            new_wins, new_losses, new_draws = profile.wins + 1, profile.losses, profile.draws
+        else:
+            new_wins, new_losses, new_draws = profile.wins, profile.losses + 1, profile.draws
+
+        # Level calculation (250 XP per level)
+        new_level = (new_xp // 250) + 1
+
+        def get_rank_name(lvl: int) -> str:
+            if lvl < 5:
+                return "Bronze"
+            elif lvl < 10:
+                return "Silver"
+            elif lvl < 15:
+                return "Gold"
+            elif lvl < 20:
+                return "Platinum"
+            elif lvl < 25:
+                return "Diamond"
+            else:
+                return "Master"
+
+        new_rank = get_rank_name(new_level)
+        ranked_up = new_level > old_level
+
+        # Update profile record
+        updated_profile = dataclasses.replace(
+            profile,
+            username=uname,
+            xp=new_xp,
+            coins=new_coins,
+            level=new_level,
+            rank=new_rank,
+            wins=new_wins,
+            losses=new_losses,
+            draws=new_draws,
+            games_played=new_games,
+            updated_at=datetime.utcnow(),
+        )
+        await self._database.upsert_player_profile(updated_profile)
+
+        # Build DM Layout Embed
+        r_key = player.metadata.get("converted_from_role") or player.role_key
+        r_meta = roles.ROLES_METADATA.get(r_key or "", {})
+        role_name = r_meta.get("name", r_key or "Unknown")
+        role_emoji = get_emoji(r_key) if r_key else ""
+        role_display = f"{role_emoji} **{role_name}** ({player.faction})"
+
+        total_games = new_wins + new_losses + new_draws
+        win_rate = round((new_wins / total_games) * 100, 1) if total_games > 0 else 0.0
+
+        level_up_str = f"\n\n🎊 **LEVEL UP!** You reached **Level {new_level}** (`{new_rank}`)!" if ranked_up else ""
+
+        dm_description = (
+            f"### Match Result: {match_result_str}\n"
+            f"• **Role Played**: {role_display}\n"
+            f"• **Match Status**: {'Alive' if player.alive else 'Eliminated'}\n\n"
+            f"### 🪙 Match Rewards\n"
+            f"• **XP Gained**: `+{xp_gained} XP`\n"
+            f"• **Coins Gained**: `+{coins_gained} Gold`{level_up_str}\n\n"
+            f"### 📊 Updated Profile Stats\n"
+            f"• **Level**: `{new_level}` | **Rank**: `{new_rank}`\n"
+            f"• **Total XP**: `{new_xp} XP` | **Gold**: `{new_coins} 🪙`\n"
+            f"• **Record**: `{new_wins}W` / `{new_losses}L` / `{new_draws}D` (`{win_rate}% Win Rate`)\n"
+            f"• **Total Games**: `{new_games}`"
+        )
+
+        reward_layout = build_v2_layout(
+            title=f"🏆 Match Summary & Rewards",
+            description=dm_description,
+            color=embed_color,
+            footer_text="Mafioso Match Rewards",
+        )
+
+        if member:
+            try:
+                self.bot.message_queue.send(member, view=reward_layout)
+            except Exception:
+                logger.exception("Failed to send endgame reward DM to user %s", user_id)
 
     def _apply_votes(self, session: GameSession) -> None:
         if not session.votes:
@@ -1062,7 +1225,7 @@ class GameEngine:
                     try:
                         await self.bot.message_queue.send(
                             mafia_channel,
-                            view=build_v2_layout(description=f"{get_emoji('night')} **Night Action Phase Ended**", footer_text="")
+                            view=build_v2_layout(description=f"Dawn breaks over the town... The night has come to an end. Everybody get in here.**", footer_text="")
                         )
                     except Exception:
                         pass
@@ -1378,7 +1541,6 @@ class GameEngine:
                                             "Will they walk free, or face the hangman's noose? Choose Guilty or Innocent below."
                                         ),
                                         color=discord.Color.red(),
-                                        image_url=get_event_image("verdict"),
                                         view=verdict_view,
                                     )
 
@@ -1750,10 +1912,19 @@ class GameEngine:
         }.get(winner_faction, "victory_neutral")
         image_url = get_event_image(image_key)
 
+        if winner_faction == "Draw":
+            color_val = discord.Color.light_grey()
+        elif winner_faction == RoleFaction.HERO.value:
+            color_val = discord.Color.green()
+        elif winner_faction == RoleFaction.VILLAIN.value:
+            color_val = discord.Color.red()
+        else:
+            color_val = discord.Color.from_rgb(255, 255, 255)
+
         victory_view = build_v2_layout(
             title=title,
             description="\n\n".join(desc_sections),
-            color=discord.Color.gold(),
+            color=color_val,
             image_url=image_url,
             footer_text=footer_text,
         )
@@ -1802,7 +1973,7 @@ class GameEngine:
         death_layout = build_v2_layout(
             title=f"{title} - Death Report",
             description=death_description,
-            color=discord.Color.dark_red() if mafia_deaths else discord.Color.gold(),
+            color=discord.Color.red(),
             image_url=get_event_image("death" if mafia_deaths else "day"),
         )
         try:
@@ -1829,16 +2000,14 @@ class GameEngine:
         alive_list = []
         dead_list = []
         for pid, pstate in session.players.items():
-            member = guild.get_member(pid)
-            mname = member.display_name if member else f"User {pid}"
             if pstate.alive:
-                alive_list.append(f"• {mname}")
+                alive_list.append(f"• <@{pid}>")
             else:
                 role_meta = roles.ROLES_METADATA.get(pstate.role_key or "", {})
                 role_display = role_meta.get("name", pstate.role_key or "Unknown")
                 role_emoji = get_emoji(pstate.role_key) if pstate.role_key else ""
                 role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
-                dead_list.append(f"• ~~{mname}~~ ({role_emoji_prefix}{role_display})")
+                dead_list.append(f"• <@{pid}> ({role_emoji_prefix}{role_display})")
 
         status_desc = (
             "## Alive Players\n" + ("\n".join(alive_list) if alive_list else "None") +
@@ -1910,7 +2079,7 @@ class GameEngine:
             action_idx = makima_payload.get("action_index", 0)
             if action_idx == 0:  # Control
                 controlled_pid = makima_payload.get("target_id")
-                redirect_pid = makima_payload.get("redirect_target")
+                redirect_pid = makima_payload.get("redirect_target") or makima_payload.get("controlled_vote_target")
                 
                 controlled_state = session.players.get(controlled_pid) if controlled_pid else None
                 makima_state = session.players.get(makima_id)

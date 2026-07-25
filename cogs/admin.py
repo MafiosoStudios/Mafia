@@ -507,7 +507,7 @@ class AdminCog(commands.Cog):
 
 class WipeConfirmationView(MafiosoLayoutView):
     def __init__(self, bot: commands.Bot, author_id: int) -> None:
-        super().__init__(timeout=30)
+        super().__init__(timeout=60)
 
         self.bot = bot
         self.author_id = author_id
@@ -519,6 +519,24 @@ class WipeConfirmationView(MafiosoLayoutView):
             await interaction.response.send_message(f"{get_emoji('cross')} You are not authorized to interact with this menu.", ephemeral=True)
             return False
         return True
+
+    @discord.ui.button(label="Confirm Wipe", style=discord.ButtonStyle.danger, custom_id="admin_wipe_confirm")
+    async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.confirmed = True
+        self.interaction = interaction
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, custom_id="admin_wipe_cancel")
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.confirmed = False
+        self.interaction = interaction
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=build_v2_layout(description=f"{get_emoji('cross')} **Database wipe cancelled.**", footer_text=""))
+        self.stop()
 
 
 async def setup(bot: commands.Bot) -> None:

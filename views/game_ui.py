@@ -323,14 +323,50 @@ class NightAbilityButtonsView(MafiosoLayoutView):
 
             # If 0 targets (like Levi's Precision Strike)
             if ability.num_targets == 0:
-                payload = {
-                    "action_index": idx,
-                    "target_id": None
-                }
-                if not await _safe_queue_night_action(interaction, self.engine, self.game_id, self.player_id, payload):
+                if self.role_inst.role_key == "levi_ackerman" and ability.name == "Precision Strike":
+                    player_state.metadata["levi_precision_active"] = True
+                    odm_ability = self.role_inst.abilities[0]
+                    odm_targets = odm_ability.get_eligible_targets(session, self.player_id)
+                    options = []
+                    guild = interaction.guild
+                    for pid in odm_targets:
+                        member = guild.get_member(pid) if guild else None
+                        name = member.display_name if member else f"User {pid}"
+                        options.append(discord.SelectOption(label=name, value=str(pid)))
+
+                    if not options:
+                        await interaction.response.send_message(view=build_v2_layout(description="No eligible targets for ODM Execution.", footer_text=""), ephemeral=True)
+                        return
+
+                    view = discord.ui.View(timeout=120)
+                    select = AbilityTargetSelect(self.game_id, self.engine, odm_ability, 0, options)
+                    view.add_item(select)
+
+                    back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
+                    async def back_callback(inter: discord.Interaction) -> None:
+                        player_state.metadata["levi_precision_active"] = False
+                        orig_view = NightAbilityButtonsView(self.game_id, self.engine, self.player_id, self.role_inst, session)
+                        await inter.response.edit_message(view=build_v2_layout(description="Select an ability to use tonight:", view=orig_view, footer_text=""))
+                    back_btn.callback = back_callback
+                    view.add_item(back_btn)
+
+                    await interaction.response.edit_message(
+                        view=build_v2_layout(
+                            description=f"{get_emoji('sword')} **Precision Strike Activated!** (Bypasses Protections)\nNow select your target for **ODM Execution**:",
+                            view=view,
+                            footer_text=""
+                        )
+                    )
                     return
-                await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{ability.name}** activated successfully.", footer_text=""))
-                return
+                else:
+                    payload = {
+                        "action_index": idx,
+                        "target_id": None
+                    }
+                    if not await _safe_queue_night_action(interaction, self.engine, self.game_id, self.player_id, payload):
+                        return
+                    await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{ability.name}** activated successfully.", footer_text=""))
+                    return
 
             # Build SelectOptions
             options = []
@@ -440,7 +476,11 @@ class TwoTargetSelectStep1(discord.ui.Select):
         view = discord.ui.View(timeout=120)
         select2 = TwoTargetSelectStep2(self.game_id, self.engine, self.ability, self.action_index, target1, options2)
         view.add_item(select2)
-        await interaction.response.edit_message(view=build_v2_layout(description=f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:", view=view, footer_text=""))
+        if self.ability.name == "Control":
+            prompt = f"Using **{self.ability.name}**.\nSelect the target to redirect <@{target1}>'s action onto:"
+        else:
+            prompt = f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:"
+        await interaction.response.edit_message(view=build_v2_layout(description=prompt, view=view, footer_text=""))
 
 
 class TwoTargetSelectStep2(discord.ui.Select):
@@ -457,12 +497,17 @@ class TwoTargetSelectStep2(discord.ui.Select):
         payload = {
             "action_index": self.action_index,
             "target_id": self.target1,
+            "redirect_target": target2,
             "controlled_vote_target": target2,
             "targets": (self.target1, target2)
         }
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await interaction.response.edit_message(view=build_v2_layout(description=f"You have decided to use **{self.ability.name}** on <@{self.target1}> and <@{target2}>.", footer_text=""))
+        if self.ability.name == "Control":
+            desc = f"You have decided to **Control** <@{self.target1}> and redirect their action onto <@{target2}>."
+        else:
+            desc = f"You have decided to use **{self.ability.name}** on <@{self.target1}> and <@{target2}>."
+        await interaction.response.edit_message(view=build_v2_layout(description=desc, footer_text=""))
 
 
 
@@ -1136,6 +1181,22 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
             mafia_channel,
             f"Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
         )
+
+        if target_pstate and target_pstate.role_key == "lelouch":
+            target_pstate.metadata["lelouch_lynched"] = True
+            zero_requiem_layout = build_v2_layout(
+                title=f"{get_emoji('crown')} Zero Requiem Activated!",
+                description=(
+                    f"**{target_name}** (Lelouch Lamperouge) has been executed under Deadly Sentencing!\n\n"
+                    f"This was all part of his master plan to focus the world's hatred on himself and die, breaking the cycle of hatred.\n\n"
+                    f"{get_emoji('victory')} **Lelouch Lamperouge wins the game!**"
+                ),
+                color=discord.Color.purple(),
+            )
+            await self.engine.bot.message_queue.send(
+                mafia_channel,
+                view=zero_requiem_layout
+            )
 
         if target_faction == RoleFaction.HERO.value:
             await asyncio.sleep(3)

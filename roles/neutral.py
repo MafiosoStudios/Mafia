@@ -56,7 +56,7 @@ class HisokaBungee(NightAction):
         if hisoka_state:
             hisoka_state.metadata["bungee_gum_used"] = True
 
-        # Send DMs to both linked players in the background
+        # Send DM embeds to both linked players in the background
         import asyncio
         async def notify_bond(s=session, h_id=context.user_id, t1=target1, t2=target2):
             if context.bot:
@@ -67,17 +67,38 @@ class HisokaBungee(NightAction):
                     t1_name = m1.display_name if m1 else f"User {t1}"
                     t2_name = m2.display_name if m2 else f"User {t2}"
                     
-                    msg1 = f"{get_emoji('web')} **Bound by Bungee Gum!**\nYou have been bound to **{t2_name}** (<@{t2}>) by Bungee Gum. If either of you fulfills their win condition while both are still alive, you both win!"
-                    msg2 = f"{get_emoji('web')} **Bound by Bungee Gum!**\nYou have been bound to **{t1_name}** (<@{t1}>) by Bungee Gum. If either of you fulfills their win condition while both are still alive, you both win!"
+                    import discord
+                    from ui import build_v2_layout
+
+                    view1 = build_v2_layout(
+                        title=f"{get_emoji('hisoka')} Bound by Bungee Gum!",
+                        description=(
+                            f"You have been bound to **{t2_name}** (<@{t2}>) by Hisoka's **Bungee Gum**!\n\n"
+                            f"🤝 **Shared Destiny:**\n"
+                            f"If either of you fulfills your win condition while both of you are still alive, **you both win!**"
+                        ),
+                        color=discord.Color.magenta(),
+                        footer_text="Bound by Bungee Gum",
+                    )
+                    view2 = build_v2_layout(
+                        title=f"{get_emoji('hisoka')} Bound by Bungee Gum!",
+                        description=(
+                            f"You have been bound to **{t1_name}** (<@{t1}>) by Hisoka's **Bungee Gum**!\n\n"
+                            f"🤝 **Shared Destiny:**\n"
+                            f"If either of you fulfills your win condition while both of you are still alive, **you both win!**"
+                        ),
+                        color=discord.Color.magenta(),
+                        footer_text="Bound by Bungee Gum",
+                    )
                     
                     if m1:
                         try:
-                            context.bot.message_queue.send(m1, msg1)
+                            context.bot.message_queue.send(m1, view=view1)
                         except Exception:
                             pass
                     if m2:
                         try:
-                            context.bot.message_queue.send(m2, msg2)
+                            context.bot.message_queue.send(m2, view=view2)
                         except Exception:
                             pass
         asyncio.create_task(notify_bond())

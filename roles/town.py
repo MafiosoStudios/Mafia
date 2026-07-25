@@ -435,11 +435,13 @@ class LeviODMExecution(NightAction):
 
         precision = player_state.metadata.get("levi_precision_active", False)
         if precision:
-            player_state.metadata["levi_precision_active"] = False
+            p_uses = player_state.metadata.get("levi_precision_uses", 1)
+            player_state.metadata["levi_precision_uses"] = max(0, p_uses - 1)
 
         pending_kills = session.metadata.setdefault("pending_kills", {})
         pending_kills[target_id] = pending_kills.get(target_id, []) + ["levi_kill"]
-        context.payload["result"] = f"{get_emoji('sword')} **ODM Execution:** You launched a strike against <@{target_id}> (Precision strike active: **{precision}**)."
+        prec_text = " (Precision Strike: **Active** — Bypasses Protections)" if precision else ""
+        context.payload["result"] = f"{get_emoji('sword')} **ODM Execution:** You launched a strike against <@{target_id}>{prec_text}."
 
 
 class LeviPrecisionStrike(NightAction):
@@ -464,8 +466,6 @@ class LeviPrecisionStrike(NightAction):
         if not session:
             return
         player_state = session.players[context.user_id]
-        uses = player_state.metadata.get("levi_precision_uses", 1)
-        player_state.metadata["levi_precision_uses"] = max(0, uses - 1)
         player_state.metadata["levi_precision_active"] = True
         context.payload["result"] = f"{get_emoji('sword')} **Precision Strike:** Your ODM Execution tonight will bypass standard protections."
 
