@@ -33,15 +33,32 @@ class ProfileCog(commands.Cog):
             statistics = StatisticsRecord(user_id=ctx.author.id)
             await database.upsert_statistics(statistics)
 
+        from utils.progression import ProgressionManager
+        from config import get_emoji
+
+        lvl_info = ProgressionManager.calculate_level_info(profile_record.xp)
+        rank_info = ProgressionManager.get_rank_info(profile_record.xp)
+
+        if profile_record.level != lvl_info.level or profile_record.rank != rank_info.get("name"):
+            import dataclasses
+            profile_record = dataclasses.replace(
+                profile_record,
+                level=lvl_info.level,
+                rank=str(rank_info.get("name", "Bronze")),
+            )
+            await database.upsert_player_profile(profile_record)
+
+        progress_bar_str = ProgressionManager.format_progress_bar(lvl_info.xp_in_level, lvl_info.xp_for_next)
+
         total_games = statistics.games_played
         win_rate = 0.0 if total_games == 0 else (statistics.wins / total_games) * 100
 
         desc = (
-            f"**Rank:** `{profile_record.rank}`\n"
-            f"**Level:** `{profile_record.level}` | **XP:** `{profile_record.xp}`\n"
-            f"**Gold:** `{profile_record.coins}`\n"
-            f"**Favorite Character:** {profile_record.favorite_character or '*None set*'}\n\n"
-            f"## Match Statistics\n"
+            f"• **Rank**: `{profile_record.rank}` ({rank_info.get('badge', 'Tier')})\n"
+            f"• **Level**: `{lvl_info.level}` | {progress_bar_str}\n"
+            f"• **Gold**: `{profile_record.coins}`\n"
+            f"• **Favorite Character**: {profile_record.favorite_character or '*None set*'}\n\n"
+            f"## Global Match Statistics\n"
             f"• **Wins:** `{statistics.wins}` | **Losses:** `{statistics.losses}` | **Draws:** `{statistics.draws}`\n"
             f"• **Total Games:** `{total_games}` | **Win Rate:** `{win_rate:.1f}%`"
         )
@@ -50,7 +67,7 @@ class ProfileCog(commands.Cog):
         profile_view = build_v2_layout(
             title=f"{profile_record.username}'s Profile",
             description=desc,
-            color=discord.Color.from_rgb(0, 0, 0),
+            color=discord.Color.from_str(rank_info.get("color", "#FFD700")),
             thumbnail_url=ctx.author.display_avatar.url,
             footer_text="",
         )

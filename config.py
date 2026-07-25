@@ -161,7 +161,22 @@ EMOJIS: dict[str, str] = {
     "detective": "🕵️‍♂️",
     "wave": "🌊",
     "web": "🕸️",
+
+    # Ranks & Progression
+    "rank_bronze": "🥉",
+    "rank_silver": "🥈",
+    "rank_gold": "🥇",
+    "rank_platinum": "💎",
+    "rank_diamond": "💠",
+    "rank_master": "🔮",
+    "rank_grandmaster": "🔥",
+    "rank_legend": "🌌",
+    "gold": "🪙",
+    "xp": "✨",
+    "level_up": "⚡",
+    "rank_up": "👑",
 }
+
 
 
 def get_emoji(key: str) -> str:

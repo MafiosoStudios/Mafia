@@ -107,6 +107,27 @@ PATCHES: list[dict] = [
             "**Muzan Kibutsuji Cooldown & Infection Fix** — Fixed Muzan Kibutsuji converting from Night 1 and doing it repeatedly without cooldown; strictly enforced Night 3 requirement (every 3 nights)",
         ],
     },
+    {
+        "version": "1.0.5",
+        "date": "July 23, 2026",
+        "title": "Version 1.0.5 — Progression System, Custom Rolelists & UI Hardening",
+        "description": (
+            "A major feature and progression update introducing root `rank.json` configuration, "
+            "automated Level/XP/Gold calculation, post-match V2 Container DM reward notifications, "
+            "the All-in-One Custom Gamemode Suite, and system-wide UI stability."
+        ),
+        "changes": [
+            "**Global Progression & Ranks** — Added `rank.json` configuration with 8 customizable rank tiers (Bronze to Mafia Legend), level curves, and global MongoDB synchronization",
+            "**Match Reward DMs** — Automatically calculates XP, Gold, Level, and Rank after every match and sends an itemized V2 Container DM with level-up/rank-up alerts",
+            "**Profile UI Overhaul** — Restructured `/profile` to render player rank, visual progress bar, gold, and global match statistics inside a clean V2 Container card",
+            "**Custom Rolelist Suite** — Interactive menu (`/customrolelist`) to create, name, load, and delete custom role lists with real-time role breakdown displays",
+            "**Multi-Copy & Balanced Custom Pools** — Full support for duplicate roles in custom lists (e.g. 5x Higuruma) with guaranteed Mafia assignment and balanced role filler",
+            "**Non-Destructive Ephemeral UX** — Selecting targets or votes now sends fresh ephemeral notifications instead of overwriting selection dropdowns",
+            "**Rate Limit & Deferral Hardening** — Instant <3s interaction deferrals and debounced embed updaters preventing 429 rate limits and 404 interaction errors",
+            "**Components V2 Migration** — Upgraded custom gamemode views to pure V2 Container cards with strict `config.py` emoji discipline",
+            "**Database State Stability** — Fixed MongoDB BSON serialization issues with sets and Discord message handles during active game state saves",
+        ],
+    },
 ]
 
 

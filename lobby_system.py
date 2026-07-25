@@ -61,6 +61,7 @@ class LobbyManager:
         self._config = config
         self._lobbies_by_guild: dict[int, LobbySession] = {}
         self._active_custom_role_lists: dict[int, list[str]] = {}
+        self._debouncers: dict[int, Any] = {}
         self._lock = asyncio.Lock()
 
     async def create_lobby(
@@ -286,12 +287,29 @@ class LobbyManager:
             lobby.channel_id = message.channel.id
         await self.refresh_lobby_message(guild_id)
 
-    async def refresh_lobby_message(self, guild_id: int) -> None:
+    async def refresh_lobby_message(self, guild_id: int, *, immediate: bool = False) -> None:
         async with self._lock:
             lobby = self._lobbies_by_guild.get(guild_id)
             if lobby is None:
                 return
-        await self._update_lobby_message(lobby)
+
+        if immediate:
+            debounc = self._debouncers.get(guild_id)
+            if debounc:
+                await debounc.flush()
+            else:
+                await self._update_lobby_message(lobby)
+        else:
+            if guild_id not in self._debouncers:
+                from utils.debouncer import DebouncedUpdater
+
+                async def _do_update() -> None:
+                    loc_lobby = await self.get_lobby(guild_id)
+                    if loc_lobby:
+                        await self._update_lobby_message(loc_lobby)
+
+                self._debouncers[guild_id] = DebouncedUpdater(_do_update, delay=1.2)
+            self._debouncers[guild_id].request_update()
 
     async def clear_lobby(self, guild_id: int, member: discord.Member) -> LobbySession:
         async with self._lock:
@@ -302,6 +320,10 @@ class LobbyManager:
                 raise PermissionError("Only the lobby leader, host, or an admin can clear the lobby.")
 
             cleared_lobby = self._lobbies_by_guild.pop(guild_id, None)
+
+        debounc = self._debouncers.pop(guild_id, None)
+        if debounc:
+            await debounc.flush()
 
         if cleared_lobby is not None:
             await self._delete_lobby_message(cleared_lobby)

@@ -86,21 +86,70 @@ class AnimeMafiaBot(commands.Bot):
 
         asyncio.create_task(sync_bg())
 
+    async def _safe_send_ctx(self, ctx: commands.Context, content: str) -> None:
+        try:
+            if ctx.interaction is not None:
+                if ctx.interaction.response.is_done():
+                    await ctx.interaction.followup.send(content, ephemeral=True)
+                else:
+                    await ctx.interaction.response.send_message(content, ephemeral=True)
+            else:
+                await ctx.send(content)
+        except Exception:
+            try:
+                if ctx.channel:
+                    await ctx.channel.send(content)
+            except Exception:
+                pass
+
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
         logger.exception("App command failed: %s", error)
-        if interaction.response.is_done():
-            await interaction.followup.send("Something went wrong while running that command.", ephemeral=True)
-        else:
-            await interaction.response.send_message("Something went wrong while running that command.", ephemeral=True)
+        msg = "Something went wrong processing that command. Try again."
+        if isinstance(error, discord.app_commands.CommandNotFound):
+            msg = "That command doesn't exist. Check your spelling and try again."
+        elif isinstance(error, discord.app_commands.MissingPermissions):
+            msg = "You don't have permission to use this command."
+        elif isinstance(error, discord.app_commands.NoPrivateMessage):
+            msg = "This command can only be used inside a server."
+        elif isinstance(error, discord.app_commands.TransformerError):
+            msg = "Invalid parameters provided for this command."
+
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
+        except Exception:
+            pass
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError) -> None:
+        if isinstance(error, commands.CommandInvokeError) and error.original:
+            error = error.original
+
         logger.exception("Prefix command failed: %s", error)
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("You do not have permission to use that command.")
-            return
+
         if isinstance(error, commands.CommandNotFound):
+            await self._safe_send_ctx(ctx, "That command doesn't exist. Check your spelling or type !help.")
             return
-        await ctx.send("Something went wrong while running that command.")
+
+        if isinstance(error, commands.MissingRequiredArgument):
+            param = error.param.name if hasattr(error, "param") and error.param else "value"
+            await self._safe_send_ctx(ctx, f"You missed the required parameter '{param}' for this command. Check parameter usage and try again.")
+            return
+
+        if isinstance(error, (commands.BadArgument, commands.BadLiteralArgument)):
+            await self._safe_send_ctx(ctx, "Invalid parameters provided for this command. Check your input and try again.")
+            return
+
+        if isinstance(error, (commands.MissingPermissions, commands.CheckFailure, commands.MissingRole)):
+            await self._safe_send_ctx(ctx, "You don't have permission to use this command.")
+            return
+
+        if isinstance(error, commands.NoPrivateMessage):
+            await self._safe_send_ctx(ctx, "This command can only be used inside a server.")
+            return
+
+        await self._safe_send_ctx(ctx, "Something went wrong processing that command. Try again.")
 
     async def _load_extensions(self) -> None:
         extensions = (

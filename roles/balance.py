@@ -186,4 +186,62 @@ def build_role_pool(player_count: int, disabled_roles: frozenset[str] | set[str]
     )
     random.shuffle(assigned)
     return assigned
+
+
+def build_custom_role_pool(
+    player_count: int,
+    custom_roles: list[str],
+    disabled_roles: frozenset[str] | set[str] | None = None,
+) -> list[str]:
+    """Builds a shuffled list of role_keys based on a custom role list.
+    Supports multi-copy roles (e.g. 5x Higuruma).
+    - Guarantees at least 1 Mafia (Villain) role is present.
+    - If custom_roles < player_count: fills remaining slots with balanced roles drawn
+      via build_role_pool logic instead of plain Villagers.
+    - If custom_roles > player_count: draws a balanced subset matching player_count.
+    """
+    if player_count <= 0:
+        return []
+
+    disabled = frozenset(disabled_roles or ())
+    valid_custom = [r for r in custom_roles if r not in disabled]
+    if not valid_custom:
+        return build_role_pool(player_count, disabled_roles=disabled)
+
+    from utils.roles import role_registry
+    mafia_in_custom = [
+        r for r in valid_custom
+        if (cls := role_registry.get(r)) and getattr(cls, "faction", None) == RoleFaction.VILLAIN
+    ]
+
+    pool: list[str] = []
+
+    if len(valid_custom) == player_count:
+        pool = list(valid_custom)
+    elif len(valid_custom) < player_count:
+        pool = list(valid_custom)
+        needed = player_count - len(pool)
+        extra_roles = build_role_pool(needed, disabled_roles=disabled)
+        pool.extend(extra_roles)
+    else:  # len(valid_custom) > player_count
+        if mafia_in_custom:
+            forced_mafia = random.choice(mafia_in_custom)
+            remaining_custom = list(valid_custom)
+            remaining_custom.remove(forced_mafia)
+            sampled = random.sample(remaining_custom, player_count - 1)
+            pool = [forced_mafia] + sampled
+        else:
+            pool = random.sample(valid_custom, player_count)
+
+    # Guarantee at least 1 Mafia role in the final pool if player_count >= 2
+    final_mafia = [
+        r for r in pool
+        if (cls := role_registry.get(r)) and getattr(cls, "faction", None) == RoleFaction.VILLAIN
+    ]
+    if not final_mafia and player_count >= 2:
+        mafia_filler = "frieza" if "frieza" not in disabled else "goon_lord"
+        pool[-1] = mafia_filler
+
+    random.shuffle(pool)
+    return pool
     

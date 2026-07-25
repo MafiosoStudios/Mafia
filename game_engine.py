@@ -17,6 +17,7 @@ from utils.helpers import utcnow
 from utils.roles import BaseRole, RoleContext, role_registry, NightAction
 import roles
 from ui import build_v2_layout
+from utils.progression import ProgressionManager
 from config import (
     get_emoji, get_death_message, get_inaction_message, get_event_image, get_role_image,
     GAME_CATEGORY_NAME_TEMPLATE, GAME_CHANNEL_NAME_TEMPLATE,
@@ -94,6 +95,14 @@ class GameSession:
     def day_num(self, value: int) -> None:
         self.metadata["day_num"] = value
 
+    @property
+    def gamemode(self) -> str:
+        return self.metadata.get("gamemode", "chaos")
+
+    @gamemode.setter
+    def gamemode(self, value: str) -> None:
+        self.metadata["gamemode"] = value
+
 
 class GameEngine:
     """Owns gameplay state and resolves roles and votes."""
@@ -101,8 +110,120 @@ class GameEngine:
     def __init__(self, database: DatabaseManager) -> None:
         self._database = database
         self._sessions: dict[str, GameSession] = {}
+        self._session_debouncers: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()
         self.bot: discord.Client | None = None
+
+    def request_vote_tally_update(self, game_id: str) -> None:
+        debouncers = self._session_debouncers.setdefault(game_id, {})
+        if "vote_tally" not in debouncers:
+            from utils.debouncer import DebouncedUpdater
+
+            async def _do_update() -> None:
+                await self._update_vote_tally(game_id)
+
+            debouncers["vote_tally"] = DebouncedUpdater(_do_update, delay=1.2)
+        debouncers["vote_tally"].request_update()
+
+    async def _update_vote_tally(self, game_id: str) -> None:
+        async with self._lock:
+            session = self._sessions.get(game_id)
+            if not session or session.phase != GamePhase.VOTING:
+                return
+
+            alive_count = sum(1 for p in session.players.values() if p.alive)
+            skips_count = len(session.metadata.get("skip_votes", set()))
+
+            tally: dict[int, int] = {}
+            geass_target = session.metadata.get("geass_target")
+            for voter_id, nominated_id in session.votes.items():
+                voter_state = session.players.get(voter_id)
+                weight = voter_state.vote_weight if voter_state else 1
+                if nominated_id == geass_target:
+                    weight *= 2
+                tally[nominated_id] = tally.get(nominated_id, 0) + weight
+
+            tally_lines = []
+            for target_id, count in sorted(tally.items(), key=lambda x: x[1], reverse=True):
+                pstate = session.players.get(target_id)
+                if pstate:
+                    tally_lines.append(f"• <@{target_id}>: **{count}** vote(s)")
+
+            if skips_count > 0:
+                tally_lines.append(f"• **Skip Vote**: **{skips_count}** vote(s)")
+
+            total_voted = len(session.votes) + skips_count
+            day_num = session.metadata.get("day_num", 1)
+            vote_msg = session.metadata.get("vote_message")
+            if not vote_msg:
+                return
+
+            status_desc = (
+                f"Accusations are flying, friendship is a myth! It's time to choose who gets dragged onto the stand.\n\n"
+                f"📊 **Ballots Cast:** {total_voted} / {alive_count}\n\n"
+                + ("\n".join(tally_lines) if tally_lines else "No votes cast yet.")
+            )
+
+        try:
+            from views.game_ui import VoteUISelectView
+            vote_view = VoteUISelectView(game_id, self)
+            layout = build_v2_layout(
+                title=f"Day {day_num} - Nomination Phase",
+                description=status_desc,
+                color=discord.Color.red(),
+                view=vote_view,
+            )
+            await vote_msg.edit(view=layout)
+        except Exception as e:
+            logger.debug("Failed to update vote tally: %s", e)
+
+    def request_night_status_update(self, game_id: str) -> None:
+        debouncers = self._session_debouncers.setdefault(game_id, {})
+        if "night_status" not in debouncers:
+            from utils.debouncer import DebouncedUpdater
+
+            async def _do_update() -> None:
+                await self._update_night_status(game_id)
+
+            debouncers["night_status"] = DebouncedUpdater(_do_update, delay=1.2)
+        debouncers["night_status"].request_update()
+
+    async def _update_night_status(self, game_id: str) -> None:
+        async with self._lock:
+            session = self._sessions.get(game_id)
+            if not session or session.phase != GamePhase.NIGHT_ACTIONS:
+                return
+
+            active_count = sum(1 for p in session.players.values() if p.alive and p.role_key not in ["villager", "demon", "mahoraga"])
+            submitted_count = len(session.night_actions)
+            night_num = session.metadata.get("night_num", 1)
+            night_msg = session.metadata.get("night_message")
+            if not night_msg:
+                return
+
+            status_desc = (
+                f"Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n\n"
+                "Click below to use your role's ability before sunrise!"
+            )
+
+        try:
+            from views.game_ui import NightActionView
+            action_view = NightActionView(game_id, self)
+            night_view = build_v2_layout(
+                title=f"Night {night_num}",
+                description=status_desc,
+                color=discord.Color.dark_blue(),
+                image_url=get_event_image("night"),
+                view=action_view,
+            )
+            await night_msg.edit(view=night_view)
+        except Exception as e:
+            logger.debug("Failed to update night status: %s", e)
+
+    def clear_session_debouncers(self, game_id: str) -> None:
+        debouncers = self._session_debouncers.pop(game_id, {})
+        for deb in debouncers.values():
+            asyncio.create_task(deb.flush())
 
     async def create_session(
         self,
@@ -223,6 +344,7 @@ class GameEngine:
                 session.votes[voter_id] = target_id
                 session.players[voter_id].votes_cast += 1
             await self.save_session_state(session)
+        self.request_vote_tally_update(game_id)
 
     async def queue_night_action(
         self,
@@ -283,6 +405,7 @@ class GameEngine:
             session.night_actions[user_id] = payload
             session.players[user_id].night_actions_used += 1
             await self.save_session_state(session)
+        self.request_night_status_update(game_id)
 
     async def resolve_night(self, game_id: str) -> None:
         async with self._lock:
@@ -626,16 +749,78 @@ class GameEngine:
                     has_won=is_winner,
                 )
 
+                # Automated Progression & Rewards DM
                 try:
-                    await self._process_player_endgame_rewards(
-                        session=session,
-                        user_id=user_id,
-                        player=player,
-                        winner_faction=winner_faction,
+                    profile = await self._database.get_player_profile(user_id)
+                    old_xp = profile.xp if profile else 0
+                    old_coins = profile.coins if profile else 0
+
+                    reward_res = ProgressionManager.calculate_match_rewards(
+                        old_xp=old_xp,
+                        old_coins=old_coins,
                         is_winner=is_winner,
+                        is_alive=player.alive,
+                        votes_cast=player.votes_cast,
+                        actions_performed=player.night_actions_used,
+                        is_mvp=(history.mvp_user_id == user_id),
                     )
-                except Exception as err:
-                    logger.error(f"Failed to process endgame rewards for user {user_id}: {err}")
+
+                    user_member = guild.get_member(user_id) if guild else None
+                    user_obj = user_member or self.bot.get_user(user_id)
+                    username = user_obj.display_name if user_obj else (profile.username if profile else f"User_{user_id}")
+
+                    updated_profile = await self._database.add_player_rewards(
+                        user_id=user_id,
+                        xp_gained=reward_res.xp_gained,
+                        coins_gained=reward_res.gold_gained,
+                        new_level=reward_res.new_level,
+                        new_rank=reward_res.new_rank,
+                        username=username,
+                    )
+
+                    if user_obj:
+                        rank_info = ProgressionManager.get_rank_info(reward_res.new_xp)
+                        rank_emoji = get_emoji(rank_info.get("emoji_key", "rank_bronze")) or "🥉"
+                        gold_emoji = get_emoji("gold") or "🪙"
+                        xp_emoji = get_emoji("xp") or "✨"
+                        level_up_emoji = get_emoji("level_up") or "⚡"
+                        rank_up_emoji = get_emoji("rank_up") or "👑"
+
+                        outcome_header = f"{get_emoji('victory')} **MATCH VICTORY!**" if is_winner else (f"{get_emoji('draw')} **MATCH DRAW**" if winner_faction == "Draw" else f"{get_emoji('death')} **MATCH DEFEAT**")
+                        
+                        lvl_info = ProgressionManager.calculate_level_info(reward_res.new_xp)
+                        progress_bar_str = ProgressionManager.format_progress_bar(lvl_info.xp_in_level, lvl_info.xp_for_next)
+
+                        dm_desc = (
+                            f"{outcome_header}\n\n"
+                            f"## Reward Breakdown\n"
+                            + "\n".join(reward_res.breakdown_lines) + "\n\n"
+                            f"## Total Earned\n"
+                            f"• {xp_emoji} **+{reward_res.xp_gained} XP** | {gold_emoji} **+{reward_res.gold_gained} Gold**\n\n"
+                            f"## Progression Update\n"
+                            f"• **Rank**: {rank_emoji} `{reward_res.new_rank}`\n"
+                            f"• **Level**: `{reward_res.new_level}` | {progress_bar_str}\n"
+                            f"• **Total Gold**: {gold_emoji} `{updated_profile.coins}`"
+                        )
+
+                        if reward_res.leveled_up:
+                            dm_desc += f"\n\n{level_up_emoji} **LEVEL UP!** You advanced to Level `{reward_res.new_level}`!"
+                        if reward_res.ranked_up:
+                            dm_desc += f"\n\n{rank_up_emoji} **RANK UP!** You promoted to `{reward_res.new_rank}`!"
+
+                        dm_layout = build_v2_layout(
+                            title="Match Rewards Summary",
+                            description=dm_desc,
+                            color=discord.Color.from_str(rank_info.get("color", "#FFD700")),
+                            thumbnail_url=user_obj.display_avatar.url if hasattr(user_obj, "display_avatar") else None,
+                        )
+
+                        try:
+                            self.bot.message_queue.send(user_obj, view=dm_layout)
+                        except Exception:
+                            logger.exception("Failed to send reward DM to user %s", user_id)
+                except Exception:
+                    logger.exception("Error processing match rewards for user %s", user_id)
 
             await self._database.save_match_history(history)
             await self._database.clear_active_game_state(game_id)
@@ -894,7 +1079,16 @@ class GameEngine:
                 disabled_roles = await self._database.get_disabled_roles(guild_id)
             except Exception:
                 logger.exception("Failed to load disabled roles for guild %s; proceeding with full roster.", guild_id)
-        assigned_keys = roles.build_role_pool(len(session.player_ids), disabled_roles=disabled_roles)
+
+        custom_list = session.metadata.get("custom_role_list")
+        if session.gamemode == "custom" and custom_list:
+            assigned_keys = roles.build_custom_role_pool(
+                len(session.player_ids), custom_list, disabled_roles=disabled_roles
+            )
+        else:
+            assigned_keys = roles.build_role_pool(
+                len(session.player_ids), disabled_roles=disabled_roles
+            )
 
         # Apply role assignments
         await self.assign_roles(game_id, tuple(assigned_keys))
@@ -1201,6 +1395,7 @@ class GameEngine:
 
                     try:
                         night_msg = await self.bot.message_queue.send(mafia_channel, view=night_view)
+                        session.metadata["night_message"] = night_msg
                     except Exception as err:
                         logger.error(f"Failed to send night view: {err}")
                         night_msg = None
@@ -1214,6 +1409,9 @@ class GameEngine:
                         if await self._all_active_submitted(session):
                             break
                         await asyncio.sleep(2)
+
+                    self.clear_session_debouncers(game_id)
+                    session.metadata.pop("night_message", None)
 
                     # Send Night Action Phase Ended as a new embed
                     try:
@@ -1334,6 +1532,7 @@ class GameEngine:
                                 mafia_channel,
                                 view=vote_layout
                             )
+                            session.metadata["vote_message"] = vote_msg
 
                         if is_resume:
                             from views.game_ui import VoteUISelectView
@@ -1351,6 +1550,7 @@ class GameEngine:
                                 mafia_channel,
                                 view=vote_layout
                             )
+                            session.metadata["vote_message"] = vote_msg
 
                         # Wait for Voting timeout
                         if not is_resume:
@@ -1365,6 +1565,9 @@ class GameEngine:
                             if total_votes >= alive_count_check:
                                 break
                             await asyncio.sleep(2)
+
+                        self.clear_session_debouncers(game_id)
+                        session.metadata.pop("vote_message", None)
 
                         # Remove vote view
                         try:
@@ -3109,11 +3312,17 @@ class GameEngine:
 
 
 def _stringify_keys(obj: Any) -> Any:
-    """Recursively convert any dict with non-string keys to string keys (MongoDB requirement)."""
+    """Recursively convert dict keys to strings and non-BSON types (sets, discord objects, tuples) to serializable primitives."""
     if isinstance(obj, dict):
         return {str(k): _stringify_keys(v) for k, v in obj.items()}
-    if isinstance(obj, list):
+    if isinstance(obj, (list, tuple, set)):
         return [_stringify_keys(i) for i in obj]
+    if hasattr(obj, "id") and isinstance(getattr(obj, "id"), int):
+        return getattr(obj, "id")
+    if hasattr(obj, "value"):
+        return obj.value
+    if type(obj).__module__.startswith("discord") or type(obj).__name__ in ("Message", "Member", "User", "TextChannel", "Guild", "Role", "Interaction"):
+        return None
     return obj
 
 

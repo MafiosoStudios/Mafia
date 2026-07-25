@@ -7,7 +7,7 @@
     "description": "A brilliant neurosurgeon driven by an unwavering sense of justice and compassion. Despite being caught in a web of tragedy and moral dilemmas, he remains determined to save lives and uphold his humanity at any cost.",
     "active_ability": "Emergency Surgery - Choose 2 players tonight. If one survives and the other dies, both survive. You cannot pick the same 2 people again next night.",
     "passive_ability": "None",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select a medical action to perform tonight:",
     "image_url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiYyDyYCpa4hcpCQVLCgne2EVx5w51gd_eeEbxYd4oDYtCyKJWklApvImdB9Ml4vmjvfePTPn_a7kqJRME6lBGFfyeV__IpHkRDiQlYFL_y9BYk6QhayEAw5UgoITkBV-19gFDgJ4ohAJQ/s1600/monster_tenma2.jpg",
     "footer": "Tomorrow will be a good day."
   },
@@ -19,7 +19,7 @@
     "description": "A mysterious mastermind who rarely reveals his true abilities. With unmatched intelligence and calculated decisions, he quietly manipulates every situation to achieve his goals.",
     "active_ability": "Observation - Observe a player. Learn who they visited and who visited them / Public Reveal - Starting from Night 4, publicly reveal the role of your target (4 day cooldown).",
     "passive_ability": "Unreadable - Immune to Framing, Forging, Mimicry, and any deceptions that alter role/faction appearance; investigations are always 100% accurate.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select a target to observe or evaluate:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRB9kkceXEnsK6iJqjjklv5HuFkCzffS69Th7_1Y2iZUJI7j0_2MFQaqTY3&s=10",
     "footer": "Peopl are nothing but tools."
   },
@@ -31,7 +31,7 @@
     "description": "The world's greatest detective, renowned for his extraordinary intellect and unmatched deductive skills. Behind his eccentric demeanor lies a relentless investigator determined to uncover the truth, no matter the cost.",
     "active_ability": "Deduction - Investigate target's alignment, this tells you their faction / Cross Examination - Compare two players' factions, this tells you if they are on the same or different side. Twice per game.",
     "passive_ability": "99% Certain - Scanning the same target on two different nights uncovers their exact role.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select an investigation method to deploy:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSw_fWndeu_8f2LOIxPbKz7FPAG2SofUoStOnZNN8b7rFfcyRuxr5OFHxxK&s=10",
     "footer": "There is no heaven or hell. I will solve this case."
   },
@@ -43,7 +43,7 @@
     "description": "The Second Hokage, celebrated for his brilliance, discipline, and tactical genius. A master of powerful jutsu and battlefield strategy, he always places the safety of the village above all else.",
     "active_ability": "Sensory Technique - Learn everyone who visited target player tonight / Flying Thunder Counter - Protect a player tonight, completely nullifying any attacks and learning who the attackers were. If the target dies, the attacker is still revealed (Twice per game).",
     "passive_ability": "Master Sensor - Learn which players visited Tobirama every night.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select a sensory or defense technique to cast:",
     "image_url": "https://images6.alphacoders.com/944/thumb-1920-944541.png",
     "footer": "These damn uchihas."
   },
@@ -55,7 +55,7 @@
     "description": "A former defense attorney who wields justice as both a weapon and a burden. Guided by an unshakable moral compass, he exposes wrongdoing and forces others to face the consequences of their actions.",
     "active_ability": "Deadly Sentencing - Instantly execute a player during Nomination phase, twice per game / Retrial - Acquit defendant during trial, twice per game.",
     "passive_ability": "None",
-    "action_prompt": "Select a day or trial action to perform:",
+    "action_prompt": "Select a courtroom decree or sentencing action:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQTL400gkDtPbp8fwSEUzQjlv4Puw-HwtvqaP0kBjvNPDuBTxV8DPPuSes&s=10",
     "footer": "The law exists to protect people."
   },
@@ -67,7 +67,7 @@
     "description": "Humanity's strongest soldier, feared for his unmatched combat skills and unwavering resolve. Calm under pressure and fiercely loyal to his comrades, Levi never hesitates to make the difficult choices for the greater good.",
     "active_ability": "ODM Execution - Attack a player, 3 uses / Precision Strike - ODM Execution ignores protection tonight, 1 use.",
     "passive_ability": "Survivor's Guilt - Become exhausted for 1 cycle if you kill a Protagonist player.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select a combat strike to execute tonight:",
     "image_url": "https://www.chromethemer.com/download/hd-wallpapers/levi-ackerman-3840x2160.jpg",
     "footer": "Give up on your dreams and die."
   },
@@ -79,7 +79,7 @@
     "description": "A sharp-witted apothecary with an insatiable curiosity for medicine, poisons, and mysteries. Her keen observational skills and logical mind allow her to uncover truths that others fail to notice.",
     "active_ability": "Postmortem Analysis - Select a dead player. You will receive 3 names, one of whom is the killer (2 day cooldown). / \nBrew Potion - Brew a potion of your choice, each potion has a 2 day cooldown:\n• Potion of Truth - Reveals the target's faction.\n• Potion of Invisibility - Target goes invisible.\n• Potion of Happiness - Distract (roleblock) the target.\n• Potion of Revitalization - Restores target's cooldowns.\n• Potion of Intelligence - Target gains +1 vote for tomorrow.",
     "passive_ability": "Photographic Memory - If the corpse is fresh (killed last night), the Postmortem Analysis has a 40% chance to guarantee another protagonist name is included among the suspects.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select an apothecary remedy or investigation to prepare:",
     "image_url": "https://images.alphacoders.com/138/1388168.png",
     "footer": "Curiosity killed the cat... but I'm still curious."
   },
@@ -91,7 +91,7 @@
     "description": "An ancient elven mage whose quiet demeanor conceals centuries of wisdom and extraordinary magical power. Though she struggles to understand human emotions, her journey teaches her the true value of the bonds forged over a lifetime.",
     "active_ability": "Ancient Binding - Bind 2 players together, if one dies, the survivor is hidden for a night / Demon Detection - Choose 3 players, you will learn how many of those belong to the antagonists / Zoltraak Specialist - Disable the passives of all antagonists and neutrals tonight this has a 2 day cooldown.",
     "passive_ability": "None",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select an ancient spell to cast tonight:",
     "image_url": "https://www.wallpaperalchemy.com/storage/wallpapers/1777/frieren-anime-character-wallpaper-4k-high-resolution.jpg",
     "footer": "The journey itself is what gives memories their meaning."
   },
@@ -103,7 +103,7 @@
     "description": "A ruthless pirate driven by boundless ambition and an insatiable desire for power. Cunning, unpredictable, and willing to betray anyone, Blackbeard believes destiny favors those bold enough to seize it.",
     "active_ability": "Darkness Logia - Roleblock a player, the player with the Roleblock status effect cannot use their ability that day / Tremor Fruit - Once per game, roleblock every single neutral and protagonist player for that night.",
     "passive_ability": "None",
-    "action_prompt": "Select a player to roleblock:",
+    "action_prompt": "Select a player to engulf in Darkness Logia:",
     "image_url": "https://i.ytimg.com/vi/dR9xalXFFTQ/maxresdefault.jpg",
     "footer": "A man's dream... will never die!"
   },
@@ -115,19 +115,19 @@
     "description": "A brilliant student whose unwavering belief in his own sense of justice drives him to reshape the world. Armed with exceptional intellect and relentless determination, he orchestrates every move with chilling precision.",
     "active_ability": "Death Note - Choose a player and guess their role, if correct, they die that night. / The Devil's Pen - Write a player's name in the Death Note, they die unpreventably after 3 nights, 3 night cooldown.",
     "passive_ability": "None",
-    "action_prompt": "Select a player to target in your Death Note:",
+    "action_prompt": "Choose which Death Note power to invoke:",
     "image_url": "https://c4.wallpaperflare.com/wallpaper/50/738/449/death-note-anime-anime-boys-yagami-light-wallpaper-preview.jpg",
     "footer": "I'll become the god of the new world."
   },
   "muzan_kibutsuji": {
     "name": "Muzan Kibutsuji",
     "faction": "Antagonist",
-    "emoji": "👹",
+    "emoji": "🩸",
     "win_condition": "Help the antagonists win.",
     "description": "The first and most powerful demon, feared for his overwhelming strength and ruthless pursuit of perfection. Cold, manipulative, and merciless, Muzan commands absolute loyalty while eliminating anyone who threatens his reign.",
     "active_ability": "Blood Demon Art - Every 3rd night, starting Night 3, transform a Protagonist player with 85% chance to become a demon with no powers, 10% chance to become a Lower Moon Demon with the ability to Roleblock, and a 5% chance to become an Upper Moon Demon with the ability to kill.",
     "passive_ability": "Instant Regeneration - Always survive the first attack, healing Muzan Kibutsuji gives him an extra passive charge.",
-    "action_prompt": "Select a Protagonist to infect:",
+    "action_prompt": "Select a Protagonist to infect with your Demon Blood:",
     "image_url": "https://images5.alphacoders.com/136/thumb-1920-1367556.jpeg",
     "footer": "I underestimated.. that Ubayashiki.."
   },
@@ -139,7 +139,7 @@
     "description": "A mysterious Public Safety officer who exudes calm authority and unmatched composure. Beneath her gentle demeanor lies a master manipulator capable of bending both allies and enemies to her will.",
     "active_ability": "Control - Choose a player, redirect target's night action to any other player of choosing. / Bang - Deals unstoppable attack once per game after contract is activated and 2 unique redirects succeed.",
     "passive_ability": "Prime Minister's Contract - Once per game, survive execution, Day immediately ends, role is not revealed.",
-    "action_prompt": "Select the player you wish to control:",
+    "action_prompt": "Select the player you wish to subject to your Control:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJBPukdWnoq2BCEt6GC-N9ERsykH9bLtKC_hAWDh_zIGzcPob-Q_vtNRg&s=10",
     "footer": "Necessary evils are always necessary."
   },
@@ -151,7 +151,7 @@
     "description": "Hisoka has no interest in justice or domination. He lives for excitement, manipulating others and turning the game into his own personal playground.",
     "active_ability": "Bungee Gum - Link two players. If either wins while both are alive, they both win / Texture Surprise - Twice per game, disguise a players faction alignment / Bloodlust - Once per game, redirect any ability targeted at Hisoka back to the attacker.",
     "passive_ability": "Bound by Bungee Gum",
-    "action_prompt": "Select the first player to link with Bungee Gum:",
+    "action_prompt": "Select a Nen ability to activate tonight:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3YxjRq2L8N8jP6rPDY-UlywimP6uXRdt0GVxAJfrS5ykUL3HEnv5BBYVg&s=10",
     "footer": "The pleasure comes not from victory, but from the fight itself."
   },
@@ -163,7 +163,7 @@
     "description": "The King of Heroes, Gilgamesh is a proud and unrivaled monarch who views the world as his rightful domain. Possessing immeasurable power and unwavering confidence, he crushes those he deems unworthy without hesitation.",
     "active_ability": "Gate of Babylon - Visit a player to search for your sword. If found, you retrieve it. The number of swords needed to be collected depends on the lobby size, 3 for small ones, 5 for larger ones.",
     "passive_ability": "The Gates of Babylon - Transform once all swords are collected, if Gilgamesh is not lynched that day, wipe the entire mafia and protagonist faction and win the game.",
-    "action_prompt": "Select a player to search for your sword:",
+    "action_prompt": "Select a player to search for your treasury sword:",
     "image_url": "https://images4.alphacoders.com/702/thumb-1920-702886.png",
     "footer": "Know your place, mongrel."
   },
@@ -175,7 +175,7 @@
     "description": "A determined soldier whose unyielding desire for freedom drives him to challenge the fate of the world itself. Fiercely passionate and willing to sacrifice everything for his convictions, Eren's choices forever reshape history.",
     "active_ability": "Founding Vision - Select a player every night and learn their faction / The Rumbling - From Night 5 onwards, Eren transforms and gains the ability to kill a player every day. Eren cannot be lynched after the Rumbling begins.",
     "passive_ability": "None",
-    "action_prompt": "Select a player to look at or attack:",
+    "action_prompt": "Select a target for your Founding Vision or Rumbling Strike:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRVVq9KyxX88t_0aepOHjeEUNTptvkO574E4ZGjBj0B9jTNlpeZ3z2OQo0H&s=10",
     "footer": "If someone tries to take my freedom, I won't hesitate to take theirs."
   },
@@ -187,7 +187,7 @@
     "description": "The ultimate shikigami of the Ten Shadows Technique. Summoned once and never defeated, Mahoraga's Eight-Handled Wheel continuously turns — adapting to every ability, every faction, every force thrown at it. It does not fight. It evolves. And once it has adapted to everything, nothing in this world can stop it.",
     "active_ability": "Adaptation — Every night, visit a player to attempt adapting to their faction. 1st faction: 75% success. 2nd faction: 50%. 3rd faction: 25%. Once adapted to a faction, their night-kill abilities can no longer harm you.",
     "passive_ability": "Absolute Adaptation — After successfully adapting to all 3 factions (Protagonist, Antagonist, Neutral), you become immune to being voted out. Only unstoppable one-hit abilities (e.g. Light's Devil's Pen, Frieza's Golden Form, Bang, Gates of Babylon) can eliminate you.",
-    "action_prompt": "",
+    "action_prompt": "Select a player to analyze and adapt to their faction:",
     "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR940rQIjSgvfUpSSguneVPC6r054WdgzG2xjUbKJVvWvgVzd4wrG4SPF4&s=10",
     "footer": "Nah I'd Adapt."
   },
@@ -199,7 +199,7 @@
     "description": "A normal citizen of the anime world with no special abilities. Villager slots only appear when there aren't enough unique Protagonist roles to fill the town — the more players, the more likely a Villager shows up.",
     "active_ability": "None",
     "passive_ability": "None",
-    "action_prompt": "",
+    "action_prompt": "You have no active night abilities.",
     "footer": "Just a regular person caught in the crossfire."
   },
   "antagonist_base_killer": {
@@ -220,7 +220,7 @@
     "description": "The ruthless emperor of the universe, Frieza rules through fear, overwhelming power, and absolute cruelty. Arrogant yet calculating, he views all life as beneath him and will stop at nothing to dominate those who oppose him.",
     "active_ability": "Death Beam - Choose a player to eliminate every night.",
     "passive_ability": "Golden Frieza - Ignores protection, immune to blocks/redirections after 3 kills.",
-    "action_prompt": "Select a player to target with Death Beam:",
+    "action_prompt": "Select a target to eliminate with your Death Beam:",
     "image_url": "https://static.wikia.nocookie.net/villains/images/e/e1/2017-06-18-1-850x560.jpg/revision/latest?cb=20170619013517",
     "footer": "Die you monkeys!"
   },
@@ -232,7 +232,7 @@
     "description": "A human turned demon by Muzan Kibutsuji. Demons are never assigned at game start — they are created mid-game when Muzan targets a Protagonist at night to turn them into a demon ally.",
     "active_ability": "None",
     "passive_ability": "None",
-    "action_prompt": "",
+    "action_prompt": "You have no active night abilities.",
     "footer": "My humanity is gone. I serve only the demon lord."
   },
   "lower_moon": {
@@ -243,7 +243,7 @@
     "description": "A powerful demon turned by Muzan Kibutsuji. Lower Moons are never assigned at game start — they are created mid-game when Muzan converts a dead Protagonist into a demon soldier.",
     "active_ability": "Distract — Roleblock a player each night.",
     "passive_ability": "None",
-    "action_prompt": "Select a player to roleblock/distract:",
+    "action_prompt": "Select a player to distract and roleblock tonight:",
     "footer": "Serving Muzan-sama with unwavering loyalty."
   },
   "upper_moon": {
@@ -254,7 +254,7 @@
     "description": "A lethal demon of supreme power turned by Muzan Kibutsuji. Upper Moons are never assigned at game start — they are created mid-game when Muzan converts a dead Protagonist into a demon soldier, granting them killing power.",
     "active_ability": "Demon Strike — Kill a player each night.",
     "passive_ability": "None",
-    "action_prompt": "Select a player to attack:",
+    "action_prompt": "Select a target for your Demon Strike:",
     "footer": "I exist only to serve Muzan-sama's will."
   },
   "kishibe": {
@@ -265,7 +265,7 @@
     "active_ability": "Veteran's Instinct (Alert) - Go on Alert, anyone who visits you is attacked with a Powerful Attack, 3 charges / Broken Screw - Once per game, Choose a player, if they visit you tonight, your Alert charge is saved.",
     "passive_ability": "Battle-Hardened - The first time someone attempts to roleblock, control, or redirect Kishibe, the effect fails and the visitor is notified that their target resisted them.",
     "win_condition": "Help the protagonists win.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select a combat posture or devil hunter tactic:",
     "footer": "I became a devil hunter so I could kill them. That is all.",
     "image_url": "https://c4.wallpaperflare.com/wallpaper/568/867/664/chainsaw-man-kishibe-chainsaw-man-hd-wallpaper-preview.jpg"
   },
@@ -277,7 +277,7 @@
     "active_ability": "Bankai: Enma Korogi - Every night, detain a player inside your Bankai. They cannot act, cannot be targeted, and may only communicate privately with Tosen. On the following night, choose to release them or execute them (max 3 executions). Executing a protagonist permanently removes your execution ability.",
     "passive_ability": "Suzumushi - Players detained inside Enma Korogi cannot activate any abilities that trigger upon death, while dying, or after death. Roles that passively evade death will not be activated. His judgment is absolute.",
     "win_condition": "Help the protagonists win.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select a player to subject to Bankai detention or judgment:",
     "footer": "Justice without power is mere sentiment. Power without justice is tyranny.",
     "image_url": "https://i.pinimg.com/736x/40/cf/1b/40cf1be8c6ffdce60e3ab8bf60f4c2e5.jpg"
   },
@@ -289,7 +289,7 @@
     "active_ability": "No Longer Human - Select a player every night, nullify the target's abilities for the night, they cannot use active abilities, their passive is suppressed, and visits are cancelled. The cooldown is 1 night.",
     "passive_ability": "Unpredictable - Dazai is immune to redirects, control, or forced visits. His chosen action will always proceed.",
     "win_condition": "Help the protagonists win.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select a player to touch with No Longer Human:",
     "footer": "There is no such thing as an ideal in this world.",
     "image_url": "https://images4.alphacoders.com/131/1314582.png"
   },
@@ -301,7 +301,7 @@
     "active_ability": "Demon Destroyer Sword - Select a player every night to cleanse all negative status effects from them. / Black Divider - Choose a player every other night and nullify their abilities for that day. / Devil Union - Once per game, Asta can merge with his devil and nullify EVERY hostile ability to protect the town",
     "passive_ability": "Anti-Magic - Immune to all negative non-physical abilities (Roleblocks, frames, hexes, silences, curses, redirects). Not immune to direct kills or lynching.",
     "win_condition": "Help the protagonists win.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select an Anti-Magic sword technique to deploy:",
     "footer": "My magic is never giving up!",
     "image_url": "https://images.alphacoders.com/139/thumb-1920-1399535.jpg"
   },
@@ -313,7 +313,7 @@
     "active_ability": "Geass - Choose a player. The following day all votes towards that player count double in both nomination and voting phases, 1 Night cooldown. / \nBlack Knight - Once per game, cause a rebellion in the lobby during discussion, ending the day phase immediately to start voting.",
     "passive_ability": "Zero Requiem - If Lelouch is executed/lynched at any point during the day, the game ends immediately and Lelouch wins the match.",
     "win_condition": "If all the protagonists are dead.",
-    "action_prompt": "Select an action to perform:",
+    "action_prompt": "Select a player to command with Geass:",
     "footer": "The only ones who should kill are those prepared to be killed.",
     "image_url": "https://images3.alphacoders.com/135/1358482.png"
   }

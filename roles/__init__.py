@@ -78,4 +78,4 @@ bind_metadata_to_roles()
 
 # Category-balanced role pool builder (imported last since it does a local,
 # lazy `from roles import get_role_balance` at call time).
-from roles.balance import build_role_pool  # noqa: E402
+from roles.balance import build_role_pool, build_custom_role_pool  # noqa: E402

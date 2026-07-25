@@ -91,6 +91,40 @@ class DatabaseManager:
         doc = await self.global_db.players.find_one({"user_id": user_id})
         return _doc_to_dataclass(PlayerProfileRecord, doc) if doc else None
 
+    async def add_player_rewards(
+        self,
+        user_id: int,
+        xp_gained: int,
+        coins_gained: int,
+        new_level: int,
+        new_rank: str,
+        username: str = "",
+    ) -> PlayerProfileRecord:
+        profile = await self.get_player_profile(user_id)
+        if profile is None:
+            profile = PlayerProfileRecord(
+                user_id=user_id,
+                username=username or f"User_{user_id}",
+                discriminator="0000",
+                level=new_level,
+                xp=xp_gained,
+                coins=coins_gained,
+                rank=new_rank,
+            )
+        else:
+            import dataclasses
+            profile = dataclasses.replace(
+                profile,
+                xp=profile.xp + xp_gained,
+                coins=profile.coins + coins_gained,
+                level=new_level,
+                rank=new_rank,
+                updated_at=datetime.utcnow(),
+            )
+        await self.upsert_player_profile(profile)
+        return profile
+
+
     # ---- Statistics ---------------------------------------------------------
 
     async def upsert_statistics(self, statistics: StatisticsRecord) -> None:
@@ -456,6 +490,10 @@ class DatabaseManager:
     async def list_custom_role_lists(self, guild_id: int) -> list[dict[str, Any]]:
         cursor = self.db.custom_role_lists.find({"guild_id": guild_id}).sort("name", 1)
         return [{"name": doc["name"], "roles": doc["roles"]} async for doc in cursor]
+
+    async def get_custom_role_lists(self, guild_id: int) -> dict[str, list[str]]:
+        lists = await self.list_custom_role_lists(guild_id)
+        return {item["name"]: item["roles"] for item in lists}
 
     # ---- Indexes ---------------------------------------------------------
 
