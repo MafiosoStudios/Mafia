@@ -20,7 +20,7 @@ class TenmaEmergencySurgery(NightAction):
         self.num_targets = 2
 
     def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
-        return [pid for pid, pstate in session.players.items() if pstate.alive and pid != actor_id]
+        return [pid for pid, pstate in session.players.items() if pstate.alive]
 
     async def execute(self, context: RoleContext) -> None:
         targets = context.targets
@@ -161,32 +161,13 @@ class AyanokojiPublicReveal(NightAction):
 
         faction_display = "Protagonist" if faction == RoleFaction.HERO.value else ("Antagonist" if faction == RoleFaction.VILLAIN.value else "Neutral")
 
-        # Send public reveal message to the mafia channel
-        mafia_ch_id = session.metadata.get("mafia_channel_id")
-        if mafia_ch_id and context.bot:
-            ch = context.bot.get_channel(mafia_ch_id)
-            if not ch:
-                try:
-                    ch = await context.bot.fetch_channel(mafia_ch_id)
-                except Exception:
-                    pass
-            if ch:
-                from ui import build_v2_layout
-                ayanokoji_view = build_v2_layout(
-                    title=f"{get_emoji('ayanokoji')} Ayanokoji Kiyotaka — Mastermind Revelation",
-                    description=(
-                        f"Ayanokoji Kiyotaka has analyzed the targets from the shadows and exposed a player's true identity!\n\n"
-                        f"👤 **Player:** <@{target_id}>\n"
-                        f"🎭 **True Role:** **{role_display}**\n"
-                        f"🍏 **Faction:** **{faction_display}**"
-                    ),
-                    color=discord.Color.purple(),
-                    thumbnail_url=role_meta.get("image_url"),
-                )
-                await context.bot.message_queue.send(ch, view=ayanokoji_view)
-
-
-        context.payload["result"] = f"{get_emoji('ayanokoji')} **Public Reveal:** You have publicly exposed <@{target_id}> as the **{role_display}** ({faction_display})."
+        session.metadata["ayanokoji_public_reveal"] = (
+            target_id,
+            role_display,
+            faction_display,
+            role_meta.get("image_url")
+        )
+        context.payload["log"] = f"Ayanokoji prepared public reveal for <@{target_id}> ({role_display})."
 
 
 @role_registry.register

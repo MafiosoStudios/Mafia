@@ -238,6 +238,9 @@ class GilgameshGate(NightAction):
             priority=19
         )
 
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        return [pid for pid in session.players.keys() if pid != actor_id]
+
     async def execute(self, context: RoleContext) -> None:
         session = context.payload.get("session")
         if not session:

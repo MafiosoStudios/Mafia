@@ -441,11 +441,14 @@ class NightAbilityButtonsView(MafiosoLayoutView):
             options = []
             guild = interaction.guild
             for pid in targets:
-                # Self targeting check (only doctor tenma is allowed to heal himself)
-                if pid == self.player_id and self.role_inst.role_key != "doctor_tenma":
+                # Self targeting check
+                if pid == self.player_id and self.role_inst.role_key not in ("doctor_tenma",):
                     continue
                 member = guild.get_member(pid) if guild else None
                 name = member.display_name if member else f"User {pid}"
+                p_st = session.players.get(pid)
+                if p_st and not p_st.alive:
+                    name += " (Dead 💀)"
                 options.append(discord.SelectOption(label=name, value=str(pid)))
 
             if not options:
@@ -463,7 +466,7 @@ class NightAbilityButtonsView(MafiosoLayoutView):
                 select = FrierenDemonDetectionMultiSelect(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
             elif ability.num_targets == 2:
-                select = TwoTargetMultiSelect(self.game_id, self.engine, ability, idx, options)
+                select = TwoTargetSelectStep1(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
             else:
                 select = AbilityTargetSelect(self.game_id, self.engine, ability, idx, options)
@@ -571,8 +574,7 @@ class TwoTargetMultiSelect(discord.ui.Select):
                 await interaction.response.defer(ephemeral=True)
             except Exception:
                 pass
-        if len(self.values) < 2:
-            await _safe_respond_or_edit(interaction, description="⚠️ You must select 2 targets.")
+        if not self.values:
             return
         target1 = int(self.values[0])
         options2 = [opt for opt in self.target_options if opt.value != str(target1)]

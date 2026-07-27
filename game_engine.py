@@ -2226,6 +2226,27 @@ class GameEngine:
         await self.bot.message_queue.send(channel, view=status_layout)
         await asyncio.sleep(2.5)
 
+        # 3. Check Ayanokoji Public Reveal
+        ayanokoji_reveal = session.metadata.pop("ayanokoji_public_reveal", None)
+        if ayanokoji_reveal:
+            target_id, role_display, faction_display, thumbnail_url = ayanokoji_reveal
+            ayanokoji_view = build_v2_layout(
+                title=f"{get_emoji('ayanokoji')} Ayanokoji Kiyotaka — Mastermind Revelation",
+                description=(
+                    f"Ayanokoji Kiyotaka has analyzed the targets from the shadows and exposed a player's true identity!\n\n"
+                    f"👤 **Player:** <@{target_id}>\n"
+                    f"🎭 **True Role:** **{role_display}**\n"
+                    f"🍏 **Faction:** **{faction_display}**"
+                ),
+                color=discord.Color.purple(),
+                thumbnail_url=thumbnail_url,
+            )
+            try:
+                await self.bot.message_queue.send(channel, view=ayanokoji_view)
+                await asyncio.sleep(2.5)
+            except Exception as err:
+                logger.error(f"Failed to send Ayanokoji reveal layout: {err}")
+
 
     async def _all_active_submitted(self, session: GameSession) -> bool:
         """Checks if all alive players who have active night actions have submitted."""
@@ -2372,6 +2393,14 @@ class GameEngine:
                 targets.append(t)
             for t in targets:
                 night_visits.setdefault(t, []).append(actor_id)
+
+        # Check Asta Devil Union activation before action loop starts
+        for pid, payload in session.night_actions.items():
+            pstate = session.players.get(pid)
+            if pstate and pstate.alive and pstate.role_key == "asta":
+                if payload.get("action_index") == 2:
+                    session.metadata["devil_union_active"] = True
+                    pstate.metadata["devil_union_used"] = True
 
         # 1. Gather all actions
         action_list = []
