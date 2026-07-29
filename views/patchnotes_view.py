@@ -124,11 +124,31 @@ PATCHES: list[dict] = [
             "**Multi-Copy & Balanced Custom Pools** — Full support for duplicate roles in custom lists (e.g. 5x Higuruma) with guaranteed Mafia assignment and balanced role filler",
             "**Non-Destructive Ephemeral UX** — Selecting targets or votes now sends fresh ephemeral notifications instead of overwriting selection dropdowns",
             "**Rate Limit & Deferral Hardening** — Instant <3s interaction deferrals and debounced embed updaters preventing 429 rate limits and 404 interaction errors",
-            "**Components V2 Migration** — Upgraded custom gamemode views to pure V2 Container cards with strict `config.py` emoji discipline",
             "**Database State Stability** — Fixed MongoDB BSON serialization issues with sets and Discord message handles during active game state saves",
         ],
     },
+    {
+        "version": "1.0.6",
+        "date": "July 29, 2026",
+        "title": "Version 1.0.6 — Global Admin Powers, Role Balancing & Engine Defenses",
+        "description": (
+            "A major system balance and bugfix update introducing global admin privileges across all game commands, "
+            "dynamic Gilgamesh sword scaling by lobby size, post-loop Devil Union protection, "
+            "Makima PM Contract immunity against Higuruma, and full roleblock DM notifications."
+        ),
+        "changes": [
+            "**Global Admin Privileges** — Bot admins in `config.ADMIN_IDS` can now start matches, clear lobbies, and kick players regardless of host status",
+            "**Gilgamesh Sword Scaling** — Gilgamesh now starts with 2 swords in <10 player lobbies, 3 swords in <15, and 4 swords in <20",
+            "**Devil Union N1 Protection** — Asta's Devil Union now purges all pending hostile kills targeting Town players at night",
+            "**Makima vs Higuruma Contract** — Makima's Prime Minister's Contract passive now triggers on Hiromi Higuruma's Deadly Sentencing execution, saving her life",
+            "**Roleblock DM Notifications** — Players receive explicit DM notifications when distracted at night, whether active or passive, preventing raw ability output leaks",
+            "**Two-Target Select Fix** — Implemented two-step target selection for multi-target abilities (e.g. Makima's Control), resolving NameError crashes",
+            "**Engine & DM Error Hardening** — Resolved guild resolution scope issues in end-game rewards and safely handled Discord 50278 no-mutual-guild DM errors",
+            "**Lobby & Fast ACK Polish** — Added instant interaction deferral to `/start` and skipped disconnected players during night completion checks",
+        ],
+    },
 ]
+
 
 
 
