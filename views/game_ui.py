@@ -482,18 +482,21 @@ class NightAbilityButtonsView(MafiosoLayoutView):
 
                     back_btn = discord.ui.Button(label="Cancel / Go Back", style=discord.ButtonStyle.danger)
                     async def back_callback(inter: discord.Interaction) -> None:
+                        if not inter.response.is_done():
+                            try:
+                                await inter.response.defer(ephemeral=True)
+                            except Exception:
+                                pass
                         player_state.metadata["levi_precision_active"] = False
                         orig_view = NightAbilityButtonsView(self.game_id, self.engine, self.player_id, self.role_inst, session)
-                        await inter.response.edit_message(view=build_v2_layout(description="Select an ability to use tonight:", view=orig_view, footer_text=""))
+                        await _safe_respond_or_edit(inter, view=orig_view, description="Select an ability to use tonight:")
                     back_btn.callback = back_callback
                     view.add_item(back_btn)
 
-                    await interaction.response.edit_message(
-                        view=build_v2_layout(
-                            description=f"{get_emoji('sword')} **Precision Strike Activated!** (Bypasses Protections)\nNow select your target for **ODM Execution**:",
-                            view=view,
-                            footer_text=""
-                        )
+                    await _safe_respond_or_edit(
+                        interaction,
+                        view=view,
+                        description=f"{get_emoji('sword')} **Precision Strike Activated!** (Bypasses Protections)\nNow select your target for **ODM Execution**:"
                     )
                     return
                 else:
@@ -503,8 +506,9 @@ class NightAbilityButtonsView(MafiosoLayoutView):
                     }
                     if not await _safe_queue_night_action(interaction, self.engine, self.game_id, self.player_id, payload):
                         return
-                    await interaction.response.edit_message(view=build_v2_layout(description=f"Ability **{ability.name}** activated successfully.", footer_text=""))
+                    await _safe_respond_or_edit(interaction, description=f"Ability **{ability.name}** activated successfully.")
                     return
+
 
 
             # Build SelectOptions
