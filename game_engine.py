@@ -787,63 +787,33 @@ class GameEngine:
 
                     if user_obj:
                         rank_info = ProgressionManager.get_rank_info(reward_res.new_xp)
-                        rank_emoji = get_emoji(rank_info.get("emoji_key", "rank_bronze")) or "🥉"
-                        gold_emoji = get_emoji("gold") or "🪙"
-                        xp_emoji = get_emoji("xp") or "✨"
-                        level_up_emoji = get_emoji("level_up") or "⚡"
-                        rank_up_emoji = get_emoji("rank_up") or "👑"
-
-                        if is_winner:
-                            outcome_header = f"{get_emoji('victory')} **MATCH VICTORY!**"
-                            card_color = discord.Color.from_str("#FFD700")
-                        elif winner_faction == "Draw":
-                            outcome_header = f"{get_emoji('draw')} **MATCH DRAW**"
-                            card_color = discord.Color.light_grey()
-                        else:
-                            outcome_header = f"{get_emoji('death')} **MATCH DEFEAT**"
-                            card_color = discord.Color.dark_red()
+                        outcome_header = "**MATCH VICTORY!**" if is_winner else ("**MATCH DRAW**" if winner_faction == "Draw" else "**MATCH DEFEAT**")
 
                         lvl_info = ProgressionManager.calculate_level_info(reward_res.new_xp)
-                        progress_bar_str = ProgressionManager.format_progress_bar(
-                            lvl_info.xp_in_level, lvl_info.xp_for_next, length=12
-                        )
-
-                        breakdown_formatted = "\n".join(reward_res.breakdown_lines)
+                        progress_bar_str = ProgressionManager.format_progress_bar(lvl_info.xp_in_level, lvl_info.xp_for_next)
 
                         dm_desc = (
-                            f"# {outcome_header}\n\n"
-                            f"### 📋 Match Rewards Breakdown\n"
-                            f"{breakdown_formatted}\n\n"
-                            f"### 💰 Total Earned This Match\n"
-                            f"• {xp_emoji} **+{reward_res.xp_gained} XP**\n"
-                            f"• {gold_emoji} **+{reward_res.gold_gained} Gold**\n\n"
-                            f"### {rank_emoji} Career & Progression Update\n"
-                            f"• **Rank Tier**: {rank_emoji} **{reward_res.new_rank}** (`{rank_info.get('badge', 'Tier')}`)\n"
-                            f"• **Current Level**: `{reward_res.new_level}`\n"
-                            f"• **Level Progress**: {progress_bar_str}\n"
-                            f"• **Total XP**: {xp_emoji} `{reward_res.new_xp:,}` XP\n"
-                            f"• **Gold Balance**: {gold_emoji} `{updated_profile.coins:,}` Gold"
+                            f"{outcome_header}\n\n"
+                            f"## Reward Breakdown\n"
+                            + "\n".join(reward_res.breakdown_lines) + "\n\n"
+                            f"## Total Earned\n"
+                            f"• **+{reward_res.xp_gained} XP** | **+{reward_res.gold_gained} Gold**\n\n"
+                            f"## Progression Update\n"
+                            f"• **Rank**: `{reward_res.new_rank}`\n"
+                            f"• **Level**: `{reward_res.new_level}` | {progress_bar_str}\n"
+                            f"• **Total Gold**: `{updated_profile.coins}`"
                         )
 
                         if reward_res.leveled_up:
-                            dm_desc += (
-                                f"\n\n---\n"
-                                f"## {level_up_emoji} LEVEL UP!\n"
-                                f"⚡ **CONGRATULATIONS!** You advanced from Level `{reward_res.old_level}` → **Level `{reward_res.new_level}`**!"
-                            )
+                            dm_desc += f"\n\n**LEVEL UP!** You advanced to Level `{reward_res.new_level}`!"
                         if reward_res.ranked_up:
-                            dm_desc += (
-                                f"\n\n---\n"
-                                f"## {rank_up_emoji} RANK PROMOTION!\n"
-                                f"👑 **RANK UP!** You promoted from `{reward_res.old_rank}` → {rank_emoji} **`{reward_res.new_rank}`**!"
-                            )
+                            dm_desc += f"\n\n**RANK UP!** You promoted to `{reward_res.new_rank}`!"
 
                         dm_layout = build_v2_layout(
-                            title=f"Match Summary & Rewards — {username}",
+                            title="Match Rewards Summary",
                             description=dm_desc,
-                            color=card_color,
+                            color=discord.Color.from_str(rank_info.get("color", "#FFD700")),
                             thumbnail_url=user_obj.display_avatar.url if hasattr(user_obj, "display_avatar") else None,
-                            footer_text=f"Mafioso Match Rewards • Match ID: {session.game_handle.game_id}",
                         )
 
                         try:
@@ -851,6 +821,7 @@ class GameEngine:
                             logger.info("Queued match reward DM for user %s (%s)", user_id, username)
                         except Exception:
                             logger.exception("Failed to send reward DM to user %s", user_id)
+
                 except Exception:
                     logger.exception("Error processing match rewards for user %s", user_id)
 

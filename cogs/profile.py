@@ -49,56 +49,31 @@ class ProfileCog(commands.Cog):
             )
             await database.upsert_player_profile(profile_record)
 
-        progress_bar_str = ProgressionManager.format_progress_bar(
-            lvl_info.xp_in_level, lvl_info.xp_for_next, length=12
-        )
+        progress_bar_str = ProgressionManager.format_progress_bar(lvl_info.xp_in_level, lvl_info.xp_for_next)
 
         total_games = statistics.games_played
         win_rate = 0.0 if total_games == 0 else (statistics.wins / total_games) * 100
 
-        rank_emoji = get_emoji(rank_info.get("emoji_key", "rank_bronze")) or "🥉"
-        gold_emoji = get_emoji("gold") or "🪙"
-        xp_emoji = get_emoji("xp") or "✨"
-        level_emoji = get_emoji("level") or "📈"
-
-        fav_char = profile_record.favorite_character
-        fav_emoji_prefix = ""
-        if fav_char:
-            for rkey, rmeta in roles.ROLES_METADATA.items():
-                rname = rmeta.get("name", "")
-                if rname.lower() == fav_char.lower() or rkey.lower() == fav_char.lower():
-                    char_emoji = get_emoji(rkey)
-                    if char_emoji:
-                        fav_emoji_prefix = char_emoji + " "
-                    break
-
-        fav_display = f"{fav_emoji_prefix}**{fav_char}**" if fav_char else "*None set (use `/setfavourite`)*"
-
         desc = (
-            f"## {rank_emoji} {profile_record.rank} Tier\n"
-            f"• **Rank Badge**: `{rank_info.get('badge', 'Tier')}`\n"
-            f"• **Total XP**: {xp_emoji} `{profile_record.xp:,}` XP\n\n"
-            f"### {level_emoji} Level Progression\n"
-            f"• **Current Level**: `{lvl_info.level}`\n"
-            f"• **Level Progress**: {progress_bar_str}\n"
-            f"• **XP in Level**: `{lvl_info.xp_in_level:,}` / `{lvl_info.xp_for_next:,}` XP\n\n"
-            f"### {gold_emoji} Inventory & Favorites\n"
-            f"• **Gold Balance**: {gold_emoji} `{profile_record.coins:,}` Gold\n"
-            f"• **Favorite Character**: {fav_display}\n\n"
-            f"## 📊 Global Match Statistics\n"
-            f"• **Wins**: `{statistics.wins}` 🏆 | **Losses**: `{statistics.losses}` 💀 | **Draws**: `{statistics.draws}` 🤝\n"
-            f"• **Total Games**: `{total_games}` 🎮 | **Win Rate**: `{win_rate:.1f}%` 🔥"
+            f"• **Rank**: `{profile_record.rank}` ({rank_info.get('badge', 'Tier')})\n"
+            f"• **Level**: `{lvl_info.level}` | {progress_bar_str}\n"
+            f"• **Gold**: `{profile_record.coins}`\n"
+            f"• **Favorite Character**: {profile_record.favorite_character or '*None set*'}\n\n"
+            f"## Global Match Statistics\n"
+            f"• **Wins:** `{statistics.wins}` | **Losses:** `{statistics.losses}` | **Draws:** `{statistics.draws}`\n"
+            f"• **Total Games:** `{total_games}` | **Win Rate:** `{win_rate:.1f}%`"
         )
 
         from ui import build_v2_layout
         profile_view = build_v2_layout(
-            title=f"👤 {profile_record.username}'s Player Profile",
+            title=f"{profile_record.username}'s Profile",
             description=desc,
             color=discord.Color.from_str(rank_info.get("color", "#FFD700")),
             thumbnail_url=ctx.author.display_avatar.url,
-            footer_text="Mafioso Progression & Career Stats",
+            footer_text="",
         )
         await send_hybrid_response(ctx, view=profile_view)
+
 
 
 
