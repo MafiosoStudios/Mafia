@@ -285,10 +285,17 @@ class Gilgamesh(BaseRole):
         self.win_condition_obj = GilgameshWinCondition()
 
     async def on_game_start(self, session: Any, user_id: int) -> None:
-        num_swords = min(5, len(session.player_ids) // 3 + 1)
-        sword_candidates = list(session.player_ids)
-        if user_id in sword_candidates:
-            sword_candidates.remove(user_id)
+        player_count = len(session.players)
+        if player_count < 10:
+            num_swords = 2
+        elif player_count < 15:
+            num_swords = 3
+        elif player_count < 20:
+            num_swords = 4
+        else:
+            num_swords = 4
+
+        sword_candidates = [pid for pid in session.players.keys() if pid != user_id]
         swords_list = random.sample(sword_candidates, min(num_swords, len(sword_candidates)))
         session.metadata["gilgamesh_swords"] = swords_list
 

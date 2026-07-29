@@ -88,6 +88,11 @@ class LobbyCog(commands.Cog):
 
     @commands.hybrid_command(name="start", aliases=["lobby_start"], description="Start the game match")
     async def start(self, ctx: commands.Context) -> None:
+        if ctx.interaction and not ctx.interaction.response.is_done():
+            await ctx.interaction.response.defer(ephemeral=True)
+        else:
+            await ctx.defer(ephemeral=True)
+
         lobby_manager = getattr(self.bot, "lobby_manager", None)
         if lobby_manager is None:
             await send_hybrid_response(ctx, "Lobby system is not ready yet.", ephemeral=True)
@@ -204,8 +209,12 @@ class LobbyCog(commands.Cog):
 
         import config
         is_bot_admin = ctx.author.id in config.ADMIN_IDS
-        is_server_admin = ctx.author.guild_permissions.administrator or ctx.author.guild_permissions.kick_members
-        is_lobby_leader = ctx.author.id == lobby.leader_id
+        is_server_admin = (
+            ctx.author.guild_permissions.administrator
+            or ctx.author.guild_permissions.kick_members
+            or ctx.author.guild_permissions.manage_guild
+        )
+        is_lobby_leader = ctx.author.id == lobby.leader_id or ctx.author.id == lobby.host_id
 
         if not (is_bot_admin or is_server_admin or is_lobby_leader):
             await send_hybrid_response(
@@ -219,7 +228,7 @@ class LobbyCog(commands.Cog):
             await send_hybrid_response(ctx, f"{get_emoji('cross')} **{player.display_name}** is not in the lobby roster.", ephemeral=True)
             return
 
-        if player.id == lobby.leader_id:
+        if player.id in (lobby.leader_id, lobby.host_id) and not (is_bot_admin or is_server_admin):
             await send_hybrid_response(ctx, f"{get_emoji('cross')} You cannot kick the lobby leader.", ephemeral=True)
             return
 

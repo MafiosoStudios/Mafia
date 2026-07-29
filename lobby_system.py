@@ -316,7 +316,7 @@ class LobbyManager:
             lobby = self._lobbies_by_guild.get(guild_id)
             if lobby is None:
                 raise KeyError("No active lobby found in this server.")
-            if not self._can_start_lobby(lobby, member):
+            if not self._can_clear_lobby(lobby, member):
                 raise PermissionError("Only the lobby leader, host, or an admin can clear the lobby.")
 
             cleared_lobby = self._lobbies_by_guild.pop(guild_id, None)
@@ -329,11 +329,21 @@ class LobbyManager:
             await self._delete_lobby_message(cleared_lobby)
         return cleared_lobby
 
+    def _can_clear_lobby(self, lobby: LobbySession, member: discord.Member) -> bool:
+        import config
+        if member.id in config.ADMIN_IDS:
+            return True
+        if member.guild_permissions.administrator or member.guild_permissions.manage_guild:
+            return True
+        if member.id in (lobby.leader_id, lobby.host_id):
+            return True
+        return any(role.id in self._config.lobby_leader_bypass_role_ids for role in member.roles)
+
     def _can_start_lobby(self, lobby: LobbySession, starter: discord.Member) -> bool:
         import config
         if starter.id in config.ADMIN_IDS:
             return True
-        if starter.guild_permissions.administrator:
+        if starter.guild_permissions.administrator or starter.guild_permissions.manage_guild:
             return True
         if starter.id in (lobby.leader_id, lobby.host_id):
             return True

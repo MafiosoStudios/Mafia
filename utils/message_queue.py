@@ -96,6 +96,16 @@ class DiscordMessageQueue:
                     if not fut.done():
                         fut.cancel()
                     return
+                except discord.Forbidden as exc:
+                    if getattr(exc, "code", None) == 50278:
+                        logger.debug("Cannot send message to user (code 50278 / no mutual guild or DMs blocked): %s", exc)
+                        if not fut.done():
+                            fut.set_exception(exc)
+                        break
+                    logger.error("Failed to run queued message action %s: %s", action, exc)
+                    if not fut.done():
+                        fut.set_exception(exc)
+                    break
                 except discord.HTTPException as http_exc:
                     if http_exc.status == 429:
                         retry_after = getattr(http_exc, "retry_after", 1.5) or 1.5

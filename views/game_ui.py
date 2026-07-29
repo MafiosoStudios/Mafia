@@ -294,6 +294,76 @@ class NightActionView(MafiosoLayoutView):
 
 
 
+class TwoTargetSelectStep1(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select first target...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.action_idx = action_index
+        self.target_options = options
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except Exception:
+                pass
+        first_target = int(self.values[0])
+        self.first_target = first_target
+
+        options2 = [opt for opt in self.target_options if opt.value not in (str(first_target), str(interaction.user.id))]
+        if not options2:
+            await _safe_respond_or_edit(interaction, description=f"{get_emoji('cross')} No eligible secondary target available.")
+            return
+
+        view = discord.ui.View(timeout=120)
+        select2 = TwoTargetSelectStep2(self.game_id, self.engine, self.ability, self.action_index, first_target, options2)
+        view.add_item(select2)
+
+        if self.ability.name == "Control":
+            prompt = f"Using **{self.ability.name}**.\nSelect the target to redirect <@{first_target}>'s action onto:"
+        else:
+            prompt = f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{first_target}>:"
+
+        await _safe_respond_or_edit(interaction, view=view, description=prompt)
+
+
+class TwoTargetSelectStep2(discord.ui.Select):
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, first_target: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(placeholder="Select second target...", options=options[:25])
+        self.game_id = game_id
+        self.engine = engine
+        self.ability = ability
+        self.action_index = action_index
+        self.action_idx = action_index
+        self.first_target = first_target
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except Exception:
+                pass
+        second_target = int(self.values[0])
+        payload = {
+            "action_index": self.action_idx,
+            "target_id": self.first_target,
+            "targets": [self.first_target, second_target],
+            "redirect_target": second_target,
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
+            return
+
+        if self.ability.name == "Control":
+            desc = f"You have decided to **Control** <@{self.first_target}> and redirect their action onto <@{second_target}>."
+        else:
+            desc = f"Ability **{self.ability.name}** registered targeting <@{self.first_target}> and <@{second_target}>."
+        await _safe_respond_or_edit(interaction, description=desc)
+
+
+
 class NightAbilityButtonsView(MafiosoLayoutView):
     def __init__(self, game_id: str, engine: GameEngine, player_id: int, role_inst: Any, session: GameSession) -> None:
         super().__init__(timeout=120)
@@ -403,7 +473,7 @@ class NightAbilityButtonsView(MafiosoLayoutView):
                         options.append(discord.SelectOption(label=name, value=str(pid)))
 
                     if not options:
-                        await interaction.response.send_message(view=build_v2_layout(description="No eligible targets for ODM Execution.", footer_text=""), ephemeral=True)
+                        await _safe_respond_or_edit(interaction, description="No eligible targets for ODM Execution.")
                         return
 
                     view = discord.ui.View(timeout=120)
@@ -551,68 +621,6 @@ class AbilityTargetSelect(discord.ui.Select):
         if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
         await _safe_respond_or_edit(interaction, description=f"Ability **{self.ability.name}** registered on <@{target_id}>.")
-
-
-class TwoTargetMultiSelect(discord.ui.Select):
-    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, options: list[discord.SelectOption]) -> None:
-        min_vals = min(2, len(options))
-        max_vals = min(2, len(options))
-        super().__init__(
-            placeholder="Select exactly 2 target players...",
-            min_values=min_vals,
-            max_values=max_vals,
-            options=options[:25],
-        )
-        self.game_id = game_id
-        self.engine = engine
-        self.ability = ability
-        self.action_index = action_index
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if not interaction.response.is_done():
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
-        if not self.values:
-            return
-        target1 = int(self.values[0])
-        options2 = [opt for opt in self.target_options if opt.value != str(target1)]
-        view = discord.ui.View(timeout=120)
-        select2 = TwoTargetSelectStep2(self.game_id, self.engine, self.ability, self.action_index, target1, options2)
-        view.add_item(select2)
-        if self.ability.name == "Control":
-            prompt = f"Using **{self.ability.name}**.\nSelect the target to redirect <@{target1}>'s action onto:"
-        else:
-            prompt = f"Using **{self.ability.name}**.\nSelect the second target to pair with <@{target1}>:"
-        await interaction.response.edit_message(view=build_v2_layout(description=prompt, view=view, footer_text=""))
-
-
-class TwoTargetSelectStep2(discord.ui.Select):
-    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target1: int, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select second target...", options=options[:25])
-        self.game_id = game_id
-        self.engine = engine
-        self.ability = ability
-        self.action_index = action_index
-        self.target1 = target1
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        target2 = int(self.values[0])
-        payload = {
-            "action_index": self.action_index,
-            "target_id": self.target1,
-            "redirect_target": target2,
-            "controlled_vote_target": target2,
-            "targets": (self.target1, target2)
-        }
-        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
-            return
-        if self.ability.name == "Control":
-            desc = f"You have decided to **Control** <@{self.target1}> and redirect their action onto <@{target2}>."
-        else:
-            desc = f"You have decided to use **{self.ability.name}** on <@{self.target1}> and <@{target2}>."
-        await interaction.response.edit_message(view=build_v2_layout(description=desc, footer_text=""))
 
 
 
@@ -1169,27 +1177,36 @@ class VoteUISelectView(MafiosoLayoutView):
 
     @discord.ui.button(label="Cast Vote", style=discord.ButtonStyle.primary, custom_id="mafia_cast_vote_button")
     async def cast_vote(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        async def _reply(target_inter: discord.Interaction, content: str = "", view: Any = None) -> None:
+            if not target_inter.response.is_done():
+                try:
+                    await target_inter.response.send_message(content, view=view, ephemeral=True)
+                except Exception:
+                    await target_inter.followup.send(content, view=view, ephemeral=True)
+            else:
+                await target_inter.followup.send(content, view=view, ephemeral=True)
+
         session = await self.engine.get_session(self.game_id)
         if not session:
-            await interaction.response.send_message("This game is no longer active.", ephemeral=True)
+            await _reply(interaction, "This game is no longer active.")
             return
 
         user_id = interaction.user.id
         if user_id not in session.players:
-            await interaction.response.send_message("You are not part of this game.", ephemeral=True)
+            await _reply(interaction, "You are not part of this game.")
             return
 
         player = session.players[user_id]
         if not player.alive:
-            await interaction.response.send_message("Dead players cannot vote.", ephemeral=True)
+            await _reply(interaction, "Dead players cannot vote.")
             return
 
         day_num = session.metadata.get("day_num", 1)
         if player.metadata.get("wounded_until_day") == day_num:
-            await interaction.response.send_message("You are Wounded and cannot vote today.", ephemeral=True)
+            await _reply(interaction, "You are Wounded and cannot vote today.")
             return
         if player.metadata.get("exhausted_until_day") == day_num:
-            await interaction.response.send_message("You are Exhausted and cannot vote today.", ephemeral=True)
+            await _reply(interaction, "You are Exhausted and cannot vote today.")
             return
 
         # Build standard target options
@@ -1215,30 +1232,30 @@ class VoteUISelectView(MafiosoLayoutView):
                     v = discord.ui.View(timeout=60)
                     select = VoteSelector(self.game_id, self.engine, normal_options)
                     v.add_item(select)
-                    await inter.response.send_message("Select a target to vote for (or Skip):", view=v, ephemeral=True)
+                    await _reply(inter, "Select a target to vote for (or Skip):", view=v)
 
                 async def deadly_cb(inter: discord.Interaction) -> None:
                     deadly_targets = [opt for opt in options if opt.value != str(user_id)]
                     if not deadly_targets:
-                        await inter.response.send_message("No eligible players to execute.", ephemeral=True)
+                        await _reply(inter, "No eligible players to execute.")
                         return
                     v = discord.ui.View(timeout=60)
                     select = HiromiDeadlySentencingSelect(self.game_id, self.engine, deadly_targets)
                     v.add_item(select)
-                    await inter.response.send_message(f"{get_emoji('trial')} **Deadly Sentencing:** Select a player to instantly execute:", view=v, ephemeral=True)
+                    await _reply(inter, f"{get_emoji('trial')} **Deadly Sentencing:** Select a player to instantly execute:", view=v)
 
                 btn_normal.callback = normal_cb
                 btn_deadly.callback = deadly_cb
                 view.add_item(btn_normal)
                 view.add_item(btn_deadly)
-                await interaction.response.send_message("Hiromi Higuruma, select an action:", view=view, ephemeral=True)
+                await _reply(interaction, "Hiromi Higuruma, select an action:", view=view)
                 return
 
         normal_options = [discord.SelectOption(label="Skip Vote", value="skip")] + options
         view = discord.ui.View(timeout=60)
         select = VoteSelector(self.game_id, self.engine, normal_options)
         view.add_item(select)
-        await interaction.response.send_message("Select a target to vote for (or Skip):", view=view, ephemeral=True)
+        await _reply(interaction, "Select a target to vote for (or Skip):", view=view)
 
 
 class HiromiDeadlySentencingSelect(discord.ui.Select):
@@ -1249,7 +1266,11 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         # Defer response immediately to avoid 3-second timeout
-        await interaction.response.defer(ephemeral=True)
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except Exception:
+                pass
         
         target_id = int(self.values[0])
         session = await self.engine.get_session(self.game_id)
@@ -1337,6 +1358,18 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
 
         await asyncio.sleep(3)
 
+        target_state = target_player or session.players.get(target_id)
+        if target_state and target_state.role_key == "makima" and not target_state.metadata.get("pm_contract_activated"):
+            target_state.metadata["pm_contract_activated"] = True
+            await self.engine.bot.message_queue.send(
+                mafia_channel,
+                f"{get_emoji('trial')} **Prime Minister's Contract Triggered!** An invisible force prevented Makima's execution!"
+            )
+            async with self.engine._lock:
+                session.metadata["deadly_sentencing_active"] = False
+            await _safe_respond_or_edit(interaction, description="Deadly Sentencing failed — Makima's Prime Minister's Contract protected her.")
+            return
+
         await self.engine.eliminate_player(self.game_id, target_id, "deadly_sentencing")
         await self.engine.bot.message_queue.send(
             mafia_channel,
@@ -1358,6 +1391,8 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
                 mafia_channel,
                 view=zero_requiem_layout
             )
+            session.state = GameState.ENDED
+            session.winner_faction = "Lelouch Lamperouge"
 
         if target_faction == RoleFaction.HERO.value:
             await asyncio.sleep(3)

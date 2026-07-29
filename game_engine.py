@@ -721,6 +721,7 @@ class GameEngine:
                         p1_state.metadata["has_won"] = True
                         p2_state.metadata["has_won"] = True
 
+            guild = self.bot.get_guild(session.game_handle.guild_id) if self.bot else None
             for user_id, player in session.players.items():
                 is_winner = False
                 if winner_faction == "Draw":
@@ -1933,6 +1934,8 @@ class GameEngine:
                                             mafia_channel,
                                             view=zero_requiem_layout
                                         )
+                                        session.state = GameState.ENDED
+                                        session.winner_faction = "Lelouch Lamperouge"
 
                                     # Check Hisoka Post-Mortem Nen lynch trigger
                                     if def_state.role_key == "hisoka" and night_num <= 5:
@@ -2252,6 +2255,8 @@ class GameEngine:
         """Checks if all alive players who have active night actions have submitted."""
         for pid, pstate in session.players.items():
             if not pstate.alive:
+                continue
+            if pstate.disconnected:
                 continue
             if pstate.role_key in ["villager", "demon", "mahoraga"]:
                 continue
@@ -2578,6 +2583,14 @@ class GameEngine:
 
             except Exception:
                 logger.exception("Failed to execute night action for user %s", actor_id)
+
+        # Devil Union N1 Post-Loop Purge
+        if session.metadata.get("devil_union_active"):
+            pending_kills = session.metadata.get("pending_kills", {})
+            for target_id in list(pending_kills.keys()):
+                pstate = session.players.get(target_id)
+                if pstate and pstate.faction == RoleFaction.HERO.value:
+                    pending_kills.pop(target_id, None)
 
         # 2. Check unpreventable Devil's Pen deaths
         death_queue = session.metadata.get("devils_pen_deaths", {})
@@ -3156,21 +3169,21 @@ class GameEngine:
             if not member:
                 continue
 
+            # Roleblocked feedback (Distraction DM for both active submitters and passive players)
+            is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
+            if is_blocked:
+                try:
+                    self.bot.message_queue.send(member, "🚫 **You were distracted tonight!** Your ability was blocked.")
+                except Exception:
+                    pass
+                continue
+
             payload = session.night_actions.get(actor_id)
 
             # No action submitted at all tonight (no ability, chose not to act, etc.)
             if payload is None:
                 try:
                     self.bot.message_queue.send(member, f"{get_emoji('night')} {get_inaction_message()}")
-                except Exception:
-                    pass
-                continue
-
-            # Roleblocked feedback
-            is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
-            if is_blocked:
-                try:
-                    self.bot.message_queue.send(member, f"{get_emoji('cross')} **Your action failed because you were roleblocked tonight!**")
                 except Exception:
                     pass
                 continue

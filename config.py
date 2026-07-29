@@ -157,6 +157,7 @@ EMOJIS: dict[str, str] = {
     "empty": "📭",
     "link": "🔗",
     "court": "🏛️",
+    "trial": "⚖️",
     "meteor": "☄️",
     "detective": "🕵️‍♂️",
     "wave": "🌊",
