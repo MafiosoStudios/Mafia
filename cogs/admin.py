@@ -456,6 +456,117 @@ class AdminCog(commands.Cog):
             ephemeral=True,
         )
 
+    @commands.hybrid_command(name="resume", description="Restore a crashed or frozen game (Admin/Host only)")
+    async def resume(self, ctx: commands.Context, game_id: str | None = None) -> None:
+        """
+        Restore a crashed/frozen game or recover after bot restart.
+        Authorization: Bot admins, server admins, or lobby host.
+        """
+        import config
+
+        # Check authorization: bot admin OR server admin
+        has_admin_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.administrator)
+
+        if not has_admin_perm:
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** Only bot admins or server admins can use this command.", ephemeral=True)
+            return
+
+        if ctx.guild is None:
+            await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
+            return
+
+        await ctx.defer(ephemeral=False)
+
+        game_manager = getattr(self.bot, "game_manager", None)
+        game_engine = getattr(self.bot, "game_engine", None)
+        database = getattr(self.bot, "db", None)
+
+        if not all([game_manager, game_engine, database]):
+            await send_hybrid_response(ctx, f"{get_emoji('cross')} Bot systems not fully initialized.", ephemeral=True)
+            return
+
+        # Find the game to resume
+        target_game_id = game_id
+        if not target_game_id:
+            # Auto-detect: find active game in this guild
+            game_handle = await game_manager.get_game_by_guild(ctx.guild.id)
+            if game_handle:
+                target_game_id = game_handle.game_id
+            else:
+                # Check database for active game
+                active_doc = await database.get_active_game_by_guild(ctx.guild.id)
+                if active_doc and active_doc.get("active_state"):
+                    target_game_id = active_doc["active_state"].get("game_handle", {}).get("game_id")
+
+        if not target_game_id:
+            await send_hybrid_response(
+                ctx,
+                f"{get_emoji('warning')} No active or frozen game found in this server.\n"
+                f"Use `/resume <game_id>` if you know the specific game ID to restore.",
+                ephemeral=True
+            )
+            return
+
+        # Check if session exists in memory (frozen but not crashed)
+        session = game_engine._sessions.get(target_game_id)
+
+        if session:
+            # Session exists in memory - game is frozen, not crashed
+            # Keep existing session and tasks, just notify
+            await send_hybrid_response(
+                ctx,
+                f"{get_emoji('check')} **Game Session Found in Memory**\n"
+                f"Game ID: `{target_game_id}`\n"
+                f"Phase: `{session.phase.value}`\n"
+                f"Alive Players: `{sum(1 for p in session.players.values() if p.alive)}/{len(session.players)}`\n\n"
+                f"Session is still active. If the game is truly frozen, consider:\n"
+                f"• Waiting a few more seconds for automatic phase transition\n"
+                f"• Using `/admin reset` to force-cancel and start fresh\n"
+                f"• Checking if players need to submit actions",
+                ephemeral=False
+            )
+        else:
+            # Session not in memory - need to restore from database
+            active_doc = await database.get_active_game_by_guild(ctx.guild.id)
+
+            if not active_doc or not active_doc.get("active_state"):
+                await send_hybrid_response(
+                    ctx,
+                    f"{get_emoji('cross')} No saved game state found in database for game `{target_game_id}`.\n"
+                    f"The game may have ended normally or was never saved.",
+                    ephemeral=True
+                )
+                return
+
+            # Reconstruct session from database (hybrid approach - memory efficient)
+            try:
+                await game_engine.restore_session_from_db(target_game_id, active_doc["active_state"])
+
+                restored_session = game_engine._sessions.get(target_game_id)
+                if restored_session:
+                    await send_hybrid_response(
+                        ctx,
+                        f"{get_emoji('check')} **Game Restored Successfully!**\n"
+                        f"Game ID: `{target_game_id}`\n"
+                        f"Phase: `{restored_session.phase.value}`\n"
+                        f"Alive Players: `{sum(1 for p in restored_session.players.values() if p.alive)}/{len(restored_session.players)}`\n\n"
+                        f"The game has been restored from the last saved state. Phase timers have been reset.\n"
+                        f"Players can now continue submitting actions.",
+                        ephemeral=False
+                    )
+                else:
+                    raise RuntimeError("Session restoration completed but session not found in memory")
+
+            except Exception as e:
+                await send_hybrid_response(
+                    ctx,
+                    f"{get_emoji('cross')} **Failed to restore game:** {str(e)}\n"
+                    f"The saved state may be corrupted. Consider using `/admin reset` to clean up.",
+                    ephemeral=True
+                )
+                import logging
+                logging.exception(f"Failed to restore game {target_game_id}")
+
     @commands.hybrid_command(name="devrestart", aliases=["dev_restart"], description="Pull latest code from git and restart the bot (Developer only)")
     async def devrestart(self, ctx: commands.Context) -> None:
         import config

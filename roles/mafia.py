@@ -251,7 +251,7 @@ class LightYagamiKill(NightAction):
                             f"in the Death Note, guessing they were **{guessed_display}**.\n\n"
                             f"{get_emoji('cross')} **The guess was wrong.** The Death Note is powerless and now everyone knows who Kira is."
                         ),
-                        color=_discord.Color.red(),
+                        color=discord.Color.red(),
                         footer_text="The pen may lie, but the truth never stays hidden.",
                     )
                     await context.bot.message_queue.send(ch, view=kira_view)

@@ -111,8 +111,43 @@ class GameEngine:
         self._database = database
         self._sessions: dict[str, GameSession] = {}
         self._session_debouncers: dict[str, dict[str, Any]] = {}
+        self._background_tasks: dict[str, asyncio.Task] = {}
         self._lock = asyncio.Lock()
         self.bot: discord.Client | None = None
+
+    def _track_task(self, task_name: str, coro) -> asyncio.Task:
+        """Track a background task with exception handling to prevent memory leaks."""
+        task = asyncio.create_task(coro)
+        task.add_done_callback(lambda t: self._handle_task_exception(t, task_name))
+        self._background_tasks[task_name] = task
+        return task
+
+    def _handle_task_exception(self, task: asyncio.Task, name: str) -> None:
+        """Log exceptions from background tasks without crashing."""
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception(f"Background task '{name}' failed")
+
+    async def cleanup_game_tasks(self, game_id: str) -> None:
+        """Cancel all background tasks associated with a game."""
+        tasks_to_cancel = [
+            task for key, task in self._background_tasks.items()
+            if game_id in key and not task.done()
+        ]
+        for task in tasks_to_cancel:
+            task.cancel()
+
+        if tasks_to_cancel:
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
+
+        # Remove cancelled tasks from tracking
+        self._background_tasks = {
+            k: v for k, v in self._background_tasks.items()
+            if not v.done() or game_id not in k
+        }
 
     def request_vote_tally_update(self, game_id: str) -> None:
         debouncers = self._session_debouncers.setdefault(game_id, {})
@@ -965,18 +1000,29 @@ class GameEngine:
             except Exception:
                 logger.exception("Failed to send endgame reward DM to user %s", user_id)
 
-    def _apply_votes(self, session: GameSession) -> None:
+    def _apply_votes(self, session: GameSession) -> int | None:
+        """
+        Apply voting results and return the player ID to be eliminated, or None.
+        Returns None if: no votes, tie, or skip wins.
+        """
         if not session.votes:
-            return
+            return None
+
         tally: dict[int, int] = {}
         for target_id in session.votes.values():
             tally[target_id] = tally.get(target_id, 0) + 1
+
         if not tally:
-            return
-        target_id = max(tally, key=tally.get)
-        if target_id in session.players:
-            session.players[target_id].alive = False
-            session.players[target_id].metadata["death_cause"] = "execution"
+            return None
+
+        max_votes = max(tally.values())
+        tied_players = [pid for pid, votes in tally.items() if votes == max_votes]
+
+        # Tie detected: no lynch occurs
+        if len(tied_players) > 1:
+            return None
+
+        return tied_players[0]
 
     def _evaluate_victory(self, session: GameSession) -> str | None:
         """Evaluate win conditions. Returns a faction name string or None."""

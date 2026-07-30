@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import asdict, fields as dataclass_fields
 from datetime import datetime
 from typing import Any
@@ -49,12 +50,27 @@ class DatabaseManager:
             )
         db_name = os.getenv("MONGODB_DB_NAME", "anime_mafia")
 
-        self._client = AsyncIOMotorClient(uri)
+        # Configure connection pool for production workload
+        self._client = AsyncIOMotorClient(
+            uri,
+            maxPoolSize=50,
+            minPoolSize=10,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=10000,
+        )
         self._db = self._client[db_name]
         self._global_db = self._client[f"{db_name}_global"]
 
-        # Fail fast on bad credentials/network instead of failing on first query.
-        await self._client.admin.command("ping")
+        # Retry connection with exponential backoff
+        for attempt in range(3):
+            try:
+                await self._client.admin.command("ping")
+                break
+            except Exception as e:
+                if attempt == 2:
+                    raise RuntimeError(f"Failed to connect to MongoDB after 3 attempts: {e}")
+                await asyncio.sleep(2 ** attempt)
+                logger.warning(f"MongoDB connection attempt {attempt + 1} failed, retrying...")
 
         await self._create_indexes()
         logger.info("Database layer initialized against MongoDB Atlas. Local: '%s', Global: '%s_global'", db_name, db_name)
@@ -100,29 +116,31 @@ class DatabaseManager:
         new_rank: str,
         username: str = "",
     ) -> PlayerProfileRecord:
-        profile = await self.get_player_profile(user_id)
-        if profile is None:
-            profile = PlayerProfileRecord(
-                user_id=user_id,
-                username=username or f"User_{user_id}",
-                discriminator="0000",
-                level=new_level,
-                xp=xp_gained,
-                coins=coins_gained,
-                rank=new_rank,
-            )
-        else:
-            import dataclasses
-            profile = dataclasses.replace(
-                profile,
-                xp=profile.xp + xp_gained,
-                coins=profile.coins + coins_gained,
-                level=new_level,
-                rank=new_rank,
-                updated_at=datetime.utcnow(),
-            )
-        await self.upsert_player_profile(profile)
-        return profile
+        """
+        Add rewards using atomic $inc operations to prevent race conditions.
+        """
+        result = await self.global_db.players.find_one_and_update(
+            {"user_id": user_id},
+            {
+                "$inc": {
+                    "xp": xp_gained,
+                    "coins": coins_gained,
+                },
+                "$set": {
+                    "level": new_level,
+                    "rank": new_rank,
+                    "updated_at": datetime.utcnow(),
+                },
+                "$setOnInsert": {
+                    "user_id": user_id,
+                    "username": username or f"User_{user_id}",
+                    "discriminator": "0000",
+                }
+            },
+            upsert=True,
+            return_document=True,
+        )
+        return _doc_to_dataclass(PlayerProfileRecord, result)
 
 
     # ---- Statistics ---------------------------------------------------------
@@ -141,39 +159,59 @@ class DatabaseManager:
         player_faction: str | None,
         winner_faction: str | None,
         has_won: bool | None = None,
+    async def update_statistics_for_match(
+        self,
+        user_id: int,
+        player_faction: str | None,
+        winner_faction: str | None,
+        has_won: bool | None = None,
     ) -> StatisticsRecord:
-        current = await self.get_statistics(user_id)
-        statistics = current or StatisticsRecord(user_id=user_id)
+        """
+        Update statistics using atomic $inc operations to prevent race conditions.
+        """
+        # Calculate increments
+        games_inc = 1
+        wins_inc = 0
+        losses_inc = 0
+        draws_inc = 0
 
-        games_played = statistics.games_played + 1
         if winner_faction is None or winner_faction == "Draw":
-            wins, losses, draws = statistics.wins, statistics.losses, statistics.draws + 1
+            draws_inc = 1
         elif has_won is not None:
-            # has_won reflects game_engine's authoritative win calculation
-            # (accounts for custom win conditions, not just faction match).
-            if has_won:
-                wins, losses, draws = statistics.wins + 1, statistics.losses, statistics.draws
-            else:
-                wins, losses, draws = statistics.wins, statistics.losses + 1, statistics.draws
+            wins_inc = 1 if has_won else 0
+            losses_inc = 0 if has_won else 1
         elif player_faction == winner_faction:
-            wins, losses, draws = statistics.wins + 1, statistics.losses, statistics.draws
+            wins_inc = 1
         else:
-            wins, losses, draws = statistics.wins, statistics.losses + 1, statistics.draws
+            losses_inc = 1
 
-        updated = StatisticsRecord(
-            user_id=user_id,
-            guild_id=0,
-            games_played=games_played,
-            wins=wins,
-            losses=losses,
-            draws=draws,
-            executions=statistics.executions,
-            night_kills=statistics.night_kills,
-            votes_cast=statistics.votes_cast,
-            achievements_unlocked=statistics.achievements_unlocked,
-            mvp_titles=statistics.mvp_titles,
+        # Atomic update with $inc
+        result = await self.global_db.statistics.find_one_and_update(
+            {"user_id": user_id},
+            {
+                "$inc": {
+                    "games_played": games_inc,
+                    "wins": wins_inc,
+                    "losses": losses_inc,
+                    "draws": draws_inc,
+                },
+                "$setOnInsert": {
+                    "user_id": user_id,
+                    "guild_id": 0,
+                    "executions": 0,
+                    "night_kills": 0,
+                    "votes_cast": 0,
+                    "achievements_unlocked": 0,
+                    "mvp_titles": 0,
+                }
+            },
+            upsert=True,
+            return_document=True,
         )
-        await self.upsert_statistics(updated)
+
+        updated = _doc_to_dataclass(StatisticsRecord, result)
+
+        # Update leaderboards atomically
         await self.upsert_leaderboard_entry(
             "wins",
             LeaderboardEntry(user_id=user_id, guild_id=0, metric="wins", value=updated.wins, rank=0),
@@ -181,6 +219,14 @@ class DatabaseManager:
         await self.upsert_leaderboard_entry(
             "games_played",
             LeaderboardEntry(
+                user_id=user_id,
+                guild_id=0,
+                metric="games_played",
+                value=updated.games_played,
+                rank=0,
+            ),
+        )
+        return updated
                 user_id=user_id,
                 guild_id=0,
                 metric="games_played",

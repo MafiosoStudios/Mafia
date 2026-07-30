@@ -28,8 +28,22 @@ class LeaderboardCog(commands.Cog):
             await send_hybrid_response(ctx, "No leaderboard data yet.", ephemeral=True)
             return
 
+        # Build leaderboard lines from entries
+        lines = []
+        for rank, entry in enumerate(entries, start=1):
+            user_id = entry.get("user_id")
+            wins = entry.get("wins", 0)
+            if user_id:
+                lines.append(f"{rank}. <@{user_id}>: **{wins}** wins")
+
         from ui import build_v2_layout
-        leaderboard_layout = build_v2_layout(title="Top Wins", description="\n".join(lines), footer_text="")
+        from config import get_emoji
+
+        leaderboard_layout = build_v2_layout(
+            title=f"{get_emoji('victory')} Top Wins Leaderboard",
+            description="\n".join(lines) if lines else "No data available yet.",
+            footer_text="Keep playing to climb the ranks!"
+        )
         await send_hybrid_response(ctx, view=leaderboard_layout)
 
 

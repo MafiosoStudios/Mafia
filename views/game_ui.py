@@ -1363,6 +1363,15 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         await asyncio.sleep(3)
 
         target_state = target_player or session.players.get(target_id)
+
+        # Get target name for messaging
+        try:
+            guild = self.engine.bot.get_guild(session.game_handle.guild_id)
+            target_member = guild.get_member(target_id) if guild else None
+            target_name = target_member.display_name if target_member else f"User {target_id}"
+        except Exception:
+            target_name = f"User {target_id}"
+
         if target_state and target_state.role_key == "makima" and not target_state.metadata.get("pm_contract_activated"):
             target_state.metadata["pm_contract_activated"] = True
             await self.engine.bot.message_queue.send(

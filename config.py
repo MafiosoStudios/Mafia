@@ -33,14 +33,32 @@ class BotConfig:
 
     @classmethod
     def from_env(cls) -> "BotConfig":
+        # Validate token first
+        token = os.getenv("DISCORD_TOKEN", "")
+        if not token or not token.strip():
+            raise RuntimeError(
+                "DISCORD_TOKEN environment variable is required but not set.\n"
+                "Please create a .env file with DISCORD_TOKEN=your_bot_token_here"
+            )
+
+        # Parse integer config values with validation
+        def _parse_int_env(key: str, default: str, min_val: int = 1, max_val: int = 10000) -> int:
+            try:
+                value = int(os.getenv(key, default))
+                if not (min_val <= value <= max_val):
+                    raise ValueError(f"{key} must be between {min_val} and {max_val}, got {value}")
+                return value
+            except ValueError as e:
+                raise RuntimeError(f"Invalid {key} configuration: {e}")
+
         return cls(
-            token=os.getenv("DISCORD_TOKEN", ""),
+            token=token.strip(),
             command_prefix=os.getenv("COMMAND_PREFIX", "!"),
-            min_players=int(os.getenv("MIN_PLAYERS", "5")),
-            max_players=int(os.getenv("MAX_PLAYERS", "15")),
-            lobby_timeout_seconds=int(os.getenv("LOBBY_TIMEOUT_SECONDS", "300")),
-            night_timeout_seconds=int(os.getenv("NIGHT_TIMEOUT_SECONDS", "120")),
-            day_timeout_seconds=int(os.getenv("DAY_TIMEOUT_SECONDS", "180")),
+            min_players=_parse_int_env("MIN_PLAYERS", "5", min_val=2, max_val=50),
+            max_players=_parse_int_env("MAX_PLAYERS", "15", min_val=2, max_val=50),
+            lobby_timeout_seconds=_parse_int_env("LOBBY_TIMEOUT_SECONDS", "300", min_val=30, max_val=3600),
+            night_timeout_seconds=_parse_int_env("NIGHT_TIMEOUT_SECONDS", "120", min_val=30, max_val=3600),
+            day_timeout_seconds=_parse_int_env("DAY_TIMEOUT_SECONDS", "180", min_val=30, max_val=3600),
             lobby_leader_bypass_role_ids=_parse_int_tuple(os.getenv("LOBBY_LEADER_BYPASS_ROLE_IDS", "")),
         )
 
