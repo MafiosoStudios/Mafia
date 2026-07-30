@@ -132,7 +132,7 @@ class AnimeMafiaBot(commands.Bot):
         elif isinstance(error, discord.app_commands.TransformerError):
             msg = "Invalid parameters provided for this command."
         elif isinstance(error, discord.app_commands.CommandOnCooldown):
-            msg = f"{get_emoji('clock')} **Calm down, bih—** That command is on cooldown. Try again in **{error.retry_after:.1f}s**."
+            msg = f"**Calm down, bih—** That command is on cooldown. Try again in **{error.retry_after:.1f}s**."
 
         try:
             if interaction.response.is_done():
@@ -170,7 +170,7 @@ class AnimeMafiaBot(commands.Bot):
             return
 
         if isinstance(error, commands.CommandOnCooldown):
-            await self._safe_send_ctx(ctx, f"{get_emoji('clock')} **Calm down, bih—** That command is on cooldown. Try again in **{error.retry_after:.1f}s**.")
+            await self._safe_send_ctx(ctx, f"**Calm down, bih—** That command is on cooldown. Try again in **{error.retry_after:.1f}s**.")
             return
 
         await self._safe_send_ctx(ctx, "Something went wrong processing that command. Try again.")
