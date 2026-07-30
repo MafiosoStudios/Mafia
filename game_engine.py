@@ -2561,7 +2561,7 @@ class GameEngine:
                                 bot.message_queue.send(member, f"{get_emoji('cross')} **Your ability was nullified tonight.**")
                             except Exception:
                                 pass
-                self._track_task(f"notify_mahoraga_null_{game_id}", notify_null())
+                self._track_task(f"notify_mahoraga_null_{session.game_handle.game_id}", notify_null())
                 continue
 
             # Asta Devil Union nullification
@@ -2590,7 +2590,7 @@ class GameEngine:
                                         bot.message_queue.send(member, f"{get_emoji('cross')} **Your action failed due to Asta's Devil Union!**")
                                     except Exception:
                                         pass
-                        self._track_task(f"notify_asta_union_{game_id}", notify_union())
+                        self._track_task(f"notify_asta_union_{session.game_handle.game_id}", notify_union())
                         continue
 
             # Invisibility check (Potion of Invisibility)

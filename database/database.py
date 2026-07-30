@@ -155,6 +155,7 @@ class DatabaseManager:
     async def update_statistics_for_match(
         self,
         user_id: int,
+        guild_id: int | None,
         player_faction: str | None,
         winner_faction: str | None,
         has_won: bool | None = None,
@@ -190,7 +191,7 @@ class DatabaseManager:
                 },
                 "$setOnInsert": {
                     "user_id": user_id,
-                    "guild_id": 0,
+                    "guild_id": guild_id or 0,
                     "executions": 0,
                     "night_kills": 0,
                     "votes_cast": 0,
