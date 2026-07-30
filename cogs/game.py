@@ -261,70 +261,7 @@ class GameCog(commands.Cog):
         else:
             await ctx.send(view=newrelease_layout)
 
-    @commands.hybrid_command(name="resume", description="Resume the active game from database state")
-    @commands.cooldown(1, 30, commands.BucketType.user)
-    async def resume(self, ctx: commands.Context) -> None:
-        import config
-        import logging
-        logger = logging.getLogger(__name__)
-        has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
-        if not has_perm:
-            await send_hybrid_response(ctx, f"{get_emoji('cross')} **Unauthorized:** You do not have permission to use this command.", ephemeral=True)
-            return
-
-        guild_id = ctx.guild.id if ctx.guild else 0
-        if not guild_id:
-            await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)
-            return
-
-        game_manager = getattr(self.bot, "game_manager", None)
-        game_engine = getattr(self.bot, "game_engine", None)
-        db = getattr(self.bot, "db", None)
-
-        if not game_manager or not game_engine or not db:
-            await send_hybrid_response(ctx, "Game system is not fully loaded.", ephemeral=True)
-            return
-
-        # Check if server already has an active game in manager
-        existing_handle = await game_manager.get_game_by_guild(guild_id)
-        if existing_handle:
-            session = await game_engine.get_session(existing_handle.game_id)
-            if session:
-                await send_hybrid_response(
-                    ctx,
-                    f"{get_emoji('warning')} There is already a live active game session (`{existing_handle.game_id}`) running in this server.",
-                    ephemeral=True
-                )
-                return
-
-        # Load active state dictionary from database
-        state_dict = await db.get_active_game_by_guild(guild_id)
-        if not state_dict:
-            await send_hybrid_response(ctx, f"{get_emoji('cross')} No saved active game state found for this server.", ephemeral=True)
-            return
-
-        try:
-            from game_engine import deserialize_session
-            session = deserialize_session(state_dict)
-            
-            # Register in game_manager
-            await game_manager.register_game(session.game_handle)
-            
-            # Put session in engine cache
-            async with game_engine._lock:
-                game_engine._sessions[session.game_handle.game_id] = session
-            
-            # Run the loop!
-            await game_engine.run_game_loop_from_resume(session.game_handle.game_id)
-            
-            await send_hybrid_response(
-                ctx,
-                f"{get_emoji('refresh')} **Success:** Active game (`{session.game_handle.game_id}`) has been successfully resumed from state `{session.phase.value}`!",
-                ephemeral=False
-            )
-        except Exception:
-            logger.exception("Failed to deserialize and resume game.")
-            await send_hybrid_response(ctx, f"{get_emoji('cross')} Failed to resume game. Check bot logs for details.", ephemeral=True)
+    # /resume is in cogs/admin.py (comprehensive implementation with DB fallback)
 
     @commands.hybrid_command(name="tutorial", description="Open the interactive Mafioso tutorial guide")
     @commands.cooldown(1, 10, commands.BucketType.user)
