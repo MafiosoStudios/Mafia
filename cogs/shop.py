@@ -12,13 +12,13 @@ class ShopCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_group(name="shop", description="Browse Mafioso cosmetics and inventory")
-    @commands.cooldown(1, 60, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def shop(self, ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
             await send_hybrid_response(ctx, "Try `shop inventory` or `shop cosmetics`.", ephemeral=True)
 
     @shop.command(name="inventory")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def inventory(self, ctx: commands.Context) -> None:
         database = getattr(self.bot, "db", None)
         if database is None:
@@ -36,7 +36,7 @@ class ShopCog(commands.Cog):
         await send_hybrid_response(ctx, view=shop_layout, ephemeral=True)
 
     @shop.command(name="cosmetics")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def cosmetics(self, ctx: commands.Context) -> None:
         database = getattr(self.bot, "db", None)
         if database is None:

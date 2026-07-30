@@ -12,13 +12,13 @@ class LeaderboardCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_group(name="leaderboard", description="View Mafioso leaderboards")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def leaderboard(self, ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
             await send_hybrid_response(ctx, "Try `leaderboard wins`.", ephemeral=True)
 
     @leaderboard.command(name="wins")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def wins_leaderboard(self, ctx: commands.Context) -> None:
         database = getattr(self.bot, "db", None)
         if database is None:

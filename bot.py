@@ -8,7 +8,7 @@ import discord
 from discord.ext import commands
 
 load_dotenv()
-from config import BotConfig
+from config import BotConfig, get_emoji
 from database.database import DatabaseManager
 from game_engine import GameEngine
 import roles
@@ -131,6 +131,8 @@ class AnimeMafiaBot(commands.Bot):
             msg = "This command can only be used inside a server."
         elif isinstance(error, discord.app_commands.TransformerError):
             msg = "Invalid parameters provided for this command."
+        elif isinstance(error, discord.app_commands.CommandOnCooldown):
+            msg = f"{get_emoji('clock')} **Calm down, bih—** That command is on cooldown. Try again in **{error.retry_after:.1f}s**."
 
         try:
             if interaction.response.is_done():
@@ -165,6 +167,10 @@ class AnimeMafiaBot(commands.Bot):
 
         if isinstance(error, commands.NoPrivateMessage):
             await self._safe_send_ctx(ctx, "This command can only be used inside a server.")
+            return
+
+        if isinstance(error, commands.CommandOnCooldown):
+            await self._safe_send_ctx(ctx, f"{get_emoji('clock')} **Calm down, bih—** That command is on cooldown. Try again in **{error.retry_after:.1f}s**.")
             return
 
         await self._safe_send_ctx(ctx, "Something went wrong processing that command. Try again.")

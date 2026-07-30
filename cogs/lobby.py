@@ -15,7 +15,7 @@ class LobbyCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(name="lobby", description="View the current lobby status and roster")
-    @commands.cooldown(1, 10, commands.BucketType.guild)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def lobby(self, ctx: commands.Context) -> None:
         lobby_manager = getattr(self.bot, "lobby_manager", None)
         if lobby_manager is None:
@@ -38,7 +38,7 @@ class LobbyCog(commands.Cog):
             await lobby_manager.bind_lobby_message(guild_id, message)
 
     @commands.hybrid_command(name="join", aliases=["lobby_join", "lobby_create"], description="Join or create the game lobby")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def join(self, ctx: commands.Context) -> None:
         config: BotConfig = self.bot.config  # type: ignore[assignment]
         lobby_manager = getattr(self.bot, "lobby_manager", None)
@@ -79,7 +79,7 @@ class LobbyCog(commands.Cog):
                 await ctx.interaction.response.defer(ephemeral=True)
 
     @commands.hybrid_command(name="leave", aliases=["lobby_leave"], description="Leave the active lobby")
-    @commands.cooldown(1, 5, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def leave(self, ctx: commands.Context) -> None:
         lobby_manager = getattr(self.bot, "lobby_manager", None)
         if lobby_manager is None:
@@ -90,7 +90,7 @@ class LobbyCog(commands.Cog):
             await ctx.interaction.response.defer(ephemeral=True)
 
     @commands.hybrid_command(name="start", aliases=["lobby_start"], description="Start the game match")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def start(self, ctx: commands.Context) -> None:
         if ctx.interaction and not ctx.interaction.response.is_done():
             await ctx.interaction.response.defer(ephemeral=True)
@@ -113,7 +113,7 @@ class LobbyCog(commands.Cog):
         await send_hybrid_response(ctx, "The game is beginning.", ephemeral=True)
 
     @commands.hybrid_command(name="clear", aliases=["lobby_clear", "disband"], description="Clear and disband the current game lobby (Leader/Admin only)")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def clear(self, ctx: commands.Context) -> None:
         lobby_manager = getattr(self.bot, "lobby_manager", None)
         if lobby_manager is None:
@@ -133,7 +133,7 @@ class LobbyCog(commands.Cog):
             await send_hybrid_response(ctx, f"{get_emoji('cross')} {exc}", ephemeral=True)
 
     @commands.hybrid_command(name="gamemode", description="Change the current lobby's gamemode (chaos/custom)")
-    @commands.cooldown(1, 10, commands.BucketType.guild)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     @discord.app_commands.describe(mode="Choose either 'chaos' or 'custom'")
     async def gamemode(self, ctx: commands.Context, mode: str) -> None:
         if ctx.guild is None:
@@ -197,7 +197,7 @@ class LobbyCog(commands.Cog):
         await send_hybrid_response(ctx, f"{get_emoji('book')} **Reality has shifted.** Game mode set to **{mode_clean.upper()}** for this lobby.")
 
     @commands.hybrid_command(name="kick", description="Kick a player from the pre-game lobby")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     @discord.app_commands.describe(player="The player to kick")
     async def kick_player(self, ctx: commands.Context, player: discord.Member) -> None:
         if ctx.guild is None:
@@ -243,7 +243,7 @@ class LobbyCog(commands.Cog):
         await send_hybrid_response(ctx, f"🚪 **{player.display_name}** was banished from the lobby.")
 
     @commands.hybrid_group(name="customrolelist", fallback="menu", description="Manage custom role lists for the guild")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def customrolelist(self, ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:
             if ctx.guild is None:
@@ -269,7 +269,7 @@ class LobbyCog(commands.Cog):
             await send_hybrid_response(ctx, view=v2_card)
 
     @customrolelist.command(name="create", description="Start editing a new custom role list draft")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     @discord.app_commands.describe(name="Name of the custom role list")
     async def create_list(self, ctx: commands.Context, name: str) -> None:
         if ctx.guild is None:
@@ -298,7 +298,7 @@ class LobbyCog(commands.Cog):
         await send_hybrid_response(ctx, f"📝 **Draft list created:** '{name_clean}'. Use `/customrolelist add` to add roles to this draft.")
 
     @customrolelist.command(name="add", description="Add a role to the active custom role list draft")
-    @commands.cooldown(1, 5, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     @discord.app_commands.describe(role="The role to add")
     async def add_role(self, ctx: commands.Context, role: str) -> None:
         if ctx.guild is None:
@@ -351,7 +351,7 @@ class LobbyCog(commands.Cog):
         await send_hybrid_response(ctx, f"{get_emoji('join')} Added **{role_name}** to draft list '{draft['name']}' (Total roles: **{len(draft['roles'])}**).")
 
     @customrolelist.command(name="remove", description="Remove a role from the active custom role list draft")
-    @commands.cooldown(1, 5, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     @discord.app_commands.describe(role="The role to remove")
     async def remove_role(self, ctx: commands.Context, role: str) -> None:
         if ctx.guild is None:
@@ -401,7 +401,7 @@ class LobbyCog(commands.Cog):
         await send_hybrid_response(ctx, f"{get_emoji('leave')} Removed **{role_name}** from draft list '{draft['name']}' (Total roles: **{len(draft['roles'])}**).")
 
     @customrolelist.command(name="save", description="Save the active custom role list draft to database")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def save_list(self, ctx: commands.Context) -> None:
         if ctx.guild is None:
             await send_hybrid_response(ctx, "This command must be used in a server.", ephemeral=True)

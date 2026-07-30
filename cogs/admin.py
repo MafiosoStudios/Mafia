@@ -162,7 +162,7 @@ class AdminCog(commands.Cog):
             await send_hybrid_response(ctx, "Try `admin sync`.", ephemeral=True)
 
     @admin.command(name="sync")
-    @commands.cooldown(1, 30, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def sync_commands(self, ctx: commands.Context) -> None:
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.administrator)
@@ -177,7 +177,7 @@ class AdminCog(commands.Cog):
         await send_hybrid_response(ctx, f"Cleaned duplicates and synced {len(synced)} global commands successfully!", ephemeral=True)
 
     @admin.command(name="wipe", description="Wipe global database user profiles and leaderboards (Bot Admin only)")
-    @commands.cooldown(1, 60, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def wipe(self, ctx: commands.Context) -> None:
         import config
         if ctx.author.id not in config.ADMIN_IDS:
@@ -271,12 +271,12 @@ class AdminCog(commands.Cog):
             )
 
     @commands.hybrid_command()
-    @commands.cooldown(1, 5, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def ping(self, ctx:commands.Context):
         return await send_hybrid_response(ctx, "pong")
         
     @commands.hybrid_command(name="reset", description="Reset the bot in the server, cleaning up game channels and status")
-    @commands.cooldown(1, 30, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def reset(self, ctx: commands.Context) -> None:
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
@@ -343,7 +343,7 @@ class AdminCog(commands.Cog):
         )
 
     @commands.hybrid_command(name="roledisable", description="Disable one or more characters from appearing in future games (Admin only)")
-    @commands.cooldown(1, 30, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def roledisable(self, ctx: commands.Context) -> None:
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
@@ -376,7 +376,7 @@ class AdminCog(commands.Cog):
         )
 
     @commands.hybrid_command(name="roleenable", description="Re-enable one or more previously disabled characters (Admin only)")
-    @commands.cooldown(1, 30, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def roleenable(self, ctx: commands.Context) -> None:
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
@@ -408,7 +408,7 @@ class AdminCog(commands.Cog):
         )
 
     @commands.hybrid_command(name="globalroledisable", description="Globally disable a character across all servers (Developer only)")
-    @commands.cooldown(1, 30, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def globalroledisable(self, ctx: commands.Context) -> None:
         import config
         if ctx.author.id not in config.ADMIN_IDS:
@@ -437,7 +437,7 @@ class AdminCog(commands.Cog):
         )
 
     @commands.hybrid_command(name="globalroleenable", description="Globally re-enable a previously disabled character (Developer only)")
-    @commands.cooldown(1, 30, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def globalroleenable(self, ctx: commands.Context) -> None:
         import config
         if ctx.author.id not in config.ADMIN_IDS:
@@ -465,7 +465,7 @@ class AdminCog(commands.Cog):
         )
 
     @commands.hybrid_command(name="resume", description="Restore a crashed or frozen game (Admin/Host only)")
-    @commands.cooldown(1, 30, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def resume(self, ctx: commands.Context, game_id: str | None = None) -> None:
         """
         Restore a crashed/frozen game or recover after bot restart.

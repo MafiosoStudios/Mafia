@@ -13,7 +13,7 @@ class ProfileCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(name="profile", description="View your Mafioso profile")
-    @commands.cooldown(1, 5, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def profile(self, ctx: commands.Context) -> None:
         database = getattr(self.bot, "db", None)
         if database is None:
@@ -80,7 +80,7 @@ class ProfileCog(commands.Cog):
 
 
     @commands.hybrid_command(name="setfavourite", description="Set your favorite anime character on your profile")
-    @commands.cooldown(1, 5, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     @discord.app_commands.describe(character="Name of the character")
     async def setfavourite(self, ctx: commands.Context, character: str) -> None:
         database = getattr(self.bot, "db", None)

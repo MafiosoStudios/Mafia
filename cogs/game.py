@@ -25,7 +25,7 @@ class GameCog(commands.Cog):
             )
 
     @game.command(name="status")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def status(self, ctx: commands.Context) -> None:
         game_manager = getattr(self.bot, "game_manager", None)
         game_engine = getattr(self.bot, "game_engine", None)
@@ -71,7 +71,7 @@ class GameCog(commands.Cog):
         await send_hybrid_response(ctx, view=status_view, ephemeral=True)
 
     @commands.hybrid_group(name="settings", description="Configure game settings for this server", invoke_without_command=True)
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def settings(self, ctx: commands.Context) -> None:
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
@@ -82,7 +82,7 @@ class GameCog(commands.Cog):
             await self.list_settings(ctx)
 
     @settings.command(name="list", aliases=["show"], description="List current game settings for this server")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def list_settings(self, ctx: commands.Context) -> None:
         import config
         has_perm = ctx.author.id in config.ADMIN_IDS or (ctx.guild and ctx.author.guild_permissions.manage_guild)
@@ -124,7 +124,7 @@ class GameCog(commands.Cog):
         await send_hybrid_response(ctx, view=settings_view, ephemeral=True)
 
     @settings.command(name="set", description="Set a game setting value")
-    @commands.cooldown(1, 30, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     @discord.app_commands.choices(key=[
         discord.app_commands.Choice(name="Night Duration (seconds)", value="night_duration"),
         discord.app_commands.Choice(name="Day Discussion Duration (seconds)", value="day_duration"),
@@ -166,7 +166,7 @@ class GameCog(commands.Cog):
 
 
     @commands.command(name="rebellion", aliases=["rebel"])
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def rebellion(self, ctx: commands.Context) -> None:
         """Cause a rebellion in the entire lobby, ending the discussion phase immediately. (Lelouch Lamperouge, Once per game)"""
         game_manager = getattr(self.bot, "game_manager", None)
@@ -213,7 +213,7 @@ class GameCog(commands.Cog):
         )
 
     @commands.command(name="newrelease")
-    @commands.cooldown(1, 10, commands.BucketType.guild)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def newrelease(self, ctx: commands.Context, image_path: str = None) -> None:
         """Sends an update release embed for Mafioso. (Owner only)"""
         # Only accessible to the user with discord user id "744831273406824449"
@@ -264,7 +264,7 @@ class GameCog(commands.Cog):
     # /resume is in cogs/admin.py (comprehensive implementation with DB fallback)
 
     @commands.hybrid_command(name="tutorial", description="Open the interactive Mafioso tutorial guide")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def tutorial(self, ctx: commands.Context) -> None:
         from views.tutorial_view import TutorialView
         view = TutorialView()
@@ -272,7 +272,7 @@ class GameCog(commands.Cog):
 
 
     @commands.hybrid_command(name="roles", description="View the interactive directory of every role in the game")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def roles(self, ctx: commands.Context) -> None:
         from views.roles_view import RolesView
         view = RolesView(ctx.author.id)
@@ -280,7 +280,7 @@ class GameCog(commands.Cog):
 
 
     @commands.hybrid_command(name="invite", description="Generate the bot's invite link with calculated permissions")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def invite(self, ctx: commands.Context) -> None:
         # Programmatic permissions calculation based on required bot operations
         perms = discord.Permissions()
@@ -329,7 +329,7 @@ class GameCog(commands.Cog):
 
 
     @commands.hybrid_command(name="patchnotes", description="Browse Mafioso version patch notes")
-    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def patchnotes(self, ctx: commands.Context) -> None:
         from views.patchnotes_view import PatchNotesView
         index = len(PatchNotesView.PATCHES) - 1  # start at latest
