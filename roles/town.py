@@ -553,7 +553,14 @@ class MaomaoPostmortem(NightAction):
         final_list = [killer_id] + other_names
         random.shuffle(final_list)
 
-        names_str = ", ".join([f"**{session.players[pid].character_name}** (<@{pid}>)" for pid in final_list])
+        import roles
+        names_list = []
+        for pid in final_list:
+            r_key = session.players[pid].role_key if session.players.get(pid) else ""
+            r_meta = roles.ROLES_METADATA.get(r_key, {})
+            r_name = r_meta.get("name", r_key.replace("_", " ").title() if r_key else "Unknown")
+            names_list.append(f"**{r_name}** (<@{pid}>)")
+        names_str = ", ".join(names_list)
 
         context.payload["result"] = (
             f"🧪 **Postmortem Analysis:** You analyzed <@{target_id}>'s corpse.\n"

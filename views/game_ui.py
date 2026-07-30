@@ -1380,8 +1380,8 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
             f"Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
         )
 
-        if target_pstate and target_pstate.role_key == "lelouch":
-            target_pstate.metadata["lelouch_lynched"] = True
+        if target_state and target_state.role_key == "lelouch":
+            target_state.metadata["lelouch_lynched"] = True
             zero_requiem_layout = build_v2_layout(
                 title=f"{get_emoji('crown')} Zero Requiem Activated!",
                 description=(
@@ -1528,7 +1528,7 @@ class VerdictUISelectView(MafiosoLayoutView):
                         pass
                     verdicts = session.metadata.setdefault("verdicts", {})
                     verdicts[str(inter.user.id)] = "innocent"
-                    await inter.edit_original_response(view=build_v2_layout(description="Registered normal Innocent verdict.", footer_text=""))
+                    await _safe_respond_or_edit(inter, description="Registered normal Innocent verdict.")
 
                 async def retrial_cb(inter: discord.Interaction) -> None:
                     try:
@@ -1548,7 +1548,7 @@ class VerdictUISelectView(MafiosoLayoutView):
                         mafia_channel,
                         f"{get_emoji('trial')} <@{inter.user.id}> (Hiromi Higuruma) has activated **Retrial** for this case!"
                     )
-                    await inter.edit_original_response(view=build_v2_layout(description=f"{get_emoji('trial')} **Retrial Activated!**", footer_text=""))
+                    await _safe_respond_or_edit(inter, description=f"{get_emoji('trial')} **Retrial Activated!**")
 
                 btn_normal.callback = normal_cb
                 btn_retrial.callback = retrial_cb
