@@ -132,7 +132,8 @@ class BlackbeardTremorFruit(NightAction):
                                     context.bot.message_queue.send(member, f"{get_emoji('warning')} **Your Tremor Fruit was resisted by <@{k_id}>!**")
                                 except Exception:
                                     pass
-                    asyncio.create_task(notify_bb())
+                    from utils.helpers import safe_create_task
+                    safe_create_task(notify_bb(), "notify_blackbeard_resist")
                 else:
                     pstate.metadata["roleblocked"] = True
                     blocked_count += 1

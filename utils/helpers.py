@@ -78,3 +78,30 @@ def get_emoji_url(emoji_str: str) -> str | None:
         return f"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{hex_str}.png"
     except Exception:
         return None
+
+
+import asyncio
+_background_safe_tasks: set[asyncio.Task] = set()
+
+
+def safe_create_task(coro, name: str = "unnamed") -> asyncio.Task:
+    """Fire-and-forget a coroutine as a background task with logging.
+
+    Completing tasks are automatically removed from the tracking set to
+    prevent memory leaks. Exceptions are logged but do not crash.
+    """
+    task = asyncio.create_task(coro)
+    _background_safe_tasks.add(task)
+    task.add_done_callback(lambda t: _safe_task_done(t, name))
+    return task
+
+
+def _safe_task_done(task: asyncio.Task, name: str) -> None:
+    _background_safe_tasks.discard(task)
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        logger = __import__("logging").getLogger(__name__)
+        logger.exception(f"Background task '{name}' failed")

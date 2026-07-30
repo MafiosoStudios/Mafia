@@ -70,21 +70,39 @@ class AnimeMafiaBot(commands.Bot):
                 logger.exception("Failed to send restart confirmation message.")
 
         # 2. Sync commands subsequently in the background so it doesn't block interactions
-        import asyncio
-        async def sync_bg():
-            for guild in self.guilds:
-                try:
-                    self.tree.clear_commands(guild=guild)
-                    await self.tree.sync(guild=guild)
-                except Exception:
-                    pass
-            try:
-                await self.tree.sync()
-                logger.info("Global commands synced successfully.")
-            except Exception:
-                logger.exception("Failed to sync global commands.")
+        self._track_task("command_sync", self._sync_commands_bg())
 
-        asyncio.create_task(sync_bg())
+    _background_tasks: dict[str, asyncio.Task] = {}
+
+    def _track_task(self, name: str, coro) -> asyncio.Task:
+        """Track a background task with exception handling to prevent memory leaks."""
+        task = asyncio.create_task(coro)
+        task.add_done_callback(lambda t: self._handle_task_exception(t, name))
+        self._background_tasks[name] = task
+        return task
+
+    def _handle_task_exception(self, task: asyncio.Task, name: str) -> None:
+        """Log exceptions from background tasks without crashing."""
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception(f"Background task '{name}' failed")
+
+    async def _sync_commands_bg(self) -> None:
+        """Sync commands in the background so it doesn't block interactions."""
+        for guild in self.guilds:
+            try:
+                self.tree.clear_commands(guild=guild)
+                await self.tree.sync(guild=guild)
+            except Exception:
+                pass
+        try:
+            await self.tree.sync()
+            logger.info("Global commands synced successfully.")
+        except Exception:
+            logger.exception("Failed to sync global commands.")
 
     async def _safe_send_ctx(self, ctx: commands.Context, content: str) -> None:
         try:

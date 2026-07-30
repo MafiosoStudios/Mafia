@@ -237,7 +237,7 @@ class LobbyManager:
                 )
             
             # Start the setup phase (assigns roles, notifies host with Start Game button)
-            asyncio.create_task(self._game_engine.setup_game(game_handle.game_id))
+            self._game_engine._track_task(f"setup_game_{game_handle.game_id}", self._game_engine.setup_game(game_handle.game_id))
         except Exception:
             async with self._lock:
                 if guild_id in self._lobbies_by_guild:

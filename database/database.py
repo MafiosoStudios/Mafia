@@ -155,13 +155,6 @@ class DatabaseManager:
     async def update_statistics_for_match(
         self,
         user_id: int,
-        guild_id: int | None,
-        player_faction: str | None,
-        winner_faction: str | None,
-        has_won: bool | None = None,
-    async def update_statistics_for_match(
-        self,
-        user_id: int,
         player_faction: str | None,
         winner_faction: str | None,
         has_won: bool | None = None,
@@ -219,14 +212,6 @@ class DatabaseManager:
         await self.upsert_leaderboard_entry(
             "games_played",
             LeaderboardEntry(
-                user_id=user_id,
-                guild_id=0,
-                metric="games_played",
-                value=updated.games_played,
-                rank=0,
-            ),
-        )
-        return updated
                 user_id=user_id,
                 guild_id=0,
                 metric="games_played",
@@ -546,6 +531,7 @@ class DatabaseManager:
     async def _create_indexes(self) -> None:
         # Transient DB
         await self.db.games.create_index("game_id", unique=True)
+        await self.db.games.create_index("active_state.game_handle.guild_id")
         await self.db.game_players.create_index([("game_id", 1), ("user_id", 1)], unique=True)
         await self.db.match_history.create_index("game_id", unique=True)
         await self.db.settings.create_index("guild_id", unique=True)
@@ -560,9 +546,11 @@ class DatabaseManager:
         await self.global_db.inventory.create_index(
             [("item_key", 1), ("owner_id", 1)], unique=True
         )
+        await self.global_db.inventory.create_index("owner_id")
         await self.global_db.unlocked_characters.create_index(
             [("user_id", 1), ("character_key", 1)], unique=True
         )
+        await self.global_db.unlocked_characters.create_index("user_id")
         await self.global_db.cosmetics.create_index("cosmetic_key", unique=True)
         await self.global_db.statistics.create_index("user_id", unique=True)
         await self.global_db.character_statistics.create_index(
@@ -571,6 +559,7 @@ class DatabaseManager:
         await self.global_db.leaderboards.create_index(
             [("leaderboard_key", 1), ("user_id", 1)], unique=True
         )
+        await self.global_db.leaderboards.create_index("metric")
 
 
 def _strip_id(doc: dict[str, Any]) -> dict[str, Any]:

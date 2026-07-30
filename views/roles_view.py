@@ -44,7 +44,7 @@ _FACTION_META = {
     },
     FACTION_ANTAGONIST: {
         "label"       : "Antagonists",
-        "emoji"       : get_emoji("Antagonist") or "💀",
+        "emoji"       : get_emoji("skull"),
         "color"       : COLOR_MAFIA,
         "aliases"     : _MAFIA_ALIASES,
         "dropdown_ph" : "Select an Antagonist…",
@@ -356,7 +356,7 @@ class RolesView(MafiosoLayoutView):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.author_id:
             await interaction.response.send_message(
-                f"{get_emoji('cross') or '❌'} **Unauthorized:** Only the person who ran this command can interact with it.",
+                f"{get_emoji('cross')} **Unauthorized:** Only the person who ran this command can interact with it.",
                 ephemeral=True,
             )
             return False

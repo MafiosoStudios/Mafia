@@ -131,8 +131,8 @@ class StartGameView(MafiosoLayoutView):
         except Exception:
             pass
 
-        # Launch the game loop as a background task
-        asyncio.create_task(self.engine.run_game_loop(self.game_id))
+        # Launch the game loop as a background task with tracking
+        self.engine._track_task(f"game_loop_{self.game_id}", self.engine.run_game_loop(self.game_id))
 
 
 
@@ -852,7 +852,7 @@ class FrierenDemonDetectionMultiSelect(discord.ui.Select):
             except Exception:
                 pass
         if len(self.values) < 3:
-            await _safe_respond_or_edit(interaction, description="⚠️ You must select 3 targets.")
+            await _safe_respond_or_edit(interaction, description=f"{get_emoji('warning')} You must select 3 targets.")
             return
         t1, t2, t3 = int(self.values[0]), int(self.values[1]), int(self.values[2])
         payload = {

@@ -25,6 +25,7 @@ class HelpCog(commands.Cog):
             await interaction_or_ctx.response.send_message(view=view, ephemeral=True)
 
     @commands.command(name="help", help="Show the Mafioso command guide")
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def help_prefix(self, ctx: commands.Context) -> None:
         await self._send_help(ctx)
 
@@ -33,6 +34,7 @@ class HelpCog(commands.Cog):
         await self._send_help(interaction)
 
     @commands.hybrid_command(name="roleinfo", description="View detailed information about a specific role")
+    @commands.cooldown(1, 5, commands.BucketType.user)
     @discord.app_commands.describe(character="Name of the character")
     async def roleinfo(self, ctx: commands.Context, character: str) -> None:
         await ctx.defer()

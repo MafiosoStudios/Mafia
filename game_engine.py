@@ -229,7 +229,7 @@ class GameEngine:
             if not session or session.phase != GamePhase.NIGHT_ACTIONS:
                 return
 
-            active_count = sum(1 for p in session.players.values() if p.alive and p.role_key not in ["villager", "demon", "mahoraga"])
+            active_count = sum(1 for p in session.players.values() if p.alive and p.role_key not in ["villager", "demon"])
             submitted_count = len(session.night_actions)
             night_num = session.metadata.get("night_num", 1)
             night_msg = session.metadata.get("night_message")
@@ -258,7 +258,41 @@ class GameEngine:
     def clear_session_debouncers(self, game_id: str) -> None:
         debouncers = self._session_debouncers.pop(game_id, {})
         for deb in debouncers.values():
-            asyncio.create_task(deb.flush())
+            self._track_task(f"debouncer_flush_{game_id}", deb.flush())
+
+    async def restore_session_from_db(self, game_id: str, active_state: dict) -> None:
+        """
+        Reconstruct GameSession from saved database state for /resume command.
+        Hybrid approach: memory-efficient reconstruction.
+        """
+        try:
+            # Deserialize session from active_state
+            session = deserialize_session(active_state)
+
+            # Reconnect Discord references if bot is available
+            if self.bot:
+                guild = self.bot.get_guild(session.game_handle.guild_id)
+                if guild:
+                    # Reconnect channel reference if it exists
+                    channel_id = session.metadata.get("mafia_channel_id")
+                    if channel_id:
+                        channel = guild.get_channel(channel_id)
+                        if channel:
+                            session.metadata["mafia_channel"] = channel
+
+            # Add session to memory
+            async with self._lock:
+                self._sessions[game_id] = session
+
+            logger.info(f"Restored session {game_id} from database")
+
+            # If game was in progress, restart the game loop
+            if session.state == GameState.NIGHT or session.state == GameState.DAY:
+                await self.run_game_loop_from_resume(game_id)
+
+        except Exception as e:
+            logger.exception(f"Failed to restore session {game_id} from database: {e}")
+            raise RuntimeError(f"Could not restore game session: {e}")
 
     async def create_session(
         self,
@@ -452,7 +486,13 @@ class GameEngine:
     async def resolve_day(self, game_id: str) -> None:
         async with self._lock:
             session = self._require_session(game_id)
-            self._apply_votes(session)
+            eliminated_id = self._apply_votes(session)
+            if eliminated_id is not None:
+                player = session.players.get(eliminated_id)
+                if player:
+                    player.alive = False
+                    player.metadata["death_cause"] = "lynch"
+
             victory = self._evaluate_victory(session)
             if victory is not None:
                 session.state = GameState.ENDED
@@ -531,7 +571,7 @@ class GameEngine:
                                                     eng.bot.message_queue.send(member, msg)
                                                 except Exception:
                                                     pass
-                                asyncio.create_task(notify_transformation())
+                                self._track_task(f"notify_frieza_transform_{game_id}", notify_transformation())
 
             if not death_message:
                 guild = self.bot.get_guild(session.game_handle.guild_id) if self.bot else None
@@ -748,8 +788,11 @@ class GameEngine:
                         if p_state.metadata.get("has_won"):
                             return True
                         r_key = p_state.role_key
-                        if r_key and roles.ROLES_METADATA.get(r_key, {}).get("name") == winner_faction:
-                            return True
+                        if r_key:
+                            meta = roles.ROLES_METADATA.get(r_key, {})
+                            role_name = meta.get("name", "") if meta else ""
+                            if role_name == winner_faction or r_key == winner_faction:
+                                return True
                         return False
                     
                     if player_wins_base(p1_state) or player_wins_base(p2_state):
@@ -878,7 +921,7 @@ class GameEngine:
         if winner_faction == "Draw":
             xp_gained = 40
             coins_gained = 15
-            match_result_str = "🤝 Draw"
+            match_result_str = f"{get_emoji('draw')} Draw"
             embed_color = discord.Color.light_grey()
         elif is_winner:
             xp_gained = 150
@@ -888,7 +931,7 @@ class GameEngine:
         else:
             xp_gained = 50
             coins_gained = 20
-            match_result_str = "💀 Defeat"
+            match_result_str = f"{get_emoji('skull')} Defeat"
             embed_color = discord.Color.red()
 
         guild = self.bot.get_guild(session.game_handle.guild_id) if self.bot else None
@@ -988,7 +1031,7 @@ class GameEngine:
         )
 
         reward_layout = build_v2_layout(
-            title=f"🏆 Match Summary & Rewards",
+            title=f"{get_emoji('victory')} Match Summary & Rewards",
             description=dm_description,
             color=embed_color,
             footer_text="Mafioso Match Rewards",
@@ -1258,7 +1301,7 @@ class GameEngine:
 
     async def run_game_loop_from_resume(self, game_id: str) -> None:
         """Starts the run_game_loop task for a deserialized game session."""
-        asyncio.create_task(self.run_game_loop(game_id))
+        self._track_task(f"game_loop_{game_id}", self.run_game_loop(game_id))
 
     # ---- Active Gameplay Loop Runner ---------------------------------------
 
@@ -2287,7 +2330,7 @@ class GameEngine:
                 description=(
                     f"Ayanokoji Kiyotaka has analyzed the targets from the shadows and exposed a player's true identity!\n\n"
                     f"👤 **Player:** <@{target_id}>\n"
-                    f"🎭 **True Role:** **{role_display}**\n"
+                    f"{get_emoji('roster')} **True Role:** **{role_display}**\n"
                     f"🍏 **Faction:** **{faction_display}**"
                 ),
                 color=discord.Color.purple(),
@@ -2387,11 +2430,20 @@ class GameEngine:
                                 has_active_target = True
                                 
                             if has_active_target:
-                                # Successful redirection!
-                                if "target_id" in controlled_payload and controlled_payload["target_id"] is not None:
-                                    controlled_payload["target_id"] = redirect_pid
-                                if "targets" in controlled_payload and controlled_payload["targets"]:
-                                    controlled_payload["targets"] = (redirect_pid,) * len(controlled_payload["targets"])
+                                # Validate redirect target is alive and valid
+                                redirect_state = session.players.get(redirect_pid) if redirect_pid else None
+                                if not redirect_state or not redirect_state.alive:
+                                    makima_payload["control_success"] = False
+                                    makima_payload["error"] = "Your control target could not be redirected — the target is invalid."
+                                elif redirect_pid == controlled_pid:
+                                    makima_payload["control_success"] = False
+                                    makima_payload["error"] = "Your control target could not be redirected — controlled player cannot target themselves."
+                                else:
+                                    # Successful redirection!
+                                    if "target_id" in controlled_payload and controlled_payload["target_id"] is not None:
+                                        controlled_payload["target_id"] = redirect_pid
+                                    if "targets" in controlled_payload and controlled_payload["targets"]:
+                                        controlled_payload["targets"] = (redirect_pid,) * len(controlled_payload["targets"])
                                     
                                 # Track unique controlled targets
                                 controlled_history = makima_state.metadata.setdefault("controlled_targets_history", [])
@@ -2509,7 +2561,7 @@ class GameEngine:
                                 bot.message_queue.send(member, f"{get_emoji('cross')} **Your ability was nullified tonight.**")
                             except Exception:
                                 pass
-                asyncio.create_task(notify_null())
+                self._track_task(f"notify_mahoraga_null_{game_id}", notify_null())
                 continue
 
             # Asta Devil Union nullification
@@ -2538,7 +2590,7 @@ class GameEngine:
                                         bot.message_queue.send(member, f"{get_emoji('cross')} **Your action failed due to Asta's Devil Union!**")
                                     except Exception:
                                         pass
-                        asyncio.create_task(notify_union())
+                        self._track_task(f"notify_asta_union_{game_id}", notify_union())
                         continue
 
             # Invisibility check (Potion of Invisibility)
@@ -3005,7 +3057,7 @@ class GameEngine:
                     if ch:
                         self.bot.message_queue.send(
                             ch,
-                            f"🩺 **Emergency Surgery Successful!** <@{target_id}> was saved from fatal injuries by Doctor Tenma's medical link!"
+                            f"{get_emoji('shield')} **Emergency Surgery Successful!** <@{target_id}> was saved from fatal injuries by Doctor Tenma's medical link!"
                         )
                 # Notify Tenma
                 tenma_id = session.metadata.get("tenma_doctor_id")
@@ -3134,7 +3186,7 @@ class GameEngine:
                                         eng.bot.message_queue.send(m, f"{get_emoji('warning')} **Judicial Penalty!** You executed a fellow **Vanguard** member. You have permanently lost the ability to execute players.")
                                     except Exception:
                                         pass
-                            asyncio.create_task(_notify_tosen_penalty())
+                            self._track_task(f"notify_tosen_penalty_{game_id}", _notify_tosen_penalty())
                         else:
                             execs = tosen_state.metadata.setdefault("executions_left", 3)
                             tosen_state.metadata["executions_left"] = max(0, execs - 1)
@@ -3146,7 +3198,7 @@ class GameEngine:
                                         eng.bot.message_queue.send(m, f"**Execution Complete.** Executions remaining: **{ex}/3**.")
                                     except Exception:
                                         pass
-                            asyncio.create_task(_notify_tosen_exec())
+                            self._track_task(f"notify_tosen_exec_{game_id}", _notify_tosen_exec())
                         break
 
         # Check Frieren's Ancient Binding

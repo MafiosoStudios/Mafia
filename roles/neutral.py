@@ -74,7 +74,7 @@ class HisokaBungee(NightAction):
                         title=f"{get_emoji('hisoka')} Bound by Bungee Gum!",
                         description=(
                             f"You have been bound to **{t2_name}** (<@{t2}>) by Hisoka's **Bungee Gum**!\n\n"
-                            f"🤝 **Shared Destiny:**\n"
+                            f"{get_emoji('draw')} **Shared Destiny:**\n"
                             f"If either of you fulfills your win condition while both of you are still alive, **you both win!**"
                         ),
                         color=discord.Color.magenta(),
@@ -84,7 +84,7 @@ class HisokaBungee(NightAction):
                         title=f"{get_emoji('hisoka')} Bound by Bungee Gum!",
                         description=(
                             f"You have been bound to **{t1_name}** (<@{t1}>) by Hisoka's **Bungee Gum**!\n\n"
-                            f"🤝 **Shared Destiny:**\n"
+                            f"{get_emoji('draw')} **Shared Destiny:**\n"
                             f"If either of you fulfills your win condition while both of you are still alive, **you both win!**"
                         ),
                         color=discord.Color.magenta(),
@@ -101,7 +101,8 @@ class HisokaBungee(NightAction):
                             context.bot.message_queue.send(m2, view=view2)
                         except Exception:
                             pass
-        asyncio.create_task(notify_bond())
+        from utils.helpers import safe_create_task
+        safe_create_task(notify_bond(), "notify_bungee_bond")
         context.payload["log"] = f"Hisoka bound <@{target1}> and <@{target2}> with Bungee Gum."
 
 
@@ -497,6 +498,7 @@ class MahoragaAdaptation(NightAction):
             if len(adapted) == 3:
                 player_state.metadata["mahoraga_adapt_complete"] = True
                 session.metadata["mahoraga_vote_immune"] = True
+                player_state.metadata["lynch_immune_day"] = session.metadata.get("day_num", 0)
                 context.payload["result"] = (
                     f"🌀 **Adaptation Successful!** You have now adapted to all three factions — "
                     f"**{faction_label}** was your final target.\n\n"

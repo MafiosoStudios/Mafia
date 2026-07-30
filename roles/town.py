@@ -34,7 +34,7 @@ class TenmaEmergencySurgery(NightAction):
         session.metadata["tenma_surgery"] = list(targets)
         session.metadata["tenma_doctor_id"] = context.user_id
 
-        context.payload["result"] = f"🩺 **Emergency Surgery:** You established a medical link between <@{targets[0]}> and <@{targets[1]}>."
+        context.payload["result"] = f"{get_emoji('shield')} **Emergency Surgery:** You established a medical link between <@{targets[0]}> and <@{targets[1]}>."
 
 
 @role_registry.register
@@ -923,7 +923,8 @@ class TosenBankai(NightAction):
                     )
                 except Exception:
                     pass
-        asyncio.create_task(_notify())
+        from utils.helpers import safe_create_task
+        safe_create_task(_notify(), "notify_tosen_detain")
 
     async def get_night_feedback(self, context):
         return context.payload.get("result")
@@ -1047,7 +1048,8 @@ class DazaiNoLongerHuman(NightAction):
                             bot.message_queue.send(member, f"{get_emoji('cross')} **Your abilities were nullified tonight.**")
                         except Exception:
                             pass
-            asyncio.create_task(notify_nullified())
+            from utils.helpers import safe_create_task
+            safe_create_task(notify_nullified(), "notify_dazai_null")
 
     async def get_night_feedback(self, context):
         return context.payload.get("result")
@@ -1111,7 +1113,8 @@ class AstaDemonDestroyer(NightAction):
                                 bot.message_queue.send(member, f"{get_emoji('sword')} **Asta's Demon Destroyer Sword has cleansed you of all negative effects!**")
                             except Exception:
                                 pass
-                asyncio.create_task(notify_cleansed())
+                from utils.helpers import safe_create_task
+                safe_create_task(notify_cleansed(), "notify_asta_cleanse")
 
     async def get_night_feedback(self, context):
         return context.payload.get("result")
