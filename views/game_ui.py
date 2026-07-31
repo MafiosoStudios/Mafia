@@ -539,6 +539,9 @@ class NightAbilityButtonsView(MafiosoLayoutView):
             elif ability.name == "Demon Detection":
                 select = FrierenDemonDetectionMultiSelect(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
+            elif ability.name == "Emergency Surgery":
+                select = TenmaEmergencySurgerySelect(self.game_id, self.engine, ability, idx, options)
+                view.add_item(select)
             elif ability.num_targets == 2:
                 select = TwoTargetSelectStep1(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
@@ -893,16 +896,19 @@ class StandardActionSelect(discord.ui.Select):
         await _safe_respond_or_edit(interaction, description=f"You have decided to use your ability on <@{target_id}>.")
 
 
-class DoctorTenmaActionSelect(discord.ui.Select):
-    def __init__(self, game_id: str, engine: GameEngine, options: list[discord.SelectOption]) -> None:
-        choices = [
-            discord.SelectOption(label="Hand of Compassion (Heal)", value="heal"),
-            discord.SelectOption(label="Scalpel of Justice (Revive Mafia)", value="revive")
-        ]
-        super().__init__(placeholder="Choose action type...", options=choices)
+class TenmaEmergencySurgerySelect(discord.ui.Select):
+    """Single multi-select dropdown – pick exactly 2 players at once."""
+    def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, options: list[discord.SelectOption]) -> None:
+        super().__init__(
+            placeholder="Select 2 players to link…",
+            options=options[:25],
+            min_values=2,
+            max_values=2,
+        )
         self.game_id = game_id
         self.engine = engine
-        self.target_options = options
+        self.ability = ability
+        self.action_idx = action_index
 
     async def callback(self, interaction: discord.Interaction) -> None:
         if not interaction.response.is_done():
@@ -910,68 +916,19 @@ class DoctorTenmaActionSelect(discord.ui.Select):
                 await interaction.response.defer(ephemeral=True)
             except Exception:
                 pass
-        action_type = self.values[0]
-        view = discord.ui.View(timeout=120)
-        
-        if action_type == "heal":
-            select = TenmaHealSelect(self.game_id, self.engine, self.target_options)
-            view.add_item(select)
-            await _safe_respond_or_edit(interaction, view=view, description="Select a player to heal:")
-        else:
-            # For revive, must select a dead player
-            session = await self.engine.get_session(self.game_id)
-            dead_mafia_options = []
-            guild = interaction.guild
-            if session:
-                for pid, pstate in session.players.items():
-                    if not pstate.alive and pstate.faction == "Villain":
-                        member = guild.get_member(pid) if guild else None
-                        name = member.display_name if member else f"User {pid}"
-                        dead_mafia_options.append(discord.SelectOption(label=name, value=str(pid)))
-
-            if not dead_mafia_options:
-                await _safe_respond_or_edit(interaction, description="There are no dead mafia members to revive.")
-                return
-
-            select = TenmaReviveSelect(self.game_id, self.engine, dead_mafia_options)
-            view.add_item(select)
-            await _safe_respond_or_edit(interaction, view=view, description="Select a dead mafia member to revive as a Default Villager:")
-
-
-class TenmaHealSelect(discord.ui.Select):
-    def __init__(self, game_id: str, engine: GameEngine, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select a player to heal...", options=options[:25])
-        self.game_id = game_id
-        self.engine = engine
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if not interaction.response.is_done():
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
-        target_id = int(self.values[0])
-        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "heal"}):
+        target1 = int(self.values[0])
+        target2 = int(self.values[1])
+        payload = {
+            "action_index": self.action_idx,
+            "target_id": target1,
+            "targets": [target1, target2],
+        }
+        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, payload):
             return
-        await _safe_respond_or_edit(interaction, description=f"You have decided to heal <@{target_id}>.")
-
-
-class TenmaReviveSelect(discord.ui.Select):
-    def __init__(self, game_id: str, engine: GameEngine, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder="Select a dead mafia member...", options=options[:25])
-        self.game_id = game_id
-        self.engine = engine
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if not interaction.response.is_done():
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
-        target_id = int(self.values[0])
-        if not await _safe_queue_night_action(interaction, self.engine, self.game_id, interaction.user.id, {"target_id": target_id, "action_type": "revive"}):
-            return
-        await _safe_respond_or_edit(interaction, description=f"You have decided to revive <@{target_id}>.")
+        await _safe_respond_or_edit(
+            interaction,
+            description=f"{get_emoji('shield')} **Emergency Surgery** registered — linking <@{target1}> and <@{target2}>."
+        )
 
 
 class LightYagamiActionSelect(discord.ui.Select):
