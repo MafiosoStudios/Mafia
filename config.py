@@ -23,7 +23,7 @@ ADMIN_IDS: set[int] = {839182501091344444, 744831273406824449}
 @dataclass(slots=True, frozen=True)
 class BotConfig:
     token: str
-    command_prefix: str = "!"
+    command_prefix: str = ","
     min_players: int = 5
     max_players: int = 15
     lobby_timeout_seconds: int = 300
