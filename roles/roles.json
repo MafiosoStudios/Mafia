@@ -262,7 +262,7 @@
     "faction": "Protagonist",
     "emoji": "🥃",
     "description": "A grizzled, battle worn hunter who survived countless encounters with devils. Kishibe has no illusions about humanity, he fights because he has nothing left to lose. Taciturn and ruthless, he is considered one of the strongest humans alive.",
-    "active_ability": "Veteran's Instinct (Alert) - Go on Alert, anyone who visits you is attacked (3 charges). Flashbang - Choose a player, anyone visiting them is distracted/roleblocked (3 Night Cooldown).",
+    "active_ability": "Veteran's Instinct (Alert) - Go on Alert, anyone who visits you is attacked (3 charges). / Flashbang - Choose a player, anyone visiting them is distracted/roleblocked (3 Night Cooldown).",
     "passive_ability": "Battle-Hardened - The first time someone attempts to roleblock, control, or redirect Kishibe, the effect fails and the visitor is notified that their target resisted them.",
     "win_condition": "Help the protagonists win.",
     "action_prompt": "Select a combat posture or devil hunter tactic:",
