@@ -29,23 +29,23 @@ logger = logging.getLogger(__name__)
 
 def get_rules_text() -> str:
     return (
-        f"** WELCOME TO MAFIOSO REMASTERED!**\n\n"
-        f"**THE PROTOCOLS:**\n"
+        f"** YOKOSO WATASHI NO MAFIOSO!**\n\n"
+        f"**SOME RULES:**\n"
         "• Your secret identity has been sent directly to your DMs. Keep it secret, or else...\n"
         f"• The Factions: **Town (Protagonists) {get_emoji('Hero')}**, **Mafia (Villains) {get_emoji('Villain')}**, and **Neutrals (Wildcards) {get_emoji('Neutral')}**.\n"
-        "• We cycle between **Night** phase, where you all can use your abilities, and **Day** phase, where you can discuss and vote a potential antagonist.\n\n"
+        "• Well uhh we cycle between day and night, who knows what might happen.\n\n"
         f"**{get_emoji('night')} THE NIGHT:**\n"
-        "• Execute your abilities in secret via the action buttons. Can you pull off a big brain play? Or just be yet another passerby.\n"
+        "• Execute your abilities via the action buttons. Can you pull off a big brain play? Or just be yet another passerby.\n"
         "• The Villains share a collective mind and can discuss plans in their dark corner where they can communicate with each other.\n\n"
         f"**{get_emoji('day')} THE DAY:**\n"
         "• Point fingers, accuse your friends, and vote to drag someone onto the stand!\n"
-        "• The defendant has a brief moment to beg for their life (Plea Phase).\n"
+        "• The defendant has a moment to beg for their life.\n"
         "• Everyone votes **Guilty** or **Innocent** to decide their fate.\n\n"
         f"**{get_emoji('victory')} THE ENDGAME:**\n"
         "• **Protagonists** win when all evil is erased from this server.\n"
         "• **Villains** win when they achieve numerical superiority and seize control.\n"
         "• **Neutrals**... well, they just want to watch the world burn. Check your specific win condition.\n\n"
-        f"**{get_emoji('warning')} Trust no one. Let the mind games begin!**"
+        f"**Trust no one. Let the mind games begin!**"
     )
 
 
@@ -194,9 +194,9 @@ class GameEngine:
                 return
 
             status_desc = (
-                f"Accusations are flying, friendship is a myth! It's time to choose who gets dragged onto the stand.\n\n"
-                f"📊 **Ballots Cast:** {total_voted} / {alive_count}\n\n"
-                + ("\n".join(tally_lines) if tally_lines else "No votes cast yet.")
+                f"Bonds are mere illusions, and trust is a fragile myth. Step forward, and drag your chosen victim to the stand.\n\n"
+                f"📊 **Judgments Recorded:** {total_voted} / {alive_count}\n\n"
+                + ("\n".join(tally_lines) if tally_lines else "*The Soul Society awaits your verdict... No votes cast yet.*")
             )
 
         try:
@@ -237,8 +237,8 @@ class GameEngine:
                 return
 
             status_desc = (
-                f"Darkness shrouds the arena. The innocent sleep, unaware of the plots brewing in the shadows.\n\n"
-                "Click below to use your role's ability before sunrise!"
+                f"**Silence covers the land...** Unbeknownst to those dreaming of tomorrow, a quiet malice begins to weave its web.\n\n"
+                "Click below to activate your ability before the sun reveals the fallout!"
             )
 
         try:
@@ -394,18 +394,18 @@ class GameEngine:
         async with self._lock:
             session = self._require_session(game_id)
             if voter_id not in session.players:
-                raise KeyError("Voter is not part of the session.")
+                raise KeyError("you aint in teh game duh.")
             if session.phase != GamePhase.VOTING:
-                raise RuntimeError("Voting has ended for this round.")
+                raise RuntimeError("voting ended for the round bruh.")
 
             # Wounded and Exhausted check
             voter_p = session.players.get(voter_id)
             if voter_p:
                 day_num = session.metadata.get("day_num", 1)
                 if voter_p.metadata.get("wounded_until_day") == day_num:
-                    raise ValueError("You are Wounded and cannot vote today.")
+                    raise ValueError("Your body refuses to move, you cannot vote today.")
                 if voter_p.metadata.get("exhausted_until_day") == day_num:
-                    raise ValueError("You are Exhausted and cannot vote today.")
+                    raise ValueError("You can barely stand, no vote today.")
 
             if target_id is None:
                 session.votes.pop(voter_id, None)
@@ -424,9 +424,9 @@ class GameEngine:
         async with self._lock:
             session = self._require_session(game_id)
             if user_id not in session.players:
-                raise KeyError("Actor is not part of the session.")
+                raise KeyError("you aint in teh game duh.")
             if session.phase != GamePhase.NIGHT_ACTIONS:
-                raise RuntimeError("Night actions have already been locked in for this round.")
+                raise RuntimeError("you cant change the action anymore.")
 
             actor_p = session.players.get(user_id)
             if actor_p and actor_p.role_key:
@@ -446,7 +446,7 @@ class GameEngine:
                         if tid is not None:
                             target_p = session.players.get(tid)
                             if target_p and target_p.faction == RoleFaction.VILLAIN.value and target_p.alive:
-                                raise ValueError("You cannot target your own Mafia teammates.")
+                                raise ValueError("blud why you wanna kill your partner in crime.")
 
                 # 2. Cooldown/night-restriction checks
                 role_cls = role_registry.get(actor_p.role_key)
@@ -454,7 +454,7 @@ class GameEngine:
                 
                 can_act, reason = role_inst.can_act_tonight(session, actor_p)
                 if not can_act:
-                    raise ValueError(reason or "Your ability is currently unavailable.")
+                    raise ValueError(reason or "your ability ain't available.")
 
                 action_index = payload.get("action_index")
                 if action_index is not None and action_index < len(role_inst.abilities):
@@ -465,11 +465,11 @@ class GameEngine:
                             if targets:
                                 last_pair = actor_p.metadata.get("tenma_last_pair")
                                 if last_pair and set(targets) == set(last_pair):
-                                    raise ValueError("You cannot pick the same 2 people as you did last night.")
+                                    raise ValueError("no picking same 2 people u picked last night vro.")
                                     
                         can_use, reason = ability.can_use(session, actor_p)
                         if not can_use:
-                            raise ValueError(reason or "This ability is currently unavailable.")
+                            raise ValueError(reason or "you cant use this ability no more.")
 
             session.night_actions[user_id] = payload
             session.players[user_id].night_actions_used += 1
@@ -554,11 +554,11 @@ class GameEngine:
                                     if guild:
                                         mafia_ids = [k for k, p in s.players.items() if p.faction == RoleFaction.VILLAIN.value]
                                         msg = (
-                                            "🌟 **Frieza Has Transformed!**\n"
-                                            "Frieza has personally eliminated 3 players and evolved into **Golden Frieza**!\n"
-                                            f"{get_emoji('meteor')} *Death Beam now ignores Basic Protection.*\n"
-                                            f"{get_emoji('shield')} *Frieza is immune to Roleblocks and cannot be redirected.*"
-                                        )
+                                            "**A TRUE MONSTER AWAKENS...**\n"
+                                            "Frieza has slimed 3 players and ascended to **Golden Frieza**!\n"
+                                            f"*Death Beam pierces Basic Protection.*\n"
+                                            f"*Immune to Roleblocks and Redirection.*"
+                                            )
                                         for mid in mafia_ids:
                                             member = guild.get_member(mid)
                                             if member:
@@ -591,8 +591,8 @@ class GameEngine:
                                 try:
                                     eng.bot.message_queue.send(
                                         member,
-                                        f"{get_emoji('sword')} **A visitor was reaped at your door.** "
-                                        f"Your passive kill count: **{n}/{q}**."
+                                        f"**An intruder took their final breath at your door.**"
+                                        f"kill count: **{n}/{q}**."
                                     )
                                 except Exception:
                                     pass
@@ -669,7 +669,7 @@ class GameEngine:
                     role_display = role_meta.get("name", player.role_key or "Unknown")
                     try:
                         death_view = build_v2_layout(
-                            title=f"{get_emoji('death')} You Have Died",
+                            title=f"{get_emoji('death')} welps you're ded",
                             description=(
                                 f"How unfortunate.."
                                 f"You may continue spectating, but you can no longer act or vote."
@@ -742,10 +742,10 @@ class GameEngine:
                         conv_layout = build_v2_layout(
                             title=f"{get_emoji('mafia')} Antagonist Inheritance!",
                             description=(
-                                f"Your primary killing leader has been eliminated!\n\n"
-                                f"You have been stripped of your former abilities and powers, "
+                                f"well uh your main killer has died...\n\n"
+                                f"you have been stripped of your former abilities and powers, "
                                 f"and inherited the **Antagonist Base Kill** ability.\n\n"
-                                f"During Night phases, your sole action will now be to choose a target to **Kill**."
+                                f"so from now on, your sole action will now be to **Kill** people."
                             ),
                             color=discord.Color.red(),
                         )
@@ -898,8 +898,6 @@ class GameEngine:
 
                         dm_desc = (
                             f"{outcome_header}\n\n"
-                            f"## Reward Breakdown\n"
-                            + "\n".join(reward_res.breakdown_lines) + "\n\n"
                             f"## Total Earned\n"
                             f"• **+{reward_res.xp_gained} XP** | **+{reward_res.gold_gained} Gold**\n\n"
                             f"## Progression Update\n"
@@ -909,12 +907,12 @@ class GameEngine:
                         )
 
                         if reward_res.leveled_up:
-                            dm_desc += f"\n\n**LEVEL UP!** You advanced to Level `{reward_res.new_level}`!"
+                            dm_desc += f"\n\n**damn you leveled up to lvl `{reward_res.new_level}`!"
                         if reward_res.ranked_up:
-                            dm_desc += f"\n\n**RANK UP!** You promoted to `{reward_res.new_rank}`!"
+                            dm_desc += f"\n\n**ggs for promotion to `{reward_res.new_rank}`!"
 
                         dm_layout = build_v2_layout(
-                            title="Match Rewards Summary",
+                            title="Your rewards :3",
                             description=dm_desc,
                             color=discord.Color.from_str(rank_info.get("color", "#FFD700")),
                             thumbnail_url=user_obj.display_avatar.url if hasattr(user_obj, "display_avatar") else None,
@@ -1262,7 +1260,7 @@ class GameEngine:
                 if quota:
                     desc_parts.append(
                         f"• **Kill Quota:** You need **{quota}** passive kills to win. "
-                        f"Anyone who visits you dies — even through protection."
+                        f"Anyone who visits you dies — no matter what."
                     )
 
             active_ability = role_meta.get('active_ability', 'None')
@@ -1304,7 +1302,7 @@ class GameEngine:
             try:
                 self.bot.message_queue.send(member, view=role_dm_layout)
                 if pstate.faction == RoleFaction.VILLAIN.value and len(mafia_members) > 1:
-                    self.bot.message_queue.send(member, f"{get_emoji('group')} **Your Fellow Antagonists:** {mafia_list_str}")
+                    self.bot.message_queue.send(member, f"{get_emoji('group')} **Your partners in crime:** {mafia_list_str}")
             except Exception:
                 logger.exception("Failed to send DM to player %s", pid)
 
@@ -1320,8 +1318,8 @@ class GameEngine:
             title="Setup Complete!",
             description=(
                 f"<@{host_id}>\n\n"
-                "All roles have been assigned and sent to DMs.\n"
-                "Click **Start Game** below to create the game channel and begin the match!"
+                "finished setting up.\n"
+                "you're free to start the game."
             ),
             color=discord.Color.green(),
             view=view,
@@ -1437,8 +1435,8 @@ class GameEngine:
                 spectate_view = build_v2_layout(
                     title="👀 Spectate Mafioso",
                     description=(
-                        "A new match has started!\n"
-                        f"Click the button below to spectate the match channel <#{mafia_channel.id}>."
+                        "Looks like a cool match just began...\n"
+                        f"wanna spectate? <#{mafia_channel.id}>."
                     ),
                     color=discord.Color.blue(),
                     view=view,
@@ -1451,11 +1449,11 @@ class GameEngine:
 
             # 3. Send rules layout
             rules_view = build_v2_layout(
-                title=f"{get_emoji('lobby')} Mafioso Remastered — Game Rules",
+                title=f"Mafioso - Game Rules",
                 description=get_rules_text(),
                 color=discord.Color.from_rgb(0, 0, 0),
                 image_url=get_event_image("rules"),
-                footer_text="Roles have been sent to your DMs. Good luck!",
+                footer_text="goon luck",
             )
             await self.bot.message_queue.send(mafia_channel, view=rules_view)
 
@@ -1463,8 +1461,11 @@ class GameEngine:
             await asyncio.sleep(8)
 
             match_start_view = build_v2_layout(
-                title="THE GAME HAS BEGUN!",
-                description="Every player now wears a mask. Some seek justice, others crave blood, and a few answer only to Governments and themselves. From this moment on, every word matters, every vote has consequences..",
+                title="This is how it began...",
+                description=(
+                    "Behind these masks, trust is a lie. Some seek justice, others crave blood.\n\n"
+                    "Speak wisely... your next word might be your last."
+                    ),
                 color=discord.Color.from_rgb(255, 255, 255),
                 image_url=get_event_image("match_start"),
             )
@@ -1551,7 +1552,7 @@ class GameEngine:
                     try:
                         await self.bot.message_queue.send(
                             mafia_channel,
-                            view=build_v2_layout(description=f"**Dawn breaks over the town... The night has come to an end. Everybody get in here!**", footer_text="")
+                            view=build_v2_layout(description=f"**Stand proud, you survived another night. Everybody get in here!**", footer_text="")
                         )
                     except Exception:
                         pass
@@ -1598,12 +1599,11 @@ class GameEngine:
                         for pid, pstate in list(session.players.items()):
                             if pstate.role_key == "gilgamesh" and pstate.metadata.get("transformed") and pstate.alive:
                                 gilgamesh_layout = build_v2_layout(
-                                    title=f"{get_emoji('warning')} Warning!",
+                                    title=f"AYO",
                                     description=(
-                                        f"{get_emoji('zap')} **Gilgamesh has retrieved all of his swords and "
-                                        f"transformed into the Horseman of Apocalypse!**\n"
-                                        f"You have until the end of today to find and lynch him, "
-                                        f"or he will unleash the Gates of Babylon and wipe everyone out!"
+                                        f"**\"KNEEL, MONGRELS! THE KING OF HEROES ASCENDS!\"**\n"
+                                        f"Gilgamesh has reclaimed every treasure and transformed into the **Horseman of Apocalypse**!\n"
+                                        f"Lynch him before the sun sets, or the **Gate of Babylon** will wipe every last soul from existence!"
                                     ),
                                     color=discord.Color.red(),
                                 )
@@ -1647,10 +1647,10 @@ class GameEngine:
                             from views.game_ui import VoteUISelectView
                             vote_view = VoteUISelectView(game_id, self)
                             vote_layout = build_v2_layout(
-                                title=f"Day {session.metadata['day_num']} - Nomination Phase",
+                                title=f"Day {session.metadata['day_num']} - voting time",
                                 description=(
-                                    "Accusations are flying, friendship is a myth! It's time to choose who gets dragged onto the stand.\n"
-                                    "Click the button below to nominate someone to face judgment, or vote to skip today's trial."
+                                    "As they say, when in doubt, vote someone.\n"
+                                    "Nominate someone to face judgment, or vote to skip today's trial."
                                 ),
                                 color=discord.Color.red(),
                                 view=vote_view,
@@ -1700,7 +1700,7 @@ class GameEngine:
                         # Remove vote view
                         try:
                             closed_vote_layout = build_v2_layout(
-                                title=f"Day {session.metadata['day_num']} - Nomination Phase Closed",
+                                title=f"Day {session.metadata['day_num']} - No more voting",
                                 description="The nomination window has closed. The ballots are being counted...",
                                 color=discord.Color.red(),
                             )
@@ -1723,7 +1723,7 @@ class GameEngine:
                             session.metadata.pop("deadly_sentencing_active", None)
                             session.metadata.pop("defendant_id", None)
                             session.metadata.pop("verdicts", None)
-                            await self.bot.message_queue.send(mafia_channel, f"{get_emoji('court')} **Deadly Sentencing completed. Skipping normal trial.**")
+                            await self.bot.message_queue.send(mafia_channel, f"{get_emoji('court')} **sucesfully executed.**")
                             await asyncio.sleep(2)
                             break
 
@@ -1789,13 +1789,12 @@ class GameEngine:
                             ):
                                 # Reveal Mahoraga's role and block the trial
                                 mahoraga_view = build_v2_layout(
-                                    title="🌀 Adaptation — Absolute!",
+                                    title="WITH THIS TREASURE, I SUMMON...",
                                     description=(
-                                        f"**{defendant_name}** has fully adapted to all three factions!\n\n"
-                                        f"They are **immune to all votes and trials**. "
-                                        f"No conventional force can remove them from this game.\n\n"
-                                        f"Their role has been revealed: **Eight-Handled Sword Divergent Sila Divine General Mahoraga** 🌀\n\n"
-                                        f"Only an unstoppable one-hit ability can end their reign now."
+                                    f"**\"WITH THIS WHEEL, I ADAPT TO ALL CREATION!\"**\n\n"
+                                    f"**{defendant_name}** has completely adapted to every faction!\n"
+                                    f"They are now **immune to all votes and trials**. Conventional judgment is useless.\n\n"
+                                    f"True Form Unveiled: **Eight-Handled Sword Divergent Sila Divine General Mahoraga**\n\n"
                                     ),
                                     color=discord.Color.from_rgb(110, 58, 190),
                                 )
@@ -1811,11 +1810,11 @@ class GameEngine:
                             # Eren Jaeger Rumbling vote immunity check
                             if target_pstate and target_pstate.role_key == "eren_jaeger" and session.metadata.get("rumbling_active"):
                                 eren_view = build_v2_layout(
-                                    title=f"{get_emoji('fire')} Eren Jaeger — Unstoppable Titan!",
+                                    title=f"THE RUMBLING BEGINS",
                                     description=(
-                                        f"**{defendant_name}** has unleashed The Rumbling!\n\n"
-                                        f"Eren Jaeger is **permanently immune to all voting and trials** while The Rumbling is active. "
-                                        f"The trial has been cancelled."
+                                        f"**\"IF WE DON'T FIGHT, WE CAN'T WIN! TATAKAE!\"**\n\n"
+                                        f"**{defendant_name}** has unleashed **The Rumbling** and is **permanently immune to all votes and trials**!\n"
+                                        f"The trial is cancelled—the world is about to be flattened."
                                     ),
                                     color=discord.Color.dark_red(),
                                 )
@@ -1839,7 +1838,7 @@ class GameEngine:
                             if not is_resume:
                                 plea_time = settings.get("plea_duration", 60)
                                 plea_view = build_v2_layout(
-                                    title="Trial: Defendant on the Stand",
+                                    title="Defendant on the Stand",
                                     description=(
                                         f"**{defendant_name}** has been dragged onto the stand by majority vote!\n"
                                         f"They have {plea_time} seconds to defend themselves before the court decides their fate. Speak, or get voted out."
@@ -1927,8 +1926,8 @@ class GameEngine:
                                 # Remove verdict view
                                 try:
                                     closed_verdict_layout = build_v2_layout(
-                                        title="Verdict Phase: Closed",
-                                        description="The verdict phase has closed. The court is deciding...",
+                                        title="no more voting",
+                                        description="verdict phase ended...",
                                         color=discord.Color.red(),
                                     )
                                     await verdict_msg.edit(view=closed_verdict_layout)
@@ -1964,9 +1963,9 @@ class GameEngine:
                                     acquittal_layout = build_v2_layout(
                                         title=f"{get_emoji('trial')} RETRIAL: SUCCESSFUL ACQUITTAL",
                                         description=(
-                                            f"Defendant <@{retrial_defendant}> has been proven to be a **Protagonist**!\n"
-                                            f"Their execution is canceled. The court has released them.\n\n"
-                                            f"Returning to the Nomination/Voting phase to choose a new target."
+                                            f"<@{retrial_defendant}> turned out to **protagonist**!\n"
+                                            f"no more execution. The court has released them.\n\n"
+                                            f"time to lynch someone else."
                                         ),
                                         color=discord.Color.green(),
                                     )
@@ -2053,10 +2052,10 @@ class GameEngine:
                                     await self.bot.message_queue.send(
                                         mafia_channel,
                                         view=build_v2_layout(
-                                            title=f"{get_emoji('fire')} Eren Jaeger — Unstoppable Titan!",
+                                            title=f"Eren Jaeger — Unstoppable Titan!",
                                             description=(
                                                 f"The verdict resulted in **Guilty**, but **Eren Jaeger** (<@{target_id}>) cannot be voted off!\n\n"
-                                                f"🔥 **The Rumbling has rendered Eren Jaeger permanently immune to all lynching and trials.** "
+                                                f"**The Rumbling has rendered Eren Jaeger permanently immune to all lynching and trials.** "
                                                 f"The execution has failed!"
                                             ),
                                             color=discord.Color.dark_red(),
@@ -2072,7 +2071,7 @@ class GameEngine:
                                         mafia_channel,
                                         f"{get_emoji('trial')} **Prime Minister's Contract Triggered!**\n"
                                         f"An invisible force has prevented the execution! The defendant survives.\n"
-                                        f"The Day ends immediately with no execution."
+                                        f"The Day ends with no execution."
                                     )
                                     session.metadata.pop("defendant_id", None)
                                     session.metadata.pop("verdicts", None)
@@ -2113,7 +2112,7 @@ class GameEngine:
                                     await self.eliminate_player(game_id, target_id, "execution")
                                     exec_layout = build_v2_layout(
                                         title=f"{get_emoji('death')} Execution",
-                                        description=f"**{defendant_name}** was executed by the town! Their role was **{role_emoji_prefix}{role_display}**.",
+                                        description=f"**{defendant_name}** was executed, their role was **{role_emoji_prefix}{role_display}**.",
                                         color=discord.Color.red(),
                                     )
                                     await self.bot.message_queue.send(
@@ -2122,7 +2121,7 @@ class GameEngine:
                                     )
 
                             else:
-                                await self.bot.message_queue.send(mafia_channel, f"{get_emoji('peace')} The town has voted to release the defendant.")
+                                await self.bot.message_queue.send(mafia_channel, f"{get_emoji('peace')} Well the town decided to release them.")
 
                             # Reset defendant metadata and break the verdict loop
                             session.metadata.pop("defendant_id", None)
@@ -2183,7 +2182,7 @@ class GameEngine:
             try:
                 # Send the final victory embed to the mafia channel too, before deleting it
                 await self._send_victory_embed(mafia_channel, guild, session, history, winner_faction)
-                await self.bot.message_queue.send(mafia_channel, f"{get_emoji('warning')} **This channel will be deleted in 20 seconds...**")
+                await self.bot.message_queue.send(mafia_channel, f"**ggs to the winner, time to nuke the channel cuz why not...**")
                 await asyncio.sleep(20)
                 await mafia_channel.delete(reason="Game ended.")
             except Exception:
@@ -2335,7 +2334,7 @@ class GameEngine:
         if mafia_deaths:
             death_description = "\n".join(f"{get_emoji('death')} {msg}" for msg in mafia_deaths)
         else:
-            death_description = f"No one was targeted by the Antagonists tonight.. How weird.."
+            death_description = f"A silent night... no one died. How weird.."
 
         death_layout = build_v2_layout(
             title=f"{title} - Death Report",
@@ -2370,12 +2369,12 @@ class GameEngine:
                 session.metadata["rumbling_announced"] = True
                 eren_id = next((pid for pid, p in session.players.items() if p == eren_player), None)
                 rumbling_layout = build_v2_layout(
-                    title=f"{get_emoji('fire')} THE RUMBLING HAS BEGUN!",
+                    title=f"THE RUMBLING HAS BEGUN!",
                     description=(
-                        f"**Eren Jaeger** (<@{eren_id}>) has unleashed the Wall Titans!\n\n"
-                        f"⚡ **The Rumbling has begun.**\n"
-                        f"• Eren Jaeger is now **permanently immune to lynching and voting**!\n"
-                        f"• Eren Jaeger can now crush and kill a target every single night until only he remains!"
+                        f"**\"IF WE DON'T FIGHT, WE CAN'T WIN! TATAKAE!\"**\n\n"
+                        f"**Eren Jaeger** (<@{eren_id}>) has unleashed the Wall Titans upon this world!\n\n"
+                        f"• Eren Jaeger is **permanently immune to all lynching and voting**!\n"
+                        f"•they can now kill every single night until he is the last one standing!"
                     ),
                     color=discord.Color.dark_red(),
                     image_url="https://media.giphy.com/media/CFA1y0lBkL2XA366RW/giphy.gif"
@@ -2419,10 +2418,11 @@ class GameEngine:
             ayanokoji_view = build_v2_layout(
                 title=f"{get_emoji('ayanokoji')} Ayanokoji Kiyotaka — Mastermind Revelation",
                 description=(
-                    f"Ayanokoji Kiyotaka has analyzed the targets from the shadows and exposed a player's true identity!\n\n"
-                    f"👤 **Player:** <@{target_id}>\n"
-                    f"{get_emoji('roster')} **True Role:** **{role_display}**\n"
-                    f"🍏 **Faction:** **{faction_display}**"
+                    f"**\"I've never thought of you as an ally... all people are nothing but tools.\"**\n\n"
+                    f"looks like ayanokoji found something!\n\n"
+                    f"**Subject:** <@{target_id}>\n"
+                    f"**Exposed Role:** **{role_display}**\n"
+                    f"**True faction:** **{faction_display}**"
                 ),
                 color=discord.Color.purple(),
                 thumbnail_url=thumbnail_url,
@@ -2597,8 +2597,8 @@ class GameEngine:
                 gt_payload["log"] = f"Kishibe used Goose to redirect <@{goose_target}> to himself."
 
                 goose_payload["result"] = (
-                    f"🦆 **Goose Successful!** <@{goose_target}> was visiting someone tonight, "
-                    f"so their action was redirected to you. They will die at your door."
+                    f"**Succesfully goosed.** <@{goose_target}> was visiting someone tonight, "
+                    f"so their action was redirected to you."
                 )
 
                 async def dm_goosed(s=session, gt=goose_target, prev_tgt=prev_tgt, k_id=kpid):
@@ -2616,7 +2616,7 @@ class GameEngine:
                                 try:
                                     self.bot.message_queue.send(
                                         member,
-                                        f"🪤 **You got Goosed!** Your action was redirected to **{kishibe_name}**!\n"
+                                        f"**You got Goosed!**!\n"
                                         f"Previous target: **{prev_name}**\nNew target: **{kishibe_name}**"
                                     )
                                 except Exception:
@@ -2625,8 +2625,8 @@ class GameEngine:
             else:
                 # Target wasn't visiting anyone — use is still consumed.
                 goose_payload["result"] = (
-                    f"🦆 **Goose Failed.** You tried to redirect <@{goose_target}>, but they "
-                    f"weren't visiting anyone tonight. The use has been consumed."
+                    f"**failed to goose.** You tried to redirect <@{goose_target}>, but they "
+                    f"weren't visiting anyone tonight. The use has been consumed. sucks to be you."
                 )
                 async def dm_goose_failed(s=session, k_id=kpid, gt=goose_target):
                     if self.bot:
@@ -2637,8 +2637,8 @@ class GameEngine:
                                 try:
                                     self.bot.message_queue.send(
                                         member,
-                                        f"🦆 **Goose Failed.** You tried to redirect <@{gt}>, but they "
-                                        f"weren't visiting anyone tonight. Your use has been consumed."
+                                        f"**failed to goose.** You tried to redirect <@{goose_target}>, but they "
+                                        f"weren't visiting anyone tonight. The use has been consumed. sucks to be you."
                                     )
                                 except Exception:
                                     pass
@@ -2730,7 +2730,7 @@ class GameEngine:
                         if member:
                             try:
                                 embed_msg = build_v2_layout(
-                                    title="🚫 Action Interrupted!",
+                                    title="hey look theres a flying elephant!",
                                     description="**You were distracted / roleblocked tonight!**\nYour ability was blocked and could not be performed.",
                                     color=discord.Color.dark_red()
                                 )
@@ -2748,7 +2748,7 @@ class GameEngine:
                         if member:
                             try:
                                 embed_msg = build_v2_layout(
-                                    title="🌑 Imprisoned in Bankai!",
+                                    title="BANKAI: ENMA KOROGI",
                                     description="**You are detained inside Kaname Tosen's Bankai (Enma Korogi)!**\nYour action could not be performed tonight.",
                                     color=discord.Color.dark_purple()
                                 )
@@ -2767,8 +2767,8 @@ class GameEngine:
                         if member:
                             try:
                                 embed_msg = build_v2_layout(
-                                    title="🚫 Ability Nullified!",
-                                    description="**Your ability was nullified tonight by Dazai's No Longer Human!**\nYour action failed to execute.",
+                                    title="Ability Nullified!",
+                                    description="**Your ability was nullified tonight by Dazai.**\nYour action failed to execute.",
                                     color=discord.Color.dark_red()
                                 )
                                 bot.message_queue.send(member, view=embed_msg)
@@ -2800,7 +2800,7 @@ class GameEngine:
                                 if member:
                                     try:
                                         embed_msg = build_v2_layout(
-                                            title="😈 Action Failed!",
+                                            title="Asta messed you up",
                                             description="**Your action failed tonight due to Asta's Devil Union!**\nAll hostile actions targeting Town players were nullified.",
                                             color=discord.Color.purple()
                                         )
@@ -2824,7 +2824,7 @@ class GameEngine:
                                 if member:
                                     try:
                                         embed_msg = build_v2_layout(
-                                            title="👻 Target Invisible!",
+                                            title="bro tried to visit ghost",
                                             description="**Your action failed tonight because your target was completely invisible!**",
                                             color=discord.Color.blue()
                                         )
@@ -2946,7 +2946,7 @@ class GameEngine:
                                 try:
                                     self.bot.message_queue.send(
                                         ly_member,
-                                        f"🍎 **Devil's Pen:** The 3 nights have passed. Your target <@{pid}> has been written out of existence!"
+                                        f"**Devil's Pen:** The 3 nights have passed. Your target <@{pid}> has been written out of existence!"
                                     )
                                 except Exception:
                                     pass
@@ -3067,7 +3067,7 @@ class GameEngine:
                     if tobirama_member:
                         attackers_str = ", ".join([f"<@{atk}>" for atk in attackers]) if attackers else "an unknown force"
                         msg = (
-                            f"{get_emoji('zap')} **Flying Thunder Counter Triggered!**\n"
+                            f"**Flying Thunder Counter triggered!**\n"
                             f"You countered the attack on <@{target_id}>.\n"
                             f"{get_emoji('detective')} **Attacker(s) detected:** {attackers_str}"
                         )
@@ -3100,7 +3100,7 @@ class GameEngine:
                             try:
                                 self.bot.message_queue.send(
                                     target_member,
-                                    f"{get_emoji('zap')} **Flying Thunder Counter!** You were targeted for an attack tonight, but Tobirama Senju intercepted and nullified it!"
+                                    f"Tobirama lowk saved your ass, they nullified the attack directed towards you."
                                 )
                             except Exception:
                                 pass
@@ -3111,7 +3111,7 @@ class GameEngine:
                                 try:
                                     self.bot.message_queue.send(
                                         atk_member,
-                                        f"**Attack Nullified!** An unusual force intercepted and countered your attack tonight."
+                                        f"Looks like someone countered your attack lmao."
                                     )
                                 except Exception:
                                     pass
@@ -3208,7 +3208,7 @@ class GameEngine:
                                 try:
                                     self.bot.message_queue.send(
                                         atk_mem,
-                                        f"**Attack Nullified!** Your target was protected by a magical barrier tonight."
+                                        f"your target was protected by a barrier, sucks to be you."
                                     )
                                 except Exception:
                                     pass
@@ -3234,7 +3234,7 @@ class GameEngine:
                                     try:
                                         self.bot.message_queue.send(
                                             doc_member,
-                                            f"{get_emoji('shield')} **Compassion Successful!** You saved <@{target_id}> from an attack! "
+                                            f"**Compassion Successful,** saved <@{target_id}> from an attack! "
                                             f"Saves: **{doc_saves}/3**."
                                         )
                                     except Exception:
@@ -3248,7 +3248,7 @@ class GameEngine:
                                 try:
                                     self.bot.message_queue.send(
                                         atk_mem,
-                                        f"**Attack Nullified!** Your target was healed and protected from your attack tonight."
+                                        f"your targetted was saved/healed from your attack lmao."
                                     )
                                 except Exception:
                                     pass
@@ -3262,7 +3262,7 @@ class GameEngine:
                     if ch:
                         self.bot.message_queue.send(
                             ch,
-                            f"{get_emoji('shield')} **Emergency Surgery Successful!** <@{target_id}> was saved from fatal injuries by Doctor Tenma's medical link!"
+                            f"{get_emoji('shield')} **Emergency Surgery Successful,** <@{target_id}> was saved from fatal injuries by Doctor Tenma."
                         )
                 # Notify Tenma
                 tenma_id = session.metadata.get("tenma_doctor_id")
@@ -3279,7 +3279,7 @@ class GameEngine:
                                 try:
                                     self.bot.message_queue.send(
                                         tenma_member,
-                                        f"{get_emoji('shield')} **Compassion Successful!** Your medical link saved <@{target_id}> from death tonight! "
+                                        f"**Compassion Successful!** Your medical link saved <@{target_id}> from death tonight! "
                                         f"Saves: **{doc_saves}/3**."
                                     )
                                 except Exception:
@@ -3293,7 +3293,7 @@ class GameEngine:
                                 try:
                                     self.bot.message_queue.send(
                                         atk_mem,
-                                        f"**Attack Nullified!** Your target was saved from fatal injuries tonight."
+                                        f"your target was saved by someone. sucks to be you."
                                     )
                                 except Exception:
                                     pass
@@ -3326,7 +3326,7 @@ class GameEngine:
                                     try:
                                         self.bot.message_queue.send(
                                             atk_mem,
-                                            f"**Attack Nullified!** Your target survived your attack tonight due to an innate defensive power."
+                                            f"your target survived attack due to an innate defensive power."
                                         )
                                     except Exception:
                                         pass
@@ -3388,7 +3388,7 @@ class GameEngine:
                                 m = g.get_member(t_id) if g else None
                                 if m:
                                     try:
-                                        eng.bot.message_queue.send(m, f"{get_emoji('warning')} **Judicial Penalty!** You executed a fellow **Vanguard** member. You have permanently lost the ability to execute players.")
+                                        eng.bot.message_queue.send(m, f"**Judicial Penalty!** You executed a fellow **Vanguard** member. You have permanently lost the ability to execute players.")
                                     except Exception:
                                         pass
                             self._track_task(f"notify_tosen_penalty_{session.game_handle.game_id}", _notify_tosen_penalty())
@@ -3422,7 +3422,7 @@ class GameEngine:
                                 if ch:
                                     self.bot.message_queue.send(
                                         ch,
-                                        f"{get_emoji('sword')} **Survivor's Guilt!** Levi Ackerman (<@{pid}>) killed a Town member and is now Exhausted. They cannot speak or vote tomorrow."
+                                        f"**Survivor's Guilt,** Levi Ackerman (<@{pid}>) killed a Town member and ended himself of guilt."
                                     )
 
         # Tobirama's Master Sensor passive feedback
@@ -3431,9 +3431,9 @@ class GameEngine:
                 tobirama_visits = night_visits.get(pid, [])
                 if tobirama_visits:
                     visitors_str = ", ".join([f"<@{v}>" for v in tobirama_visits])
-                    msg = f"{get_emoji('wave')} **Master Sensor:** You sensed chakra from the following players visiting you tonight: {visitors_str}."
+                    msg = f"**Master Sensor:** You sensed chakra from the following players visiting you tonight: {visitors_str}."
                 else:
-                    msg = f"{get_emoji('wave')} **Master Sensor:** You did not sense anyone visiting you tonight."
+                    msg = f"**Master Sensor:** You did not sense anyone visiting you tonight."
                 member = guild.get_member(pid) if guild else None
                 if member:
                     self.bot.message_queue.send(member, msg)
@@ -3453,7 +3453,7 @@ class GameEngine:
                                     try:
                                         self.bot.message_queue.send(
                                             m_mem,
-                                            f"🔓 **[Mafia DM Chat] ANTAGONIST RELEASED!**\n"
+                                            f"**[Mafia DM Chat] ANTAGONIST RELEASED!**\n"
                                             f"<@{m_id}>'s detention has ended. They can now send and receive Mafia DM Chat messages again."
                                         )
                                     except Exception:
@@ -3479,7 +3479,7 @@ class GameEngine:
             is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
             if is_blocked:
                 try:
-                    self.bot.message_queue.send(member, "🚫 **You were distracted tonight!** Your ability was blocked.")
+                    self.bot.message_queue.send(member, "**Look a flying hazy! You were distracted tonight!**.")
                 except Exception:
                     pass
                 continue
@@ -3558,7 +3558,7 @@ class GameEngine:
         if converted_member:
             try:
                 desc_parts = [
-                    f"**Muzan Kibutsuji** has infected you with his blood!\n\n"
+                    f"**Muzan Kibutsuji** decided to donate you some blood.\n\n"
                     f"**Your New Role:** {role_display}\n"
                     f"**Your New Faction:** Villain (Mafia)\n\n"
                     f"You now win with the Mafia. Your old role and abilities are gone.\n"
