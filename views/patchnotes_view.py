@@ -147,6 +147,28 @@ PATCHES: list[dict] = [
             "**Lobby & Fast ACK Polish** — Added instant interaction deferral to `/start` and skipped disconnected players during night completion checks",
         ],
     },
+    {
+        "version": "1.0.7",
+        "date": "July 31, 2026",
+        "title": "Version 1.0.7 — Role Reworks, Balance Tuning & Engine Polish",
+        "description": (
+            "A comprehensive role balancing and bugfix update introducing reworks for "
+            "Muzan Kibutsuji, Asta, Frieren, and Kishibe, along with fixes for Eren's Rumbling, "
+            "Hisoka's Bungee Gum, Maomao's potions & postmortem analysis, and Kaname Tosen's Bankai system."
+        ),
+        "changes": [
+            "**Muzan Kibutsuji Rework** — Removed Night 3 starting requirement & 3-night cooldown; Blood Demon Art is now limited to 2 uses per game",
+            "**Asta Rework** — Removed Demon Destroyer Sword; replaced Black Divider with Ki Detection (learn whether target used an ability, visited someone, or was visited)",
+            "**Frieren Rework & Nerf** — Removed Ancient Binding; reworked Demon Detection to count players with killing abilities (includes killing Neutrals & Town killers; excludes non-killers)",
+            "**Kishibe Rework** — Replaced Broken Screw with Flashbang (target a player, anyone visiting them is blinded/roleblocked; 3 Night Cooldown)",
+            "**Eren Jaeger Rumbling Fix** — Rumbling announcement embed positioned right after death report & before roster embed; enforced permanent trial nomination and voting immunity",
+            "**Frieren's Demon Detection Feedback** — Direct DMs now explicitly list the names of the 3 selected members being analyzed",
+            "**Hisoka's Bungee Gum Fix** — Fixed shared win evaluation so bound fates persist through death and award shared victory credit",
+            "**Maomao's Postmortem Analysis** — Role names removed from suspect list to keep identities masked",
+            "**Maomao's Potion Brew Cooldowns** — Removed global ability lock; each potion now has its own independent cooldown (Truth: 3N, Invisibility: 2N, Happiness: 3N, Revitalization: 4N, Intelligence: 2N)",
+            "**Kaname Tosen Bankai DMs** — Jailed players receive explicit DMs in Bankai (Enma Korogi), and jailed Antagonists are isolated from Mafia DM Chat with dedicated DM announcements",
+        ],
+    },
 ]
 
 
