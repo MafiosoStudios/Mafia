@@ -688,36 +688,11 @@ class Maomao(BaseRole):
 # Frieren (Mage)
 # =============================================================================
 
-class FrierenAncientBinding(NightAction):
-    def __init__(self) -> None:
-        super().__init__(
-            name="Ancient Binding",
-            description="Bind two players. If one dies tonight, the survivor becomes Hidden. Cooldown: 2 Days after success.",
-            priority=7
-        )
-        self.num_targets = 2
-
-    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
-        cooldown_until = player_state.metadata.setdefault("frieren_binding_cooldown_until_day", 0)
-        if session.day_num < cooldown_until:
-            return False, f"Ancient Binding is on cooldown until Day {cooldown_until}."
-        return True, None
-
-    async def execute(self, context: RoleContext) -> None:
-        targets = context.targets
-        session = context.payload.get("session")
-        if len(targets) < 2 or not session:
-            return
-
-        session.metadata.setdefault("ancient_bindings", {})[context.user_id] = list(targets)
-        context.payload["result"] = f"✨ **Ancient Binding:** You bound <@{targets[0]}> and <@{targets[1]}> together."
-
-
 class FrierenDemonDetection(NightAction):
     def __init__(self) -> None:
         super().__init__(
             name="Demon Detection",
-            description="Choose three players. You will learn how many of them belong to the antagonists faction. (No cooldown)",
+            description="Choose three players. You will learn how many of them have the ability to kill (includes Neutrals and Town killers). (No cooldown)",
             priority=7
         )
         self.num_targets = 3
@@ -731,15 +706,31 @@ class FrierenDemonDetection(NightAction):
         if len(targets) < 3 or not session:
             return
 
-        antag_count = 0
+        KILLING_ROLES = {
+            "frieza", "antagonist_base_killer", "light_yagami",
+            "eren_jaeger", "mahoraga", "gilgamesh", "hisoka",
+            "kishibe", "hiromi_higuruma", "levi_ackerman", "tobirama_senju", "tosen"
+        }
+
+        killer_count = 0
         for pid in targets:
             pstate = session.players.get(pid)
             if pstate:
-                f = RoleFaction.VILLAIN.value if pstate.metadata.get("framed") else pstate.metadata.get("disguised_faction", pstate.faction)
-                if f == RoleFaction.VILLAIN.value:
-                    antag_count += 1
+                r_key = pstate.role_key or ""
+                is_killer = False
+                if r_key in KILLING_ROLES:
+                    is_killer = True
+                elif pstate.metadata.get("is_converted_antagonist"):
+                    is_killer = True
+                
+                if is_killer:
+                    killer_count += 1
 
-        context.payload["result"] = f"✨ **Demon Detection:** Out of the three chosen players, exactly **{antag_count}** belong to the antagonists."
+        target_mentions = ", ".join([f"<@{pid}>" for pid in targets])
+        context.payload["result"] = (
+            f"✨ **Demon Detection:** You analyzed {target_mentions}.\n"
+            f"Out of the three chosen players, exactly **{killer_count}** have the ability to kill."
+        )
 
 
 class FrierenZoltraakSpecialist(NightAction):
@@ -776,12 +767,12 @@ class Frieren(BaseRole):
     role_key: ClassVar[str] = "frieren"
     priority: ClassVar[int] = 7
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
-    cooldown_text: ClassVar[str] = "Ancient Binding: 2 Days on success, Zoltraak Specialist: 2 Nights"
+    cooldown_text: ClassVar[str] = "Demon Detection: None, Zoltraak Specialist: 2 Nights"
     limitations_text: ClassVar[str] = "None"
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [FrierenAncientBinding(), FrierenDemonDetection(), FrierenZoltraakSpecialist()]
+        self.abilities = [FrierenDemonDetection(), FrierenZoltraakSpecialist()]
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
         return context.payload.get("result")
@@ -941,7 +932,7 @@ class TosenBankai(NightAction):
         )
 
         import asyncio
-        async def _notify(s=session, p_id=target_id, bot=context.bot):
+        async def _notify(s=session, p_id=target_id, bot=context.bot, p_st=prisoner_state):
             if not bot:
                 return
             guild = bot.get_guild(s.game_handle.guild_id)
@@ -952,14 +943,35 @@ class TosenBankai(NightAction):
                 try:
                     bot.message_queue.send(
                         p_member,
-                        "🌑 **Enma Korogi - You Have Been Detained!**\n"
+                        "🌑 **Enma Korogi — You Have Been Detained!**\n"
                         "Kaname Tosen has imprisoned you inside his Bankai tonight.\n"
-                        "- You **cannot** perform your night ability.\n"
-                        "- You **cannot** be targeted by other players.\n"
-                        "- You **may** privately message Tosen by sending a DM starting with a dot (e.g. `.hello`)."
+                        "• You **cannot** perform your night ability.\n"
+                        "• You **cannot** be targeted by other players.\n"
+                        "• You **may** privately message Tosen by sending a DM starting with a dot (e.g. `.hello`)."
                     )
                 except Exception:
                     pass
+
+            # Handle Mafia DM isolation if prisoner is an Antagonist
+            if p_st and p_st.faction in (RoleFaction.VILLAIN.value, "Villain", "Antagonist", "Mafia"):
+                if p_id not in s.metadata.setdefault("jailed_mafia_ids", []):
+                    s.metadata["jailed_mafia_ids"].append(p_id)
+                
+                # Send DM notification ONLY to Mafia members in DMs
+                for pid, pstate in s.players.items():
+                    if pid != p_id and pstate.faction in (RoleFaction.VILLAIN.value, "Villain", "Antagonist", "Mafia"):
+                        other_mem = guild.get_member(pid)
+                        if other_mem:
+                            try:
+                                bot.message_queue.send(
+                                    other_mem,
+                                    f"🚨 **[Mafia DM Chat] ANTAGONIST IMPRISONED!**\n"
+                                    f"<@{p_id}> has been detained inside Kaname Tosen's Bankai (*Enma Korogi*) tonight. "
+                                    f"Their access to Mafia DM Chat has been temporarily revoked."
+                                )
+                            except Exception:
+                                pass
+
         from utils.helpers import safe_create_task
         safe_create_task(_notify(), "notify_tosen_detain")
 
@@ -1110,15 +1122,16 @@ class OsamuDazai(BaseRole):
 # Asta (Anti-Magic Knight)
 # =============================================================================
 
-class AstaDemonDestroyer(NightAction):
+class AstaKiDetection(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Demon Destroyer Sword",
-            description="Remove all negative status effects from a player.",
-            priority=5
+            name="Ki Detection",
+            description="Choose a player every night to randomly learn whether they used an ability, visited someone, or were visited.",
+            priority=15
         )
+        self.num_targets = 1
 
-    async def execute(self, context):
+    async def execute(self, context: RoleContext) -> None:
         target_id = context.target_id
         if not target_id:
             return
@@ -1127,69 +1140,34 @@ class AstaDemonDestroyer(NightAction):
             return
 
         target_state = session.players.get(target_id)
-        if target_state:
-            # Cleanses negative effects
-            cleansed = []
-            negative_keys = ["framed", "silenced", "cursed", "hexed", "poisoned", "marked", "roleblocked", "ability_disabled", "nullified", "black_divider_nullified"]
-            for key in negative_keys:
-                if target_state.metadata.pop(key, None) is not None:
-                    cleansed.append(key)
-
-            context.payload["log"] = f"Asta cleansed <@{target_id}> of negative effects: {', '.join(cleansed) if cleansed else 'none'}."
-            context.payload["result"] = f"{get_emoji('sword')} **Demon Destroyer Sword!** You have cleansed <@{target_id}> of all negative status effects."
-
-            # Notify target
-            if cleansed:
-                import asyncio
-                async def notify_cleansed(s=session, t_id=target_id, bot=context.bot):
-                    if bot:
-                        guild = bot.get_guild(s.game_handle.guild_id)
-                        member = guild.get_member(t_id) if guild else None
-                        if member:
-                            try:
-                                bot.message_queue.send(member, f"{get_emoji('sword')} **Asta's Demon Destroyer Sword has cleansed you of all negative effects!**")
-                            except Exception:
-                                pass
-                from utils.helpers import safe_create_task
-                safe_create_task(notify_cleansed(), "notify_asta_cleanse")
-
-    async def get_night_feedback(self, context):
-        return context.payload.get("result")
-
-
-class AstaBlackDivider(NightAction):
-    def __init__(self) -> None:
-        super().__init__(
-            name="Black Divider",
-            description="Target a player. If they attempt to act, nullify their ability, bypassing immunity. Cooldown: 1 Night.",
-            priority=5
-        )
-
-    def can_use(self, session, player_state):
-        last_used = player_state.metadata.get("asta_divider_last_used")
-        if last_used is not None and session.metadata.get("night_num", 1) - last_used < 2:
-            return False, f"Black Divider is on cooldown until Night {last_used + 2}."
-        return True, None
-
-    async def execute(self, context):
-        target_id = context.target_id
-        if not target_id:
-            return
-        session = context.payload.get("session")
-        if not session:
+        if not target_state:
             return
 
-        asta_state = session.players.get(context.user_id)
-        if asta_state:
-            asta_state.metadata["asta_divider_last_used"] = session.metadata.get("night_num", 1)
+        night_num = session.metadata.get("night_num", 1)
 
-        target_state = session.players.get(target_id)
-        if target_state:
-            target_state.metadata["black_divider_nullified"] = True
-            context.payload["log"] = f"Asta targeted <@{target_id}> with Black Divider."
-            context.payload["result"] = f"{get_emoji('sword')} **Black Divider Active!** If <@{target_id}> attempts to use an ability tonight, it will be nullified."
+        # Fact 1: Used ability
+        has_action = target_id in session.night_actions
+        
+        # Fact 2: Visited someone
+        target_payload = session.night_actions.get(target_id, {})
+        visited_someone = bool(target_payload.get("target_id") or target_payload.get("targets"))
 
-    async def get_night_feedback(self, context):
+        # Fact 3: Someone visited them
+        night_visits = session.metadata.get("night_visits_history", {}).get(night_num, {})
+        visitors = night_visits.get(target_id, [])
+        was_visited = len(visitors) > 0
+
+        facts = [
+            f"🔮 **Ki Detection:** You sensed <@{target_id}>'s Ki... They **{'used an ability' if has_action else 'did not use an ability'}** tonight.",
+            f"🔮 **Ki Detection:** You sensed <@{target_id}>'s Ki... They **{'visited someone' if visited_someone else 'did not visit anyone'}** tonight.",
+            f"🔮 **Ki Detection:** You sensed <@{target_id}>'s Ki... **{'Someone visited them' if was_visited else 'No one visited them'}** tonight.",
+        ]
+
+        import random
+        chosen_fact = random.choice(facts)
+        context.payload["result"] = chosen_fact
+
+    async def get_night_feedback(self, context: RoleContext) -> str | None:
         return context.payload.get("result")
 
 
@@ -1230,9 +1208,9 @@ class Asta(BaseRole):
     priority = 5
     tags = (RoleCategory.UTILITY,)
     is_unique = True
-    cooldown_text = "Black Divider: 1 Night. Devil Union: Once per game."
+    cooldown_text = "Ki Detection: None, Devil Union: Once per game"
     limitations_text = "Anti-Magic passive: Immune to non-physical negative abilities and redirects."
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [AstaDemonDestroyer(), AstaBlackDivider(), AstaDevilUnion()]
+        self.abilities = [AstaKiDetection(), AstaDevilUnion()]

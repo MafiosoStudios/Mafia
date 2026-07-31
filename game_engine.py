@@ -2556,7 +2556,8 @@ class GameEngine:
         for pid, payload in session.night_actions.items():
             pstate = session.players.get(pid)
             if pstate and pstate.alive and pstate.role_key == "asta":
-                if payload.get("action_index") == 2:
+                action_idx = payload.get("action_index")
+                if action_idx == 1 or payload.get("ability_name") == "Devil Union":
                     session.metadata["devil_union_active"] = True
                     pstate.metadata["devil_union_used"] = True
 
@@ -2608,21 +2609,6 @@ class GameEngine:
 
             # Dazai No Longer Human nullification
             if actor_state.metadata.get("nullified"):
-                continue
-
-            # Asta Black Divider nullification
-            if actor_state.metadata.get("black_divider_nullified"):
-                import asyncio
-                async def notify_null(s=session, a_id=actor_id, bot=self.bot):
-                    if bot:
-                        guild = bot.get_guild(s.game_handle.guild_id)
-                        member = guild.get_member(a_id) if guild else None
-                        if member:
-                            try:
-                                bot.message_queue.send(member, f"{get_emoji('cross')} **Your ability was nullified tonight.**")
-                            except Exception:
-                                pass
-                self._track_task(f"notify_mahoraga_null_{session.game_handle.game_id}", notify_null())
                 continue
 
             # Asta Devil Union nullification
@@ -3288,28 +3274,6 @@ class GameEngine:
                             self._track_task(f"notify_tosen_exec_{game_id}", _notify_tosen_exec())
                         break
 
-        # Check Frieren's Ancient Binding
-        ancient_bindings = session.metadata.get("ancient_bindings", {})
-        for frieren_id, bound_pair in list(ancient_bindings.items()):
-            if len(bound_pair) < 2:
-                continue
-            p1, p2 = bound_pair[0], bound_pair[1]
-            p1_state = session.players.get(p1)
-            p2_state = session.players.get(p2)
-            p1_died = p1 in session.metadata.get("dead_this_round", [])
-            p2_died = p2 in session.metadata.get("dead_this_round", [])
-            
-            if p1_died and not p2_died and p2_state and p2_state.alive:
-                p2_state.metadata["hidden_until_night"] = night_num + 1
-                frieren_state = session.players.get(frieren_id)
-                if frieren_state:
-                    frieren_state.metadata["frieren_binding_cooldown_until_day"] = session.metadata.get("day_num", 1) + 2
-            elif p2_died and not p1_died and p1_state and p1_state.alive:
-                p1_state.metadata["hidden_until_night"] = night_num + 1
-                frieren_state = session.players.get(frieren_id)
-                if frieren_state:
-                    frieren_state.metadata["frieren_binding_cooldown_until_day"] = session.metadata.get("day_num", 1) + 2
-
         # Check Levi's Survivor's Guilt
         for pid, pstate in session.players.items():
             if pstate.role_key == "levi_ackerman" and pstate.alive:
@@ -3341,6 +3305,28 @@ class GameEngine:
                 member = guild.get_member(pid) if guild else None
                 if member:
                     self.bot.message_queue.send(member, msg)
+
+        # Restore Mafia DM Chat access & notify Mafia DMs for released Antagonists
+        jailed_mafia = session.metadata.get("jailed_mafia_ids", [])
+        if jailed_mafia:
+            guild_obj = self.bot.get_guild(session.game_handle.guild_id) if self.bot else None
+            if guild_obj:
+                for m_id in list(jailed_mafia):
+                    m_state = session.players.get(m_id)
+                    if m_state and m_state.alive:
+                        for pid, pstate in session.players.items():
+                            if pstate.faction in (RoleFaction.VILLAIN.value, "Villain", "Antagonist", "Mafia"):
+                                m_mem = guild_obj.get_member(pid)
+                                if m_mem:
+                                    try:
+                                        self.bot.message_queue.send(
+                                            m_mem,
+                                            f"🔓 **[Mafia DM Chat] ANTAGONIST RELEASED!**\n"
+                                            f"<@{m_id}>'s detention has ended. They can now send and receive Mafia DM Chat messages again."
+                                        )
+                                    except Exception:
+                                        pass
+            session.metadata["jailed_mafia_ids"] = []
 
         # Set dead_last_night for Maomao
         session.metadata["dead_last_night"] = list(session.metadata.get("dead_this_round", []))

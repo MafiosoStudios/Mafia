@@ -123,8 +123,16 @@ class EventsCog(commands.Cog):
                     await message.channel.send(f"{get_emoji('cross')} Tōsen is not active or dead.")
                 return
 
+        # If a detained player tries to send a DM without a dot:
+        if player_state.metadata.get("detained"):
+            await message.channel.send(
+                f"{get_emoji('cross')} **You are detained inside Tōsen's Bankai!**\n"
+                f"You cannot send messages to Mafia Chat while detained. Prefix your message with '.' to talk to Tōsen."
+            )
+            return
+
         # Fallback to Mafia Chat if they belong to Villain faction
-        if player_state.faction != "Villain":
+        if player_state.faction not in ("Villain", RoleFaction.VILLAIN.value):
             return
 
         guild = self.bot.get_guild(target_session.game_handle.guild_id)
@@ -141,7 +149,9 @@ class EventsCog(commands.Cog):
         for pid, pstate in target_session.players.items():
             if pid == message.author.id:
                 continue
-            if pstate.faction == "Villain":
+            if pstate.metadata.get("detained"):
+                continue  # Skip detained members so they don't receive Mafia Chat DMs
+            if pstate.faction in ("Villain", RoleFaction.VILLAIN.value):
                 member = guild.get_member(pid)
                 if member:
                     try:

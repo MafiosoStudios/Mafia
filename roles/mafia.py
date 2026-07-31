@@ -295,14 +295,14 @@ class MuzanInfect(NightAction):
     def __init__(self) -> None:
         super().__init__(
             name="Blood Demon Art",
-            description="Every 3rd night (starting Night 3), transform a Town player into a Demon (85% basic, 10% Lower Moon, 5% Upper Moon).",
+            description="Transform a Town player into a Demon (85% basic Demon, 10% Lower Moon, 5% Upper Moon). (Twice per game)",
             priority=16
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
-        night_num = session.metadata.get("night_num", 1)
-        if night_num < 3 or night_num % 3 != 0:
-            return False, f"Blood Demon Art can only be used starting from Night 3, every 3 nights (Night 3, 6, 9, etc.). It is currently Night {night_num}."
+        uses_left = player_state.metadata.get("muzan_uses_left", 2)
+        if uses_left <= 0:
+            return False, "You have already used Blood Demon Art twice this game."
         return True, None
 
     async def execute(self, context: RoleContext) -> None:
@@ -322,6 +322,10 @@ class MuzanInfect(NightAction):
             context.payload["error"] = "You can only transform town members into demons."
             return
 
+        player_state = session.players[context.user_id]
+        uses_left = player_state.metadata.get("muzan_uses_left", 2)
+        player_state.metadata["muzan_uses_left"] = max(0, uses_left - 1)
+
         # Transform logic
         rand = random.random()
         if rand < 0.85:
@@ -335,7 +339,8 @@ class MuzanInfect(NightAction):
             new_role_name = "Upper Moon Demon"
 
         target_player.faction = RoleFaction.VILLAIN.value
-        context.payload["log"] = f"Muzan Kibutsuji infected <@{target_id}>, transforming them into a **{new_role_name}**!"
+        remaining = player_state.metadata["muzan_uses_left"]
+        context.payload["log"] = f"Muzan Kibutsuji infected <@{target_id}>, transforming them into a **{new_role_name}**! ({remaining} uses left)"
 
 
 class MuzanRegen(PassiveEffect):
@@ -372,8 +377,8 @@ class MuzanKibutsuji(BaseRole):
     role_key: ClassVar[str] = "muzan_kibutsuji"
     priority: ClassVar[int] = 16
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.DECEPTION,)
-    cooldown_text: ClassVar[str] = "Usable every 3 nights (Nights 3, 6, 9...)"
-    limitations_text: ClassVar[str] = "Can only infect living Town (Hero) faction players."
+    cooldown_text: ClassVar[str] = "None (Twice per game total)"
+    limitations_text: ClassVar[str] = "Can only infect living Town (Hero) faction players. 2 uses total."
 
     def __init__(self) -> None:
         super().__init__()
@@ -381,9 +386,9 @@ class MuzanKibutsuji(BaseRole):
         self.passives = [MuzanRegen()]
 
     def can_act_tonight(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
-        current_night = session.metadata.get("night_num", 1)
-        if current_night < 3 or current_night % 3 != 0:
-            return False, f"Blood Demon Art can only be used starting from Night 3, every 3 nights (Night 3, 6, 9, etc.). It is currently Night {current_night}."
+        uses_left = player_state.metadata.get("muzan_uses_left", 2)
+        if uses_left <= 0:
+            return False, "You have already used Blood Demon Art twice this game."
         return True, None
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
