@@ -553,14 +553,7 @@ class MaomaoPostmortem(NightAction):
         final_list = [killer_id] + other_names
         random.shuffle(final_list)
 
-        import roles
-        names_list = []
-        for pid in final_list:
-            r_key = session.players[pid].role_key if session.players.get(pid) else ""
-            r_meta = roles.ROLES_METADATA.get(r_key, {})
-            r_name = r_meta.get("name", r_key.replace("_", " ").title() if r_key else "Unknown")
-            names_list.append(f"**{r_name}** (<@{pid}>)")
-        names_str = ", ".join(names_list)
+        names_str = ", ".join([f"<@{pid}>" for pid in final_list])
 
         context.payload["result"] = (
             f"🧪 **Postmortem Analysis:** You analyzed <@{target_id}>'s corpse.\n"
@@ -569,19 +562,57 @@ class MaomaoPostmortem(NightAction):
         )
 
 
+MAOMAO_POTION_COOLDOWNS = {
+    "truth": 3,
+    "invisibility": 2,
+    "happiness": 3,
+    "revitalization": 4,
+    "intelligence": 2,
+}
+
+def is_maomao_potion_on_cooldown(session: Any, player_state: Any, potion_key: str) -> tuple[bool, str | None]:
+    last_used = player_state.metadata.setdefault("maomao_potion_cooldowns", {}).get(potion_key)
+    current_night = session.metadata.get("night_num", 1)
+    cd_duration = MAOMAO_POTION_COOLDOWNS.get(potion_key, 2)
+    if last_used is not None and (current_night - last_used) < cd_duration:
+        remaining = cd_duration - (current_night - last_used)
+        ready_night = last_used + cd_duration
+        potion_name = {
+            "truth": "Potion of Truth",
+            "invisibility": "Potion of Invisibility",
+            "happiness": "Potion of Happiness",
+            "revitalization": "Potion of Revitalization",
+            "intelligence": "Potion of Intelligence",
+        }.get(potion_key, potion_key.title())
+        return True, f"{potion_name} is on cooldown until Night {ready_night} ({remaining} Night(s) left)."
+    return False, None
+
+
 class MaomaoBrewPotion(NightAction):
     def __init__(self) -> None:
         super().__init__(
             name="Brew Potion",
-            description="Brew a potion of your choice tonight. Cooldown: 2 Nights.",
+            description=(
+                "Brew a potion of your choice tonight.\n"
+                "Individual Cooldowns:\n"
+                "• Truth: 3 Nights\n"
+                "• Invisibility: 2 Nights\n"
+                "• Happiness (Roleblock): 3 Nights\n"
+                "• Revitalization: 4 Nights\n"
+                "• Intelligence (+1 Vote): 2 Nights"
+            ),
             priority=12
         )
 
     def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
-        last_used = player_state.metadata.get("maomao_potion_last_used")
-        current_night = session.metadata.get("night_num", 1)
-        if last_used is not None and current_night - last_used < 2:
-            return False, f"Brew Potion is on cooldown. You can use it again in {2 - (current_night - last_used)} Nights."
+        all_on_cd = True
+        for p_key in MAOMAO_POTION_COOLDOWNS:
+            on_cd, _ = is_maomao_potion_on_cooldown(session, player_state, p_key)
+            if not on_cd:
+                all_on_cd = False
+                break
+        if all_on_cd:
+            return False, "All of your potions are currently on cooldown."
         return True, None
 
     def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
@@ -598,7 +629,8 @@ class MaomaoBrewPotion(NightAction):
             return
 
         player_state = session.players[context.user_id]
-        player_state.metadata["maomao_potion_last_used"] = session.metadata.get("night_num", 1)
+        current_night = session.metadata.get("night_num", 1)
+        player_state.metadata.setdefault("maomao_potion_cooldowns", {})[potion_choice] = current_night
 
         target_player = session.players.get(target_id)
         if not target_player:
@@ -624,10 +656,11 @@ class MaomaoBrewPotion(NightAction):
             cooldown_keys = [
                 "last_surgery_night", "last_kamehameha_night", "dazai_nullify_last_used",
                 "asta_divider_last_used", "ayanokoji_reveal_last_used", "maomao_postmortem_last_used",
-                "last_block_night", "maomao_potion_last_used"
+                "last_block_night"
             ]
             for key in cooldown_keys:
                 target_player.metadata.pop(key, None)
+            target_player.metadata.pop("maomao_potion_cooldowns", None)
             context.payload["result"] = f"🧪 **Potion of Revitalization:** Restored all ability cooldowns for <@{target_id}>."
             
         elif potion_choice == "intelligence":
@@ -640,7 +673,7 @@ class Maomao(BaseRole):
     role_key: ClassVar[str] = "maomao"
     priority: ClassVar[int] = 12
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
-    cooldown_text: ClassVar[str] = "Postmortem Analysis: 2 Nights, Brew Potion: 2 Nights"
+    cooldown_text: ClassVar[str] = "Postmortem: 2N, Truth: 3N, Invisible: 2N, Distract: 3N, Revitalize: 4N, Intelligence: 2N"
     limitations_text: ClassVar[str] = "None"
 
     def __init__(self) -> None:
@@ -805,20 +838,20 @@ class KishibeAlert(NightAction):
         return context.payload.get("result")
 
 
-class KishibeBrokenScrew(NightAction):
+class KishibeFlashbang(NightAction):
     def __init__(self) -> None:
         super().__init__(
-            name="Broken Screw",
-            description="(Once per game) Choose a player. If they visit you tonight while on Alert, your Alert charge is not consumed.",
-            priority=10
+            name="Flashbang",
+            description="Choose a player tonight. Anyone who attempts to visit them will be blinded (distracted/roleblocked). Cooldown: 3 Nights.",
+            priority=4
         )
 
     def can_use(self, session, player_state):
-        alerts = player_state.metadata.get("alerts_left", 3)
-        if alerts <= 0:
-            return False, "You have no Alert charges remaining."
-        if player_state.metadata.get("broken_screw_used"):
-            return False, "You have already used Broken Screw."
+        last_used = player_state.metadata.get("kishibe_flashbang_last_used")
+        current_night = session.metadata.get("night_num", 1)
+        if last_used is not None and current_night - last_used < 3:
+            remaining = 3 - (current_night - last_used)
+            return False, f"Flashbang is on cooldown for {remaining} more Night(s)."
         return True, None
 
     async def execute(self, context):
@@ -831,11 +864,15 @@ class KishibeBrokenScrew(NightAction):
         pstate = session.players.get(context.user_id)
         if not pstate:
             return
-        pstate.metadata["broken_screw_used"] = True
-        context.payload["log"] = f"Kishibe used Broken Screw on <@{target_id}>."
+        
+        current_night = session.metadata.get("night_num", 1)
+        pstate.metadata["kishibe_flashbang_last_used"] = current_night
+        session.metadata["flashbang_target_id"] = target_id
+        
+        context.payload["log"] = f"Kishibe threw a Flashbang at <@{target_id}>."
         context.payload["result"] = (
-            f"🥃 **Broken Screw Active!** You are on Alert. If <@{target_id}> visits you tonight, "
-            f"your Alert charge will be saved."
+            f"💥 **Flashbang Thrown!** You targeted <@{target_id}> tonight. "
+            f"Anyone attempting to visit them will be blinded and their actions will fail."
         )
 
     async def get_night_feedback(self, context):
@@ -848,12 +885,12 @@ class Kishibe(BaseRole):
     priority = 10
     tags = (RoleCategory.KILLING,)
     is_unique = True
-    cooldown_text = "None"
-    limitations_text = "Alert has 3 charges. Broken Screw is once per game."
+    cooldown_text = "Flashbang: 3 Nights"
+    limitations_text = "Alert has 3 charges total."
 
     def __init__(self) -> None:
         super().__init__()
-        self.abilities = [KishibeAlert(), KishibeBrokenScrew()]
+        self.abilities = [KishibeAlert(), KishibeFlashbang()]
 
 
 # =============================================================================

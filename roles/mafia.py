@@ -30,7 +30,7 @@ class AntagonistBaseKill(NightAction):
 
         kills = session.metadata.setdefault("pending_kills", {})
         kills[target_id] = kills.get(target_id, []) + ["mafia_strike"]
-        context.payload["log"] = f"Antagonist Base Killer attacked <@{target_id}>."
+        context.payload["log"] = f"Antagonist attacked <@{target_id}>."
 
 
 @role_registry.register

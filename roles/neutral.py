@@ -320,7 +320,7 @@ class ErenWinCondition(WinCondition):
             return False
             
         current_night = session.metadata.get("night_num", 1)
-        if current_night >= 6:
+        if session.metadata.get("rumbling_active") or current_night >= 5:
             alive_players = [pid for pid, pstate in session.players.items() if pstate.alive]
             if len(alive_players) == 1 and alive_players[0] == context.user_id:
                 player_state.metadata["rumbling_win"] = True
@@ -332,7 +332,7 @@ class ErenRumble(NightAction):
     def __init__(self) -> None:
         super().__init__(
             name="Founding Vision / The Rumbling",
-            description="Founding Vision: Learn player faction. The Rumbling (Night 6+): Crush and kill a target.",
+            description="Founding Vision (Night 1-4): Learn player faction. The Rumbling (Night 5+): Crush and kill a target.",
             priority=18
         )
 
@@ -348,10 +348,11 @@ class ErenRumble(NightAction):
         current_night = session.metadata.get("night_num", 1)
 
         # Active Rumbling: Kill
-        if current_night >= 6:
+        if session.metadata.get("rumbling_active") or current_night >= 5:
             kills = session.metadata.setdefault("pending_kills", {})
-            kills[target_id] = kills.get(target_id, []) + ["rumbling"]
+            kills[target_id] = kills.get(target_id, []) + ["eren_attack"]
             context.payload["log"] = f"Eren Jaeger's Rumbling crushed <@{target_id}>!"
+            context.payload["result"] = f"{get_emoji('fire')} **The Rumbling!** You commanded the Wall Titans to crush <@{target_id}> tonight."
             return
 
         # Normal Founding Vision: check side
@@ -368,7 +369,7 @@ class ErenJaeger(BaseRole):
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "apocalypse")
     is_hostile_neutral: ClassVar[bool] = True
     cooldown_text: ClassVar[str] = "None"
-    limitations_text: ClassVar[str] = "The Rumbling kills are only active Night 6 onwards."
+    limitations_text: ClassVar[str] = "The Rumbling kills are active Night 5 onwards."
 
     def __init__(self) -> None:
         super().__init__()
@@ -376,7 +377,7 @@ class ErenJaeger(BaseRole):
         self.win_condition_obj = ErenWinCondition()
 
     def is_active_threat(self, session: Any, player_state: Any) -> bool:
-        return player_state.alive and session.metadata.get("night_num", 1) >= 6
+        return player_state.alive and (session.metadata.get("rumbling_active") or session.metadata.get("night_num", 1) >= 5)
 
 
 # --- Mahoraga ---

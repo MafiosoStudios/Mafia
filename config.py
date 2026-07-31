@@ -100,6 +100,7 @@ EMOJIS: dict[str, str] = {
     "lower_moon": "🌙",
     "upper_moon": "💀",
     "frieza": "<:freiza:1527179281812160695>",
+    "antagonist_base_killer": "<:antagonist:1527264705838846105>",
     "tobirama_senju": "<:tobirama:1527169451383066736>",
     "hiromi_higuruma": "<:higuruma:1527177235667353690>",
     "levi_ackerman": "<:levi:1527168891904856085>",

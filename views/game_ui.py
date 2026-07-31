@@ -752,11 +752,11 @@ class TextureSurpriseStep3(discord.ui.Select):
 class MaomaoBrewPotionStep1(discord.ui.Select):
     def __init__(self, game_id: str, engine: GameEngine, ability: Any, action_index: int, target_options: list[discord.SelectOption]) -> None:
         potion_options = [
-            discord.SelectOption(label="Potion of Truth (Faction)", value="truth", description="Reveals the target's faction"),
-            discord.SelectOption(label="Potion of Invisibility (Untargetable)", value="invisibility", description="Makes target invisible tonight"),
-            discord.SelectOption(label="Potion of Happiness (Roleblock)", value="happiness", description="Distracts (roleblocks) the target"),
-            discord.SelectOption(label="Potion of Revitalization (Cooldown)", value="revitalization", description="Restores target's cooldowns"),
-            discord.SelectOption(label="Potion of Intelligence (+1 Vote)", value="intelligence", description="Gains target +1 vote for tomorrow")
+            discord.SelectOption(label="Potion of Truth", value="truth", description="Reveals the target's faction"),
+            discord.SelectOption(label="Potion of Invisibility", value="invisibility", description="Makes target invisible tonight"),
+            discord.SelectOption(label="Potion of Happiness", value="happiness", description="Distracts (roleblocks) the target"),
+            discord.SelectOption(label="Potion of Revitalization", value="revitalization", description="Restores target's cooldowns"),
+            discord.SelectOption(label="Potion of Intelligence", value="intelligence", description="Gains target +1 vote for tomorrow")
         ]
         super().__init__(placeholder="Select a potion to brew...", options=potion_options)
         self.game_id = game_id
@@ -772,6 +772,16 @@ class MaomaoBrewPotionStep1(discord.ui.Select):
             except Exception:
                 pass
         potion_choice = self.values[0]
+        session = await self.engine.get_session(self.game_id)
+        if session:
+            player_state = session.players.get(interaction.user.id)
+            if player_state:
+                from roles.town import is_maomao_potion_on_cooldown
+                on_cd, cd_msg = is_maomao_potion_on_cooldown(session, player_state, potion_choice)
+                if on_cd:
+                    await _safe_respond_or_edit(interaction, description=f"{get_emoji('cross')} **{cd_msg}**\nPlease select a different potion.")
+                    return
+
         view = discord.ui.View(timeout=120)
         select2 = MaomaoBrewPotionStep2(self.game_id, self.engine, self.ability, self.action_index, potion_choice, self.target_options)
         view.add_item(select2)

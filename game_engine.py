@@ -523,11 +523,6 @@ class GameEngine:
             if player.role_key == "lelouch" and cause in ("lynch", "trial", "deadly_sentencing", "execution"):
                 player.metadata["lelouch_lynched"] = True
 
-            # Clear Bungee Gum bond if one of the linked players dies
-            bond = session.metadata.get("bungee_gum_bond")
-            if bond and user_id in bond:
-                session.metadata.pop("bungee_gum_bond", None)
-
             # Tōsen — release prisoner if Tōsen dies
             if player.role_key == "tosen":
                 prisoner_id = player.metadata.get("detained_player_id")
@@ -777,14 +772,16 @@ class GameEngine:
                 p1_id, p2_id = bond
                 p1_state = session.players.get(p1_id)
                 p2_state = session.players.get(p2_id)
-                if p1_state and p2_state and p1_state.alive and p2_state.alive:
+                if p1_state and p2_state:
                     def player_wins_base(p_state):
                         if winner_faction == "Draw":
                             return False
-                        if winner_faction == RoleFaction.HERO.value:
-                            return p_state.faction == RoleFaction.HERO.value
-                        if winner_faction == RoleFaction.VILLAIN.value:
-                            return p_state.faction == RoleFaction.VILLAIN.value
+                        if winner_faction in (RoleFaction.HERO.value, "Hero", "Protagonist", "Town"):
+                            if p_state.faction in (RoleFaction.HERO.value, "Hero", "Protagonist", "Town"):
+                                return True
+                        if winner_faction in (RoleFaction.VILLAIN.value, "Villain", "Antagonist", "Mafia"):
+                            if p_state.faction in (RoleFaction.VILLAIN.value, "Villain", "Antagonist", "Mafia"):
+                                return True
                         if p_state.metadata.get("has_won"):
                             return True
                         r_key = p_state.role_key
@@ -798,11 +795,15 @@ class GameEngine:
                     if player_wins_base(p1_state) or player_wins_base(p2_state):
                         p1_state.metadata["has_won"] = True
                         p2_state.metadata["has_won"] = True
+                        p1_state.metadata["bungee_gum_shared_win"] = True
+                        p2_state.metadata["bungee_gum_shared_win"] = True
 
             guild = self.bot.get_guild(session.game_handle.guild_id) if self.bot else None
             for user_id, player in session.players.items():
                 is_winner = False
-                if winner_faction == "Draw":
+                if player.metadata.get("has_won"):
+                    is_winner = True
+                elif winner_faction == "Draw":
                     is_winner = False
                 elif winner_faction in (RoleFaction.HERO.value, "Hero", "Protagonist", "Town"):
                     if player.faction in (RoleFaction.HERO.value, "Hero", "Protagonist", "Town"):
@@ -811,14 +812,9 @@ class GameEngine:
                     if player.faction in (RoleFaction.VILLAIN.value, "Villain", "Antagonist", "Mafia"):
                         is_winner = True
                 else:
-                    if player.metadata.get("has_won"):
-                        is_winner = True
                     r_key = player.role_key
                     if r_key and roles.ROLES_METADATA.get(r_key, {}).get("name") == winner_faction:
                         is_winner = True
-
-                if player.metadata.get("has_won"):
-                    is_winner = True
 
                 await self._database.update_statistics_for_match(
                     user_id=user_id,
@@ -1773,6 +1769,23 @@ class GameEngine:
                                 majority_passed = False
                                 break  # skip the voting phase entirely for this cycle
 
+                            # Eren Jaeger Rumbling vote immunity check
+                            if target_pstate and target_pstate.role_key == "eren_jaeger" and session.metadata.get("rumbling_active"):
+                                eren_view = build_v2_layout(
+                                    title=f"{get_emoji('fire')} Eren Jaeger — Unstoppable Titan!",
+                                    description=(
+                                        f"**{defendant_name}** has unleashed The Rumbling!\n\n"
+                                        f"Eren Jaeger is **permanently immune to all voting and trials** while The Rumbling is active. "
+                                        f"The trial has been cancelled."
+                                    ),
+                                    color=discord.Color.dark_red(),
+                                )
+                                await self.bot.message_queue.send(mafia_channel, view=eren_view)
+                                session.votes.clear()
+                                session.metadata.pop("skip_votes", None)
+                                majority_passed = False
+                                break
+
                             # Mute all EXCEPT defendant (but do not mute the text channel during plea)
                             session.phase = GamePhase.TRIAL
                             session.metadata["defendant_id"] = target_id
@@ -1997,6 +2010,23 @@ class GameEngine:
                                 def_state = session.players[target_id]
                                 if def_state.metadata.get("lynch_immune_day") == session.metadata.get("day_num", 0):
                                     await self.bot.message_queue.send(mafia_channel, f"{get_emoji('mahoraga')} **Mahoraga is immune to being lynched today!** The trial is dismissed.")
+                                elif def_state.role_key == "eren_jaeger" and session.metadata.get("rumbling_active"):
+                                    await self.bot.message_queue.send(
+                                        mafia_channel,
+                                        view=build_v2_layout(
+                                            title=f"{get_emoji('fire')} Eren Jaeger — Unstoppable Titan!",
+                                            description=(
+                                                f"The verdict resulted in **Guilty**, but **Eren Jaeger** (<@{target_id}>) cannot be voted off!\n\n"
+                                                f"🔥 **The Rumbling has rendered Eren Jaeger permanently immune to all lynching and trials.** "
+                                                f"The execution has failed!"
+                                            ),
+                                            color=discord.Color.dark_red(),
+                                        )
+                                    )
+                                    session.metadata.pop("defendant_id", None)
+                                    session.metadata.pop("verdicts", None)
+                                    break_to_voting = False
+                                    break
                                 elif def_state.role_key == "makima" and not def_state.metadata.get("pm_contract_activated"):
                                     def_state.metadata["pm_contract_activated"] = True
                                     await self.bot.message_queue.send(
@@ -2169,27 +2199,27 @@ class GameEngine:
             player_line = f"• **{name}** — {role_display}  ({status})"
 
             is_winner = False
-            if winner_faction == "Draw":
+            if pstate and pstate.metadata.get("has_won"):
+                is_winner = True
+            elif winner_faction == "Draw":
                 is_winner = False
-            elif winner_faction == RoleFaction.HERO.value:
-                if pstate and pstate.faction == RoleFaction.HERO.value:
+            elif winner_faction in (RoleFaction.HERO.value, "Hero", "Protagonist", "Town"):
+                if pstate and pstate.faction in (RoleFaction.HERO.value, "Hero", "Protagonist", "Town"):
                     is_winner = True
-            elif winner_faction == RoleFaction.VILLAIN.value:
-                if pstate and pstate.faction == RoleFaction.VILLAIN.value:
+            elif winner_faction in (RoleFaction.VILLAIN.value, "Villain", "Antagonist", "Mafia"):
+                if pstate and pstate.faction in (RoleFaction.VILLAIN.value, "Villain", "Antagonist", "Mafia"):
                     is_winner = True
             else:
-                if pstate and pstate.metadata.get("has_won"):
+                if pstate and rkey and roles.ROLES_METADATA.get(rkey, {}).get("name") == winner_faction:
                     is_winner = True
-                elif pstate and rkey and roles.ROLES_METADATA.get(rkey, {}).get("name") == winner_faction:
-                    is_winner = True
+
+            if pstate and pstate.metadata.get("bungee_gum_shared_win"):
+                player_line += " 🍬 *(Bungee Gum Shared Win)*"
 
             if is_winner:
                 winners_lines.append(player_line)
             else:
-                if pstate and pstate.metadata.get("has_won"):
-                    winners_lines.append(player_line)
-                else:
-                    losers_lines.append(player_line)
+                losers_lines.append(player_line)
 
         desc_sections = []
         if winners_lines:
@@ -2293,7 +2323,29 @@ class GameEngine:
                 await self.bot.message_queue.send(channel, view=other_layout)
             except Exception as err:
                 logger.error(f"Failed to send other casualties layout: {err}")
-            await asyncio.sleep(2.5)
+        # Check Eren Rumbling announcement (RIGHT AFTER death report & BEFORE alive player status embed)
+        eren_player = next((p for p in session.players.values() if p.role_key == "eren_jaeger" and p.alive), None)
+        if eren_player and (session.metadata.get("rumbling_active") or session.metadata.get("night_num", 1) >= 5):
+            session.metadata["rumbling_active"] = True
+            if not session.metadata.get("rumbling_announced"):
+                session.metadata["rumbling_announced"] = True
+                eren_id = next((pid for pid, p in session.players.items() if p == eren_player), None)
+                rumbling_layout = build_v2_layout(
+                    title=f"{get_emoji('fire')} THE RUMBLING HAS BEGUN!",
+                    description=(
+                        f"**Eren Jaeger** (<@{eren_id}>) has unleashed the Wall Titans!\n\n"
+                        f"⚡ **The Rumbling has begun.**\n"
+                        f"• Eren Jaeger is now **permanently immune to lynching and voting**!\n"
+                        f"• Eren Jaeger can now crush and kill a target every single night until only he remains!"
+                    ),
+                    color=discord.Color.dark_red(),
+                    image_url="https://media.giphy.com/media/CFA1y0lBkL2XA366RW/giphy.gif"
+                )
+                try:
+                    await self.bot.message_queue.send(channel, view=rumbling_layout)
+                    await asyncio.sleep(2.5)
+                except Exception as err:
+                    logger.error(f"Failed to send Rumbling layout: {err}")
 
         alive_list = []
         dead_list = []
@@ -2508,6 +2560,15 @@ class GameEngine:
                     session.metadata["devil_union_active"] = True
                     pstate.metadata["devil_union_used"] = True
 
+        # Check Kishibe Flashbang activation before action loop starts
+        for pid, payload in session.night_actions.items():
+            pstate = session.players.get(pid)
+            if pstate and pstate.alive and pstate.role_key == "kishibe":
+                if payload.get("action_index") == 1:
+                    t_id = payload.get("target_id")
+                    if t_id:
+                        session.metadata["flashbang_target_id"] = t_id
+
         # 1. Gather all actions
         action_list = []
         for actor_id, payload in list(session.night_actions.items()):
@@ -2592,6 +2653,32 @@ class GameEngine:
                                         pass
                         self._track_task(f"notify_asta_union_{session.game_handle.game_id}", notify_union())
                         continue
+
+            # Kishibe Flashbang intercept
+            flashbang_target = session.metadata.get("flashbang_target_id")
+            if flashbang_target and actor_state.role_key != "kishibe":
+                targeted_flashbang = False
+                t_id = payload.get("target_id")
+                if t_id and t_id == flashbang_target:
+                    targeted_flashbang = True
+                ts_list = payload.get("targets", ())
+                if ts_list and flashbang_target in ts_list:
+                    targeted_flashbang = True
+                if targeted_flashbang:
+                    actor_state.metadata["roleblocked"] = True
+                    payload["error"] = "Your action failed because your target was blinded by a Flashbang!"
+                    payload["log"] = f"{actor_state.character_name} attempted to target <@{flashbang_target}>, but was blinded by Kishibe's Flashbang."
+                    async def notify_flashbang(s=session, a_id=actor_id, bot=self.bot):
+                        if bot:
+                            guild = bot.get_guild(s.game_handle.guild_id)
+                            member = guild.get_member(a_id) if guild else None
+                            if member:
+                                try:
+                                    bot.message_queue.send(member, f"{get_emoji('warning')} **Your action failed tonight because your target was blinded by a Flashbang!**")
+                                except Exception:
+                                    pass
+                    self._track_task(f"notify_flashbang_{session.game_handle.game_id}_{actor_id}", notify_flashbang())
+                    continue
 
             # Invisibility check (Potion of Invisibility)
             if actor_state.role_key != "maomao":
