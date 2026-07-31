@@ -568,6 +568,36 @@ class GameEngine:
                                                     pass
                                 self._track_task(f"notify_frieza_transform_{game_id}", notify_transformation())
 
+            # Kishibe — count passive kills and track progress toward his win quota
+            if cause == "kishibe_alert_kill":
+                killer_id = player.metadata.get("killer_id")
+                kishibe_state = session.players.get(killer_id) if killer_id else None
+                if not kishibe_state or kishibe_state.role_key != "kishibe":
+                    kishibe_state = None
+                    for kpid, kpstate in session.players.items():
+                        if kpstate.role_key == "kishibe" and kpstate.alive:
+                            kishibe_state = kpstate
+                            break
+                if kishibe_state:
+                    kills = kishibe_state.metadata.get("kishibe_kills", 0) + 1
+                    kishibe_state.metadata["kishibe_kills"] = kills
+                    quota = kishibe_state.metadata.get("kishibe_kill_quota", 0)
+
+                    async def notify_kishibe_kill(eng=self, s=session, k_id=kishibe_state.user_id, n=kills, q=quota):
+                        guild = eng.bot.get_guild(s.game_handle.guild_id) if eng.bot else None
+                        if guild:
+                            member = guild.get_member(k_id)
+                            if member:
+                                try:
+                                    eng.bot.message_queue.send(
+                                        member,
+                                        f"{get_emoji('sword')} **A visitor was reaped at your door.** "
+                                        f"Your passive kill count: **{n}/{q}**."
+                                    )
+                                except Exception:
+                                    pass
+                    self._track_task(f"notify_kishibe_kill_{game_id}_{user_id}", notify_kishibe_kill())
+
             if not death_message:
                 guild = self.bot.get_guild(session.game_handle.guild_id) if self.bot else None
                 member = guild.get_member(user_id) if guild else None
@@ -1225,6 +1255,15 @@ class GameEngine:
             desc_parts = [role_meta.get('description', '')]
             desc_parts.append(f"• **Faction:** {faction_emoji} **{display_faction}**")
             desc_parts.append(f"• **Win Condition:** {role_meta.get('win_condition', '')}")
+
+            # Kishibe — show his kill quota (set during on_game_start) in the match-start DM
+            if pstate.role_key == "kishibe":
+                quota = pstate.metadata.get("kishibe_kill_quota")
+                if quota:
+                    desc_parts.append(
+                        f"• **Kill Quota:** You need **{quota}** passive kills to win. "
+                        f"Anyone who visits you dies — even through protection."
+                    )
 
             active_ability = role_meta.get('active_ability', 'None')
             if "Max Ability:" in active_ability:
@@ -2458,57 +2497,51 @@ class GameEngine:
                 makima_state = session.players.get(makima_id)
                 
                 if controlled_state and controlled_state.alive and controlled_state.faction != RoleFaction.VILLAIN.value:
-                    if controlled_state.role_key == "kishibe" and not controlled_state.metadata.get("battle_hardened_used"):
-                        controlled_state.metadata["battle_hardened_used"] = True
-                        makima_payload["control_success"] = False
-                        makima_payload["error"] = "Your target resisted your ability."
-                        makima_payload["log"] = f"Makima attempted to control <@{controlled_pid}>, but they resisted!"
-                    else:
-                        last_controlled = makima_state.metadata.get("last_controlled_player")
-                        if last_controlled != controlled_pid:
-                            makima_state.metadata["last_controlled_player"] = controlled_pid
-                        
-                        # Target must perform an active visit (be in night_actions and have target_id or targets)
-                        if controlled_pid in session.night_actions:
-                            controlled_payload = session.night_actions[controlled_pid]
-                            has_active_target = False
-                            if controlled_payload.get("target_id") is not None:
-                                has_active_target = True
-                            elif controlled_payload.get("targets"):
-                                has_active_target = True
-                                
-                            if has_active_target:
-                                # Validate redirect target is alive and valid
-                                redirect_state = session.players.get(redirect_pid) if redirect_pid else None
-                                if not redirect_state or not redirect_state.alive:
-                                    makima_payload["control_success"] = False
-                                    makima_payload["error"] = "Your control target could not be redirected — the target is invalid."
-                                elif redirect_pid == controlled_pid:
-                                    makima_payload["control_success"] = False
-                                    makima_payload["error"] = "Your control target could not be redirected — controlled player cannot target themselves."
-                                else:
-                                    # Successful redirection!
-                                    if "target_id" in controlled_payload and controlled_payload["target_id"] is not None:
-                                        controlled_payload["target_id"] = redirect_pid
-                                    if "targets" in controlled_payload and controlled_payload["targets"]:
-                                        controlled_payload["targets"] = (redirect_pid,) * len(controlled_payload["targets"])
-                                    
-                                # Track unique controlled targets
-                                controlled_history = makima_state.metadata.setdefault("controlled_targets_history", [])
-                                if controlled_pid not in controlled_history:
-                                    controlled_history.append(controlled_pid)
-                                makima_state.metadata["controlled_count"] = len(controlled_history)
-                                
-                                makima_payload["control_success"] = True
-                                makima_payload["target_id"] = controlled_pid
-                                makima_payload["redirect_target"] = redirect_pid
-                                makima_payload["log"] = f"Makima controlled <@{controlled_pid}> and redirected their action to <@{redirect_pid}>."
-                            else:
+                    last_controlled = makima_state.metadata.get("last_controlled_player")
+                    if last_controlled != controlled_pid:
+                        makima_state.metadata["last_controlled_player"] = controlled_pid
+                    
+                    # Target must perform an active visit (be in night_actions and have target_id or targets)
+                    if controlled_pid in session.night_actions:
+                        controlled_payload = session.night_actions[controlled_pid]
+                        has_active_target = False
+                        if controlled_payload.get("target_id") is not None:
+                            has_active_target = True
+                        elif controlled_payload.get("targets"):
+                            has_active_target = True
+                            
+                        if has_active_target:
+                            # Validate redirect target is alive and valid
+                            redirect_state = session.players.get(redirect_pid) if redirect_pid else None
+                            if not redirect_state or not redirect_state.alive:
                                 makima_payload["control_success"] = False
-                                makima_payload["error"] = "Target player did not perform an active visit."
+                                makima_payload["error"] = "Your control target could not be redirected — the target is invalid."
+                            elif redirect_pid == controlled_pid:
+                                makima_payload["control_success"] = False
+                                makima_payload["error"] = "Your control target could not be redirected — controlled player cannot target themselves."
+                            else:
+                                # Successful redirection!
+                                if "target_id" in controlled_payload and controlled_payload["target_id"] is not None:
+                                    controlled_payload["target_id"] = redirect_pid
+                                if "targets" in controlled_payload and controlled_payload["targets"]:
+                                    controlled_payload["targets"] = (redirect_pid,) * len(controlled_payload["targets"])
+                                
+                            # Track unique controlled targets
+                            controlled_history = makima_state.metadata.setdefault("controlled_targets_history", [])
+                            if controlled_pid not in controlled_history:
+                                controlled_history.append(controlled_pid)
+                            makima_state.metadata["controlled_count"] = len(controlled_history)
+                            
+                            makima_payload["control_success"] = True
+                            makima_payload["target_id"] = controlled_pid
+                            makima_payload["redirect_target"] = redirect_pid
+                            makima_payload["log"] = f"Makima controlled <@{controlled_pid}> and redirected their action to <@{redirect_pid}>."
                         else:
                             makima_payload["control_success"] = False
                             makima_payload["error"] = "Target player did not perform an active visit."
+                    else:
+                        makima_payload["control_success"] = False
+                        makima_payload["error"] = "Target player did not perform an active visit."
                 else:
                     makima_payload["control_success"] = False
                     makima_payload["error"] = "Invalid target."
@@ -2528,6 +2561,88 @@ class GameEngine:
                         payload["targets"] = new_ts
                 if payload.get("controlled_vote_target") == hisoka_id:
                     payload["controlled_vote_target"] = actor_id
+
+        # Kishibe's Goose — redirect the chosen player's action to Kishibe.
+        # Runs before visits are collected so the goosed player counts as a
+        # visitor of Kishibe (and thus dies to his passive).
+        for kpid, kpstate in session.players.items():
+            if kpstate.role_key != "kishibe" or not kpstate.alive:
+                continue
+            goose_payload = session.night_actions.get(kpid)
+            if not goose_payload or goose_payload.get("action_index") != 0:
+                continue
+            if kpstate.metadata.get("goose_used"):
+                continue
+            goose_target = goose_payload.get("target_id")
+            if not goose_target:
+                continue
+            kpstate.metadata["goose_used"] = True
+
+            gt_payload = session.night_actions.get(goose_target)
+            has_active_visit = gt_payload and (
+                gt_payload.get("target_id") is not None or bool(gt_payload.get("targets"))
+            )
+
+            if has_active_visit:
+                # Grab the previous target for the goosed player's DM
+                prev_tgt = gt_payload.get("target_id")
+                if prev_tgt is None:
+                    ts = gt_payload.get("targets") or ()
+                    prev_tgt = ts[0] if ts else None
+                # Redirect their whole action onto Kishibe
+                if "target_id" in gt_payload and gt_payload["target_id"] is not None:
+                    gt_payload["target_id"] = kpid
+                if "targets" in gt_payload and gt_payload["targets"]:
+                    gt_payload["targets"] = (kpid,) * len(gt_payload["targets"])
+                gt_payload["log"] = f"Kishibe used Goose to redirect <@{goose_target}> to himself."
+
+                goose_payload["result"] = (
+                    f"🦆 **Goose Successful!** <@{goose_target}> was visiting someone tonight, "
+                    f"so their action was redirected to you. They will die at your door."
+                )
+
+                async def dm_goosed(s=session, gt=goose_target, prev_tgt=prev_tgt, k_id=kpid):
+                    if self.bot:
+                        guild = self.bot.get_guild(s.game_handle.guild_id)
+                        if guild:
+                            member = guild.get_member(gt)
+                            if member:
+                                prev_name = "no one"
+                                if prev_tgt is not None:
+                                    prev_member = guild.get_member(prev_tgt)
+                                    prev_name = prev_member.display_name if prev_member else f"User {prev_tgt}"
+                                kishibe_member = guild.get_member(k_id)
+                                kishibe_name = kishibe_member.display_name if kishibe_member else "Kishibe"
+                                try:
+                                    self.bot.message_queue.send(
+                                        member,
+                                        f"🪤 **You got Goosed!** Your action was redirected to **{kishibe_name}**!\n"
+                                        f"Previous target: **{prev_name}**\nNew target: **{kishibe_name}**"
+                                    )
+                                except Exception:
+                                    pass
+                self._track_task(f"dm_goosed_{session.game_handle.game_id}_{goose_target}", dm_goosed())
+            else:
+                # Target wasn't visiting anyone — use is still consumed.
+                goose_payload["result"] = (
+                    f"🦆 **Goose Failed.** You tried to redirect <@{goose_target}>, but they "
+                    f"weren't visiting anyone tonight. The use has been consumed."
+                )
+                async def dm_goose_failed(s=session, k_id=kpid, gt=goose_target):
+                    if self.bot:
+                        guild = self.bot.get_guild(s.game_handle.guild_id)
+                        if guild:
+                            member = guild.get_member(k_id)
+                            if member:
+                                try:
+                                    self.bot.message_queue.send(
+                                        member,
+                                        f"🦆 **Goose Failed.** You tried to redirect <@{gt}>, but they "
+                                        f"weren't visiting anyone tonight. Your use has been consumed."
+                                    )
+                                except Exception:
+                                    pass
+                self._track_task(f"dm_goose_failed_{session.game_handle.game_id}_{kpid}", dm_goose_failed())
 
         # Collect visits for history (to support Maomao)
         history = session.metadata.setdefault("night_visits_history", {})
@@ -2555,14 +2670,22 @@ class GameEngine:
                     session.metadata["devil_union_active"] = True
                     pstate.metadata["devil_union_used"] = True
 
-        # Check Kishibe Flashbang activation before action loop starts
-        for pid, payload in session.night_actions.items():
-            pstate = session.players.get(pid)
-            if pstate and pstate.alive and pstate.role_key == "kishibe":
-                if payload.get("action_index") == 1:
-                    t_id = payload.get("target_id")
-                    if t_id:
-                        session.metadata["flashbang_target_id"] = t_id
+        # Kishibe's passive — any player who visits him dies (unstoppable).
+        # Resolved at Kishibe's priority (currently 1): visitors are killed before
+        # their own action can run, and their action is cancelled so it never lands
+        # on Kishibe. If Kishibe's priority is ever raised above another actor's,
+        # this block would need to move into the action loop so the earlier actor
+        # resolves first (and Kishibe only kills them if he survives).
+        for pid, pstate in session.players.items():
+            if pstate.role_key == "kishibe" and pstate.alive:
+                for visitor_id in night_visits.get(pid, []):
+                    v_state = session.players.get(visitor_id)
+                    if not v_state or not v_state.alive:
+                        continue
+                    # Cancel the visitor's action so it never resolves on Kishibe
+                    session.night_actions.pop(visitor_id, None)
+                    kills = session.metadata.setdefault("pending_kills", {})
+                    kills[visitor_id] = kills.get(visitor_id, []) + ["kishibe_alert_kill"]
 
         # 1. Gather all actions
         action_list = []
@@ -2686,37 +2809,6 @@ class GameEngine:
                                         pass
                         self._track_task(f"notify_asta_union_{session.game_handle.game_id}", notify_union())
                         continue
-
-            # Kishibe Flashbang intercept
-            flashbang_target = session.metadata.get("flashbang_target_id")
-            if flashbang_target and actor_state.role_key != "kishibe":
-                targeted_flashbang = False
-                t_id = payload.get("target_id")
-                if t_id and t_id == flashbang_target:
-                    targeted_flashbang = True
-                ts_list = payload.get("targets", ())
-                if ts_list and flashbang_target in ts_list:
-                    targeted_flashbang = True
-                if targeted_flashbang:
-                    actor_state.metadata["roleblocked"] = True
-                    payload["error"] = "Your action failed because your target was blinded by a Flashbang!"
-                    payload["log"] = f"{actor_state.character_name} attempted to target <@{flashbang_target}>, but was blinded by Kishibe's Flashbang."
-                    async def notify_flashbang(s=session, a_id=actor_id, bot=self.bot):
-                        if bot:
-                            guild = bot.get_guild(s.game_handle.guild_id)
-                            member = guild.get_member(a_id) if guild else None
-                            if member:
-                                try:
-                                    embed_msg = build_v2_layout(
-                                        title="💥 Flashbang Blindness!",
-                                        description="**Your action failed tonight because your target was blinded by Kishibe's Flashbang!**",
-                                        color=discord.Color.gold()
-                                    )
-                                    bot.message_queue.send(member, view=embed_msg)
-                                except Exception:
-                                    pass
-                    self._track_task(f"notify_flashbang_{session.game_handle.game_id}_{actor_id}", notify_flashbang())
-                    continue
 
             # Invisibility check (Potion of Invisibility)
             if actor_state.role_key != "maomao":
@@ -2870,34 +2962,6 @@ class GameEngine:
                             kills = session.metadata.setdefault("pending_kills", {})
                             kills[target_pid] = kills.get(target_pid, []) + ["gates_of_babylon"]
 
-
-        # 4. Kishibe Veteran's Instinct — Alert kills
-        for pid, pstate in session.players.items():
-            if pstate.role_key == "kishibe" and pstate.alive:
-                payload = session.night_actions.get(pid)
-                if not payload:
-                    continue
-                action_idx = payload.get("action_index", 0)
-                is_alert = action_idx in (0, 1)  # 0 = Alert, 1 = Broken Screw
-                if not is_alert:
-                    continue
-
-                visitors = night_visits.get(pid, [])
-                for visitor_id in visitors:
-                    v_state = session.players.get(visitor_id)
-                    if v_state and v_state.alive:
-                        kills = session.metadata.setdefault("pending_kills", {})
-                        kills[visitor_id] = kills.get(visitor_id, []) + ["kishibe_alert_kill"]
-
-                # Broken Screw: if the screw target visited, charge is saved
-                saved_charge = False
-                if action_idx == 1:
-                    screw_target = payload.get("target_id")
-                    if screw_target and screw_target in visitors:
-                        saved_charge = True
-
-                if not saved_charge:
-                    pstate.metadata["alerts_left"] = max(0, pstate.metadata.get("alerts_left", 3) - 1)
 
         # Populate heals history for the night
         heals_history = session.metadata.setdefault("heals_history", {})

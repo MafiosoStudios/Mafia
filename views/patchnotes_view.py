@@ -169,6 +169,24 @@ PATCHES: list[dict] = [
             "**Kaname Tosen Bankai DMs** — Jailed players receive explicit DMs in Bankai (Enma Korogi), and jailed Antagonists are isolated from Mafia DM Chat with dedicated DM announcements",
         ],
     },
+    {
+        "version": "1.0.8",
+        "date": "July 31, 2026",
+        "title": "Version 1.0.8 — Kishibe Neutral Rework, Levi Guilt & Roleblock Fixes",
+        "description": (
+            "A focused character update delivering a complete rework for Kishibe — "
+            "who abandons the Town for the Neutral faction — a rewritten Survivor's Guilt "
+            "for Levi Ackerman, and fixes to leftover roleblock immunity that kept control "
+            "abilities from landing on the newly rewritten Kishibe."
+        ),
+        "changes": [
+            "**Kishibe Rework** — Complete rewrite from Town to Neutral: Alert, Flashbang, and Battle-Hardened are gone, replaced by the **Goose** ability (redirect any player to you; 1 use per game) and the **Death Trap** passive (anyone who visits you — Town, Neutral, or Mafia — dies, even through protection, with *\"visited Kishibe and got reaped\"* reports)",
+            "**Kishibe Kill Quota** — Kishibe now wins by reaching a passive kill quota revealed in his DM when the match starts, scaled to lobby size (e.g. 3 kills for a 10-player lobby)",
+            "**Levi Survivor's Guilt** — If Levi kills a Protagonist, he ends himself of guilt of killing a fellow protagonist: he and his victim both fall, with his sacrifice announced on the next line of the victim's death report. Killing Mafia or Neutral leaves Levi standing",
+            "**Roleblock & Control Fix** — Removed stale Battle-Hardened immunity checks from Blackbeard's Darkness Logia & Tremor Fruit, the Lower Moon, and Makima's Control so the new Kishibe can be roleblocked, distracted, and controlled like any other role",
+            "**Priority Restructure** — Kishibe's entire kit now resolves from a single role priority of #1, letting Goose and Death Trap timing be reordered freely; `/priorities` now lists Kishibe at the top",
+        ],
+    },
 ]
 
 

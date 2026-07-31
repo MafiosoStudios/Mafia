@@ -326,6 +326,9 @@ DEATH_MESSAGES: dict[str, list[str]] = {
         "**{player}** was sliced to pieces by Levi Ackerman's dual blades.",
         "**{player}** stood no chance against the Humanity's Strongest Soldier's ODM execution.",
     ],
+    "levi_guilt": [
+        "**{player}** ended himself of guilt for killing a fellow protagonist.",
+    ],
     "deadly_sentencing": [
         "**{player}** was immediately sentenced to execution by Hiromi Higuruma.",
     ],
@@ -338,9 +341,9 @@ DEATH_MESSAGES: dict[str, list[str]] = {
         "**{player}** was executed within Suzumushi's world — no one heard them scream.",
     ],
     "kishibe_alert_kill": [
-        "**{player}** visited the wrong person tonight — Kishibe's battle instincts did the rest.",
-        "**{player}** approached Kishibe's door and never left. A Veteran's Alert is not to be trifled with.",
-        "**{player}** made the last mistake of their life: visiting Kishibe while he was on guard.",
+        "**{player}** visited Kishibe and got reaped.",
+        "**{player}** walked right into Kishibe's trap and got reaped.",
+        "**{player}** knocked on Kishibe's door and never walked out — reaped on the spot.",
     ],
 }
 

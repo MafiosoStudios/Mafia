@@ -66,7 +66,7 @@
     "win_condition": "Help the protagonists win.",
     "description": "Humanity's strongest soldier, feared for his unmatched combat skills and unwavering resolve. Calm under pressure and fiercely loyal to his comrades, Levi never hesitates to make the difficult choices for the greater good.",
     "active_ability": "ODM Execution - Attack a player, 3 uses / Precision Strike - ODM Execution ignores protection tonight, 1 use.",
-    "passive_ability": "Survivor's Guilt - Become exhausted for 1 cycle if you kill a Protagonist player.",
+    "passive_ability": "Survivor's Guilt - If you kill a Protagonist player, you end yourself of guilt.",
     "action_prompt": "Select a combat strike to execute tonight:",
     "image_url": "https://www.chromethemer.com/download/hd-wallpapers/levi-ackerman-3840x2160.jpg",
     "footer": "Give up on your dreams and die."
@@ -259,13 +259,13 @@
   },
   "kishibe": {
     "name": "Kishibe",
-    "faction": "Protagonist",
+    "faction": "Neutral",
     "emoji": "🥃",
-    "description": "A grizzled, battle worn hunter who survived countless encounters with devils. Kishibe has no illusions about humanity, he fights because he has nothing left to lose. Taciturn and ruthless, he is considered one of the strongest humans alive.",
-    "active_ability": "Veteran's Instinct (Alert) - Go on Alert, anyone who visits you is attacked (3 charges). / Flashbang - Choose a player, anyone visiting them is distracted/roleblocked (3 Night Cooldown).",
-    "passive_ability": "Battle-Hardened - The first time someone attempts to roleblock, control, or redirect Kishibe, the effect fails and the visitor is notified that their target resisted them.",
-    "win_condition": "Help the protagonists win.",
-    "action_prompt": "Select a combat posture or devil hunter tactic:",
+    "description": "A grizzled, battle worn hunter who survived countless encounters with devils. Now he hunts alone — anyone foolish enough to visit his door walks straight into a trap.",
+    "active_ability": "Goose - Select a player and redirect them to you. If they are visiting someone tonight, they are pulled to your door instead and die to your passive. (1 use per game)",
+    "passive_ability": "Death Trap - Any player who visits you (Town, Neutral, or Mafia) dies.",
+    "win_condition": "Reach your kill quota by eliminating players who visit you. (Your quota is sent in your DM when the match starts.)",
+    "action_prompt": "Select a player to redirect:",
     "footer": "I became a devil hunter so I could kill them. That is all.",
     "image_url": "https://c4.wallpaperflare.com/wallpaper/568/867/664/chainsaw-man-kishibe-chainsaw-man-hd-wallpaper-preview.jpg"
   },

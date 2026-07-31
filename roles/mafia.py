@@ -81,13 +81,8 @@ class BlackbeardDarknessLogia(NightAction):
 
         target_player = session.players.get(target_id)
         if target_player:
-            if target_player.role_key == "kishibe" and not target_player.metadata.get("battle_hardened_used"):
-                target_player.metadata["battle_hardened_used"] = True
-                context.payload["log"] = f"Blackbeard attempted to roleblock <@{target_id}> using Darkness Logia, but they resisted!"
-                context.payload["result"] = "Your target resisted your ability."
-            else:
-                target_player.metadata["roleblocked"] = True
-                context.payload["log"] = f"Blackbeard roleblocked <@{target_id}> using Darkness Logia."
+            target_player.metadata["roleblocked"] = True
+            context.payload["log"] = f"Blackbeard roleblocked <@{target_id}> using Darkness Logia."
 
 
 class BlackbeardTremorFruit(NightAction):
@@ -115,23 +110,8 @@ class BlackbeardTremorFruit(NightAction):
         blocked_count = 0
         for pid, pstate in session.players.items():
             if pstate.alive and pstate.faction != RoleFaction.VILLAIN.value:
-                if pstate.role_key == "kishibe" and not pstate.metadata.get("battle_hardened_used"):
-                    pstate.metadata["battle_hardened_used"] = True
-                    import asyncio
-                    async def notify_bb(s=session, bb_id=context.user_id, k_id=pid):
-                        if context.bot:
-                            guild = context.bot.get_guild(s.game_handle.guild_id)
-                            member = guild.get_member(bb_id) if guild else None
-                            if member:
-                                try:
-                                    context.bot.message_queue.send(member, f"{get_emoji('warning')} **Your Tremor Fruit was resisted by <@{k_id}>!**")
-                                except Exception:
-                                    pass
-                    from utils.helpers import safe_create_task
-                    safe_create_task(notify_bb(), "notify_blackbeard_resist")
-                else:
-                    pstate.metadata["roleblocked"] = True
-                    blocked_count += 1
+                pstate.metadata["roleblocked"] = True
+                blocked_count += 1
 
         context.payload["action_type"] = "tremor"
         context.payload["log"] = f"Blackbeard triggered the Tremor Fruit! An earthquake roleblocked {blocked_count} players."
@@ -530,13 +510,8 @@ class LowerMoonDistract(NightAction):
             
         target_player = session.players.get(target_id)
         if target_player:
-            if target_player.role_key == "kishibe" and not target_player.metadata.get("battle_hardened_used"):
-                target_player.metadata["battle_hardened_used"] = True
-                context.payload["log"] = f"Lower Moon Demon attempted to distract <@{target_id}>, but they resisted!"
-                context.payload["result"] = "Your target resisted your ability."
-            else:
-                target_player.metadata["roleblocked"] = True
-                context.payload["log"] = f"Lower Moon Demon distracted <@{target_id}>."
+            target_player.metadata["roleblocked"] = True
+            context.payload["log"] = f"Lower Moon Demon distracted <@{target_id}>."
 
 
 @role_registry.register

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import random
 from typing import ClassVar, Any
 from utils.roles import BaseRole, RoleContext, RoleCategory, role_registry, NightAction, PassiveEffect, WinCondition
@@ -681,3 +682,83 @@ class LelouchLamperouge(BaseRole):
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
         return context.payload.get("result")
+
+
+# --- Kishibe (Neutral) ---
+
+def kishibe_kill_quota(player_count: int) -> int:
+    """Number of passive kills Kishibe needs to win, based on lobby size."""
+    return max(1, math.ceil(player_count / 4))
+
+
+class KishibeGoose(NightAction):
+    def __init__(self) -> None:
+        super().__init__(
+            name="Goose",
+            description=(
+                "Select a player and redirect them to you. If they are visiting someone "
+                "tonight, they are pulled to your door instead and die to your passive. "
+                "(1 use per game)"
+            ),
+            priority=1
+        )
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        if player_state.metadata.get("goose_used"):
+            return False, "Goose has no uses left."
+        return True, None
+
+    def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
+        return [pid for pid, pstate in session.players.items() if pstate.alive and pid != actor_id]
+
+    async def execute(self, context: RoleContext) -> None:
+        session = context.payload.get("session")
+        if not session or not context.target_id:
+            return
+        player_state = session.players.get(context.user_id)
+        if player_state:
+            player_state.metadata["goose_used"] = True
+        # The actual redirect is resolved by the engine before night visits are
+        # collected. Only fill a feedback line if the engine didn't already.
+        if not context.payload.get("result"):
+            context.payload["result"] = (
+                f"🦆 **Goose:** You targeted <@{context.target_id}>. If they visit anyone "
+                f"tonight, they will be pulled to you — and die at your door."
+            )
+
+
+class KishibeWinCondition(WinCondition):
+    def __init__(self) -> None:
+        super().__init__("Reach your kill quota by eliminating players who visit you.")
+
+    def check(self, alive_factions: frozenset[str], context: RoleContext) -> bool:
+        session = context.payload.get("session")
+        if not session:
+            return False
+        player_state = session.players.get(context.user_id)
+        if not player_state or not player_state.alive:
+            return False
+        quota = player_state.metadata.get("kishibe_kill_quota", 0)
+        kills = player_state.metadata.get("kishibe_kills", 0)
+        return bool(quota) and kills >= quota
+
+
+@role_registry.register
+class Kishibe(BaseRole):
+    role_key: ClassVar[str] = "kishibe"
+    priority: ClassVar[int] = 1
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, RoleCategory.KILLING)
+    is_unique: ClassVar[bool] = True
+    cooldown_text: ClassVar[str] = "None"
+    limitations_text: ClassVar[str] = "Goose: 1 use per game."
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.abilities = [KishibeGoose()]
+        self.win_condition_obj = KishibeWinCondition()
+
+    async def on_game_start(self, session: Any, user_id: int) -> None:
+        player_state = session.players.get(user_id)
+        if player_state:
+            player_state.metadata["kishibe_kill_quota"] = kishibe_kill_quota(len(session.players))
+            player_state.metadata["kishibe_kills"] = 0

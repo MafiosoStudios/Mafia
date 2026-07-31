@@ -41,6 +41,7 @@ class PrioritiesView(MafiosoLayoutView):
     @staticmethod
     def build_layout() -> discord.ui.LayoutView:
         ordered_keys = [
+            "kishibe",
             "blackbeard",
             "makima",
             "tosen",
@@ -50,7 +51,6 @@ class PrioritiesView(MafiosoLayoutView):
             "frieren",
             "tobirama_senju",
             "l",
-            "kishibe",
             "ayanokoji_kiyotaka",
             "maomao",
             "levi_ackerman",
