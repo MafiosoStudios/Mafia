@@ -100,8 +100,7 @@ class LeaveLobbyButton(ui.Button):
             bot_name = bot.user.display_name if bot and bot.user else "Mafia Remastered"
             from ui import build_v2_layout
             leave_layout = build_v2_layout(
-                title=bot_name,
-                description=f"{user.display_name} left the party.",
+                description=f"**{bot_name}**\n\n{user.display_name} left the party.",
                 color=discord.Color.from_rgb(231, 76, 60),
             )
             try:
