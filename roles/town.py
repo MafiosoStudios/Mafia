@@ -1091,12 +1091,6 @@ class DazaiNoLongerHuman(NightAction):
 
         target_state = session.players.get(target_id)
         if target_state:
-            # Asta is immune to negative non-physical abilities (like Dazai's nullification)
-            if target_state.role_key == "asta":
-                context.payload["log"] = f"Dazai attempted to nullify <@{target_id}>, but their Anti-Magic resisted it!"
-                context.payload["result"] = "Your target resisted your ability."
-                return
-
             target_state.metadata["nullified"] = True
             context.payload["log"] = f"Dazai nullified <@{target_id}>'s abilities."
             context.payload["result"] = f"✋ **No Longer Human!** You have nullified <@{target_id}>'s abilities tonight."
@@ -1126,7 +1120,7 @@ class OsamuDazai(BaseRole):
     tags = (RoleCategory.UTILITY,)
     is_unique = True
     cooldown_text = "1 Night"
-    limitations_text = "Unpredictable passive: Immune to redirects, control, or forced visits."
+    limitations_text = "None"
 
     def __init__(self) -> None:
         super().__init__()
@@ -1224,7 +1218,7 @@ class Asta(BaseRole):
     tags = (RoleCategory.UTILITY,)
     is_unique = True
     cooldown_text = "Ki Detection: None, Devil Union: Once per game"
-    limitations_text = "Anti-Magic passive: Immune to non-physical negative abilities and redirects."
+    limitations_text = "Ki Detection: None, Devil Union: Once per game"
 
     def __init__(self) -> None:
         super().__init__()

@@ -81,10 +81,7 @@ class BlackbeardDarknessLogia(NightAction):
 
         target_player = session.players.get(target_id)
         if target_player:
-            if target_player.role_key == "asta":
-                context.payload["log"] = f"Blackbeard attempted to roleblock <@{target_id}> using Darkness Logia, but their Anti-Magic resisted it!"
-                context.payload["result"] = "Your target resisted your ability."
-            elif target_player.role_key == "kishibe" and not target_player.metadata.get("battle_hardened_used"):
+            if target_player.role_key == "kishibe" and not target_player.metadata.get("battle_hardened_used"):
                 target_player.metadata["battle_hardened_used"] = True
                 context.payload["log"] = f"Blackbeard attempted to roleblock <@{target_id}> using Darkness Logia, but they resisted!"
                 context.payload["result"] = "Your target resisted your ability."
@@ -118,10 +115,7 @@ class BlackbeardTremorFruit(NightAction):
         blocked_count = 0
         for pid, pstate in session.players.items():
             if pstate.alive and pstate.faction != RoleFaction.VILLAIN.value:
-                if pstate.role_key == "asta":
-                    # Asta is immune to Tremor Fruit roleblock
-                    continue
-                elif pstate.role_key == "kishibe" and not pstate.metadata.get("battle_hardened_used"):
+                if pstate.role_key == "kishibe" and not pstate.metadata.get("battle_hardened_used"):
                     pstate.metadata["battle_hardened_used"] = True
                     import asyncio
                     async def notify_bb(s=session, bb_id=context.user_id, k_id=pid):
@@ -536,10 +530,7 @@ class LowerMoonDistract(NightAction):
             
         target_player = session.players.get(target_id)
         if target_player:
-            if target_player.role_key == "asta":
-                context.payload["log"] = f"Lower Moon Demon attempted to distract <@{target_id}>, but their Anti-Magic resisted it!"
-                context.payload["result"] = "Your target resisted your ability."
-            elif target_player.role_key == "kishibe" and not target_player.metadata.get("battle_hardened_used"):
+            if target_player.role_key == "kishibe" and not target_player.metadata.get("battle_hardened_used"):
                 target_player.metadata["battle_hardened_used"] = True
                 context.payload["log"] = f"Lower Moon Demon attempted to distract <@{target_id}>, but they resisted!"
                 context.payload["result"] = "Your target resisted your ability."

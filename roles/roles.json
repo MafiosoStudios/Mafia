@@ -287,8 +287,7 @@
     "emoji": "✋",
     "description": "A member of the Armed Detective Agency, Dazai possesses the ability to nullify any supernatural power with a single touch. Beneath his eccentric, suicidal exterior lies a mind of unmatched strategic genius.",
     "active_ability": "No Longer Human - Select a player every night, nullify the target's abilities for the night, they cannot use active abilities, their passive is suppressed, and visits are cancelled. The cooldown is 1 night.",
-    "passive_ability": "Unpredictable - Dazai is immune to redirects, control, or forced visits. His chosen action will always proceed.",
-    "win_condition": "Help the protagonists win.",
+    g"win_condition": "Help the protagonists win.",
     "action_prompt": "Select a player to touch with No Longer Human:",
     "footer": "There is no such thing as an ideal in this world.",
     "image_url": "https://images4.alphacoders.com/131/1314582.png"
@@ -299,7 +298,6 @@
     "emoji": "🍀",
     "description": "An orphan who received a five-leaf clover grimoire and wields Anti-Magic swords. Despite having zero mana, his sheer physical strength, determination, and anti-magic make him one of the most formidable magic knights.",
     "active_ability": "Ki Detection — Choose a player every night to randomly learn whether they used an ability, visited someone, or were visited. / Devil Union — Nullify all hostile abilities targeting Town tonight (Once per game).",
-    "passive_ability": "Anti-Magic - Immune to all negative non-physical abilities (Roleblocks, frames, hexes, silences, curses, redirects). Not immune to direct kills or lynching.",
     "win_condition": "Help the protagonists win.",
     "action_prompt": "Select an Anti-Magic sword technique to deploy:",
     "footer": "My magic is never giving up!",

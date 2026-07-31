@@ -2463,10 +2463,6 @@ class GameEngine:
                         makima_payload["control_success"] = False
                         makima_payload["error"] = "Your target resisted your ability."
                         makima_payload["log"] = f"Makima attempted to control <@{controlled_pid}>, but they resisted!"
-                    elif controlled_state.role_key in ("dazai", "asta"):
-                        makima_payload["control_success"] = False
-                        makima_payload["error"] = "Your target resisted your ability."
-                        makima_payload["log"] = f"Makima attempted to control <@{controlled_pid}>, but they resisted!"
                     else:
                         last_controlled = makima_state.metadata.get("last_controlled_player")
                         if last_controlled != controlled_pid:
@@ -2521,8 +2517,6 @@ class GameEngine:
         challenges = session.metadata.get("bloodlust_challenges", {})
         for actor_id, hisoka_id in challenges.items():
             actor_state = session.players.get(actor_id)
-            if actor_state and actor_state.role_key in ("dazai", "asta"):
-                continue  # Dazai and Asta are immune to redirects
             payload = session.night_actions.get(actor_id)
             if payload:
                 if payload.get("target_id") == hisoka_id:
