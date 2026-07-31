@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 
 from views.vote_view import VoteView
-from utils.constants import GameState
+from utils.constants import GameState, GamePhase
 from ui import build_v2_layout, MafiosoLayoutView
 from utils.helpers import send_hybrid_response
 from config import get_emoji

@@ -669,7 +669,7 @@ class GameEngine:
                     role_display = role_meta.get("name", player.role_key or "Unknown")
                     try:
                         death_view = build_v2_layout(
-                            title=f"{get_emoji('death')} welps you're ded",
+                            title=f"{get_emoji('death')} Welps you're dead",
                             description=(
                                 f"How unfortunate.."
                                 f"You may continue spectating, but you can no longer act or vote."
@@ -1571,7 +1571,7 @@ class GameEngine:
                         # separate embeds (they used to be one combined embed).
                         await self._send_death_and_status_embeds(
                             mafia_channel, guild, session,
-                            title=f"Day {day_num} (Match Point)",
+                            title=f"Day {day_num}",
                         )
 
                         session.state = GameState.ENDED
@@ -2372,18 +2372,40 @@ class GameEngine:
                     title=f"THE RUMBLING HAS BEGUN!",
                     description=(
                         f"**\"IF WE DON'T FIGHT, WE CAN'T WIN! TATAKAE!\"**\n\n"
-                        f"**Eren Jaeger** (<@{eren_id}>) has unleashed the Wall Titans upon this world!\n\n"
+                        f"**Eren Jaeger** has unleashed the Wall Titans upon this world!\n\n"
                         f"• Eren Jaeger is **permanently immune to all lynching and voting**!\n"
                         f"•they can now kill every single night until he is the last one standing!"
                     ),
                     color=discord.Color.dark_red(),
-                    image_url="https://media.giphy.com/media/CFA1y0lBkL2XA366RW/giphy.gif"
+                    image_url="https://static0.cbrimages.com/wordpress/wp-content/uploads/2025/07/eren-founding-titan.jpeg?q=70&fit=crop&w=825&dpr=1"
                 )
                 try:
                     await self.bot.message_queue.send(channel, view=rumbling_layout)
                     await asyncio.sleep(2.5)
                 except Exception as err:
                     logger.error(f"Failed to send Rumbling layout: {err}")
+
+        # 3. Check Ayanokoji Public Reveal (RIGHT AFTER death report & BEFORE alive/dead status embed)
+        ayanokoji_reveal = session.metadata.pop("ayanokoji_public_reveal", None)
+        if ayanokoji_reveal:
+            target_id, role_display, faction_display, thumbnail_url = ayanokoji_reveal
+            ayanokoji_view = build_v2_layout(
+                title=f"{get_emoji('ayanokoji')} Mastermind Revelation",
+                description=(
+                    f"**\"I've never thought of you as an ally... all people are nothing but tools.\"**\n\n"
+                    f"looks like ayanokoji found something!\n\n"
+                    f"**Subject:** <@{target_id}>\n"
+                    f"**Exposed Role:** **{role_display}**\n"
+                    f"**True faction:** **{faction_display}**"
+                ),
+                color=discord.Color.purple(),
+                thumbnail_url=thumbnail_url,
+            )
+            try:
+                await self.bot.message_queue.send(channel, view=ayanokoji_view)
+                await asyncio.sleep(2.5)
+            except Exception as err:
+                logger.error(f"Failed to send Ayanokoji reveal layout: {err}")
 
         alive_list = []
         dead_list = []
@@ -2410,28 +2432,6 @@ class GameEngine:
         )
         await self.bot.message_queue.send(channel, view=status_layout)
         await asyncio.sleep(2.5)
-
-        # 3. Check Ayanokoji Public Reveal
-        ayanokoji_reveal = session.metadata.pop("ayanokoji_public_reveal", None)
-        if ayanokoji_reveal:
-            target_id, role_display, faction_display, thumbnail_url = ayanokoji_reveal
-            ayanokoji_view = build_v2_layout(
-                title=f"{get_emoji('ayanokoji')} Ayanokoji Kiyotaka — Mastermind Revelation",
-                description=(
-                    f"**\"I've never thought of you as an ally... all people are nothing but tools.\"**\n\n"
-                    f"looks like ayanokoji found something!\n\n"
-                    f"**Subject:** <@{target_id}>\n"
-                    f"**Exposed Role:** **{role_display}**\n"
-                    f"**True faction:** **{faction_display}**"
-                ),
-                color=discord.Color.purple(),
-                thumbnail_url=thumbnail_url,
-            )
-            try:
-                await self.bot.message_queue.send(channel, view=ayanokoji_view)
-                await asyncio.sleep(2.5)
-            except Exception as err:
-                logger.error(f"Failed to send Ayanokoji reveal layout: {err}")
 
 
     async def _all_active_submitted(self, session: GameSession) -> bool:
