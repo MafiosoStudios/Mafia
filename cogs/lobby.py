@@ -14,7 +14,7 @@ class LobbyCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.hybrid_command(name="lobby", description="View the current lobby status and roster")
+    @commands.hybrid_command(name="lobby", aliases=["party"], description="View the current lobby status and roster")
     @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def lobby(self, ctx: commands.Context) -> None:
         lobby_manager = getattr(self.bot, "lobby_manager", None)
@@ -64,19 +64,47 @@ class LobbyCog(commands.Cog):
             if message is not None:
                 await lobby_manager.bind_lobby_message(guild_id, message)
             if ctx.interaction and not ctx.interaction.response.is_done():
-                await ctx.interaction.response.defer(ephemeral=True)
+                await ctx.interaction.response.defer()
         else:
             # Join existing lobby
             try:
-                _, status_msg = await lobby_manager.join_lobby(
+                lobby_snapshot, status_msg = await lobby_manager.join_lobby(
                     guild_id=guild_id,
                     user_id=ctx.author.id,
                 )
             except Exception as exc:
                 await send_hybrid_response(ctx, str(exc), ephemeral=True)
                 return
+
             if ctx.interaction and not ctx.interaction.response.is_done():
-                await ctx.interaction.response.defer(ephemeral=True)
+                await ctx.interaction.response.defer()
+
+            # Send public join notification card to channel matching the media screenshot
+            if ctx.channel and lobby_snapshot:
+                user = ctx.author
+                user_name = user.display_name
+                title = f"{user_name} has joined the party."
+                party_size = len(lobby_snapshot.players)
+                gamemode = getattr(lobby_snapshot, "gamemode", "classic")
+                description = (
+                    f"🥳 Party Size: **{party_size}**\n"
+                    f"🎲 Current Mode : **{gamemode}**"
+                )
+                avatar_url = user.display_avatar.url if hasattr(user, "display_avatar") else (user.avatar.url if getattr(user, "avatar", None) else None)
+                footer_text = "Current Patch: 1.0.7\nType /party to see who's in the party!"
+
+                from ui import build_v2_layout
+                join_layout = build_v2_layout(
+                    title=title,
+                    description=description,
+                    color=discord.Color.from_rgb(46, 204, 113),
+                    thumbnail_url=avatar_url,
+                    footer_text=footer_text,
+                )
+                try:
+                    await ctx.channel.send(view=join_layout)
+                except Exception:
+                    pass
 
     @commands.hybrid_command(name="leave", aliases=["lobby_leave"], description="Leave the active lobby")
     @commands.cooldown(1, 1.5, commands.BucketType.user)
@@ -85,9 +113,30 @@ class LobbyCog(commands.Cog):
         if lobby_manager is None:
             await send_hybrid_response(ctx, "Lobby system is not ready yet.", ephemeral=True)
             return
-        _, status_msg = await lobby_manager.leave_lobby(guild_id=ctx.guild.id if ctx.guild is not None else 0, user_id=ctx.author.id)
+
+        user = ctx.author
+        guild_id = ctx.guild.id if ctx.guild is not None else 0
+        lobby_snapshot, status_msg = await lobby_manager.leave_lobby(
+            guild_id=guild_id,
+            user_id=user.id,
+        )
+
         if ctx.interaction and not ctx.interaction.response.is_done():
-            await ctx.interaction.response.defer(ephemeral=True)
+            await ctx.interaction.response.defer()
+
+        channel = ctx.channel
+        if channel:
+            bot_name = self.bot.user.display_name if self.bot and self.bot.user else "Mafia Remastered"
+            from ui import build_v2_layout
+            leave_layout = build_v2_layout(
+                title=bot_name,
+                description=f"{user.display_name} left the party.",
+                color=discord.Color.from_rgb(231, 76, 60),
+            )
+            try:
+                await channel.send(view=leave_layout)
+            except Exception:
+                pass
 
     @commands.hybrid_command(name="start", aliases=["lobby_start"], description="Start the game match")
     @commands.cooldown(1, 1.5, commands.BucketType.user)
