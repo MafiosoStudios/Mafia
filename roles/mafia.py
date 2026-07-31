@@ -31,6 +31,7 @@ class AntagonistBaseKill(NightAction):
         kills = session.metadata.setdefault("pending_kills", {})
         kills[target_id] = kills.get(target_id, []) + ["mafia_strike"]
         context.payload["log"] = f"Antagonist attacked <@{target_id}>."
+        context.payload["result"] = f"{get_emoji('antagonist_base_killer')} **Antagonist Attack:** You targeted <@{target_id}> tonight."
 
 
 @role_registry.register
@@ -615,6 +616,7 @@ class FriezaDeathBeam(NightAction):
         kills = session.metadata.setdefault("pending_kills", {})
         kills[target_id] = kills.get(target_id, []) + ["frieza_kill"]
         context.payload["log"] = f"Frieza fired a Death Beam at <@{target_id}>."
+        context.payload["result"] = f"{get_emoji('frieza')} **Death Beam Fired!** You targeted <@{target_id}> with your Death Beam tonight."
 
 
 @role_registry.register

@@ -205,7 +205,7 @@ class BaseRole(ABC):
         return False
 
     async def get_night_feedback(self, context: RoleContext) -> str | None:
-        return None
+        return context.payload.get("result")
 
     def can_act_tonight(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
         return True, None

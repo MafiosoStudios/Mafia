@@ -920,6 +920,7 @@ class TosenBankai(NightAction):
                 prev.metadata.pop("detained", None)
 
         tosen_state.metadata["detained_player_id"] = target_id
+        tosen_state.metadata["detained_night"] = session.metadata.get("night_num", 1)
         prisoner_state = session.players.get(target_id)
         if prisoner_state:
             prisoner_state.metadata["detained"] = True
@@ -947,7 +948,7 @@ class TosenBankai(NightAction):
                         "Kaname Tosen has imprisoned you inside his Bankai tonight.\n"
                         "• You **cannot** perform your night ability.\n"
                         "• You **cannot** be targeted by other players.\n"
-                        "• You **may** privately message Tosen by sending a DM starting with a dot (e.g. `.hello`)."
+                        "• You **may** talk directly with Tosen by replying in this DM."
                     )
                 except Exception:
                     pass
@@ -985,12 +986,12 @@ class TosenExecute(NightAction):
             name="Execute Prisoner",
             description=(
                 "Execute your currently detained prisoner with absolute judgment. "
-                "Vanguard prisoner: they die, you lose execution ability permanently. "
-                "Abyss/Rogues prisoner: they die, you retain remaining executions. "
+                "Can only be used on the night immediately after detaining a player. "
                 "Max 3 executions. Bypasses all protection and death-evasion passives."
             ),
             priority=3
         )
+        self.num_targets = 0
 
     def can_use(self, session, player_state):
         if player_state.metadata.get("lost_execution_ability"):
@@ -998,8 +999,18 @@ class TosenExecute(NightAction):
         execs = player_state.metadata.get("executions_left", 3)
         if execs <= 0:
             return False, "You have no execution charges remaining (max 3 executions)."
-        if not player_state.metadata.get("detained_player_id"):
-            return False, "You have no prisoner currently detained."
+
+        prisoner_id = player_state.metadata.get("detained_player_id")
+        detained_night = player_state.metadata.get("detained_night")
+        current_night = session.metadata.get("night_num", 1)
+
+        if not prisoner_id or detained_night is None or current_night != detained_night + 1:
+            return False, "You can only execute a prisoner on the night immediately after detaining them."
+
+        prisoner_state = session.players.get(prisoner_id)
+        if not prisoner_state or not prisoner_state.alive:
+            return False, "Your prisoner is no longer alive to execute."
+
         return True, None
 
     async def execute(self, context):
@@ -1009,17 +1020,21 @@ class TosenExecute(NightAction):
         tosen_state = session.players.get(context.user_id)
         if not tosen_state:
             return
+
         prisoner_id = tosen_state.metadata.get("detained_player_id")
         if not prisoner_id:
             context.payload["error"] = "No prisoner to execute."
             return
+
         prisoner_state = session.players.get(prisoner_id)
         if not prisoner_state or not prisoner_state.alive:
             tosen_state.metadata["detained_player_id"] = None
             context.payload["error"] = "Your prisoner is already dead."
             return
+
         kills = session.metadata.setdefault("pending_kills", {})
         kills[prisoner_id] = kills.get(prisoner_id, []) + ["tosen_kill"]
+        tosen_state.metadata["detained_player_id"] = None
         context.payload["log"] = f"Tosen delivered absolute judgment upon <@{prisoner_id}>."
         context.payload["result"] = f"🌑 **Judgment Delivered.** You have executed <@{prisoner_id}>."
 

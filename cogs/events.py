@@ -81,29 +81,9 @@ class EventsCog(commands.Cog):
             return
 
         # Check Tōsen Bankai communication
-        if player_state.alive and message.content.startswith("."):
-            content_without_dot = message.content[1:].strip()
-            
-            # Case 1: Tōsen sending to Prisoner
-            if player_state.role_key == "tosen":
-                prisoner_id = player_state.metadata.get("detained_player_id")
-                if prisoner_id:
-                    guild = self.bot.get_guild(target_session.game_handle.guild_id)
-                    prisoner_mem = guild.get_member(prisoner_id) if guild else None
-                    if prisoner_mem:
-                        try:
-                            self.bot.message_queue.send(prisoner_mem, f"🌑 **[Bankai Chat] Tōsen**: {content_without_dot}")
-                            await message.channel.send(f"🌑 **[Bankai Chat] To Prisoner**: {content_without_dot}")
-                        except Exception:
-                            pass
-                    else:
-                        await message.channel.send(f"{get_emoji('cross')} Could not send message: Prisoner is not in the server.")
-                else:
-                    await message.channel.send(f"{get_emoji('cross')} You do not have any prisoner detained tonight.")
-                return
-            
-            # Case 2: Prisoner sending to Tōsen
-            elif player_state.metadata.get("detained"):
+        if player_state.alive:
+            # Case 1: Prisoner sending DM -> auto-relays to Tōsen
+            if player_state.metadata.get("detained"):
                 tosen_id = None
                 for pid, ps in target_session.players.items():
                     if ps.role_key == "tosen" and ps.alive:
@@ -114,8 +94,8 @@ class EventsCog(commands.Cog):
                     tosen_mem = guild.get_member(tosen_id) if guild else None
                     if tosen_mem:
                         try:
-                            self.bot.message_queue.send(tosen_mem, f"🌑 **[Bankai Chat] Prisoner**: {content_without_dot}")
-                            await message.channel.send(f"🌑 **[Bankai Chat] To Tōsen**: {content_without_dot}")
+                            self.bot.message_queue.send(tosen_mem, f"🌑 **[Bankai Chat] Prisoner**: {message.content}")
+                            await message.channel.send(f"🌑 **[Bankai Chat] To Tōsen**: {message.content}")
                         except Exception:
                             pass
                     else:
@@ -124,13 +104,25 @@ class EventsCog(commands.Cog):
                     await message.channel.send(f"{get_emoji('cross')} Tōsen is not active or dead.")
                 return
 
-        # If a detained player tries to send a DM without a dot:
-        if player_state.metadata.get("detained"):
-            await message.channel.send(
-                f"{get_emoji('cross')} **You are detained inside Tōsen's Bankai!**\n"
-                f"You cannot send messages to Mafia Chat while detained. Prefix your message with '.' to talk to Tōsen."
-            )
-            return
+            # Case 2: Tōsen sending DM -> auto-relays to Prisoner if one is detained
+            elif player_state.role_key == "tosen":
+                prisoner_id = player_state.metadata.get("detained_player_id")
+                if prisoner_id or message.content.startswith("."):
+                    content_to_send = message.content[1:].strip() if message.content.startswith(".") else message.content.strip()
+                    if prisoner_id:
+                        guild = self.bot.get_guild(target_session.game_handle.guild_id)
+                        prisoner_mem = guild.get_member(prisoner_id) if guild else None
+                        if prisoner_mem:
+                            try:
+                                self.bot.message_queue.send(prisoner_mem, f"🌑 **[Bankai Chat] Tōsen**: {content_to_send}")
+                                await message.channel.send(f"🌑 **[Bankai Chat] To Prisoner**: {content_to_send}")
+                            except Exception:
+                                pass
+                        else:
+                            await message.channel.send(f"{get_emoji('cross')} Could not send message: Prisoner is not in the server.")
+                    else:
+                        await message.channel.send(f"{get_emoji('cross')} You do not have any prisoner detained tonight.")
+                    return
 
         # Fallback to Mafia Chat if they belong to Villain faction
         if player_state.faction not in ("Villain", RoleFaction.VILLAIN.value):

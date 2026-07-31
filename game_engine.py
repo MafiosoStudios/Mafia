@@ -2598,17 +2598,66 @@ class GameEngine:
         action_list.sort(key=lambda x: x[0])
 
         # Execute actions in priority order
+        from views.game_ui import build_v2_layout
+        import discord
+
         for priority, actor_id, payload, role_inst in action_list:
             # Check if actor got roleblocked or detained during the resolution
             actor_state = session.players.get(actor_id)
             is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
             if is_blocked:
+                async def notify_rb(s=session, a_id=actor_id, bot=self.bot):
+                    if bot:
+                        guild = bot.get_guild(s.game_handle.guild_id)
+                        member = guild.get_member(a_id) if guild else None
+                        if member:
+                            try:
+                                embed_msg = build_v2_layout(
+                                    title="🚫 Action Interrupted!",
+                                    description="**You were distracted / roleblocked tonight!**\nYour ability was blocked and could not be performed.",
+                                    color=discord.Color.dark_red()
+                                )
+                                bot.message_queue.send(member, view=embed_msg)
+                            except Exception:
+                                pass
+                self._track_task(f"notify_rb_{session.game_handle.game_id}_{actor_id}", notify_rb())
                 continue
+
             if actor_state.metadata.get("detained"):
+                async def notify_detained(s=session, a_id=actor_id, bot=self.bot):
+                    if bot:
+                        guild = bot.get_guild(s.game_handle.guild_id)
+                        member = guild.get_member(a_id) if guild else None
+                        if member:
+                            try:
+                                embed_msg = build_v2_layout(
+                                    title="🌑 Imprisoned in Bankai!",
+                                    description="**You are detained inside Kaname Tosen's Bankai (Enma Korogi)!**\nYour action could not be performed tonight.",
+                                    color=discord.Color.dark_purple()
+                                )
+                                bot.message_queue.send(member, view=embed_msg)
+                            except Exception:
+                                pass
+                self._track_task(f"notify_detained_{session.game_handle.game_id}_{actor_id}", notify_detained())
                 continue
 
             # Dazai No Longer Human nullification
             if actor_state.metadata.get("nullified"):
+                async def notify_nullified(s=session, a_id=actor_id, bot=self.bot):
+                    if bot:
+                        guild = bot.get_guild(s.game_handle.guild_id)
+                        member = guild.get_member(a_id) if guild else None
+                        if member:
+                            try:
+                                embed_msg = build_v2_layout(
+                                    title="🚫 Ability Nullified!",
+                                    description="**Your ability was nullified tonight by Dazai's No Longer Human!**\nYour action failed to execute.",
+                                    color=discord.Color.dark_red()
+                                )
+                                bot.message_queue.send(member, view=embed_msg)
+                            except Exception:
+                                pass
+                self._track_task(f"notify_nullified_{session.game_handle.game_id}_{actor_id}", notify_nullified())
                 continue
 
             # Asta Devil Union nullification
@@ -2627,14 +2676,18 @@ class GameEngine:
                             if t_st and t_st.faction == RoleFaction.HERO.value:
                                 targets_town = True
                     if targets_town:
-                        import asyncio
                         async def notify_union(s=session, a_id=actor_id, bot=self.bot):
                             if bot:
                                 guild = bot.get_guild(s.game_handle.guild_id)
                                 member = guild.get_member(a_id) if guild else None
                                 if member:
                                     try:
-                                        bot.message_queue.send(member, f"{get_emoji('cross')} **Your action failed due to Asta's Devil Union!**")
+                                        embed_msg = build_v2_layout(
+                                            title="😈 Action Failed!",
+                                            description="**Your action failed tonight due to Asta's Devil Union!**\nAll hostile actions targeting Town players were nullified.",
+                                            color=discord.Color.purple()
+                                        )
+                                        bot.message_queue.send(member, view=embed_msg)
                                     except Exception:
                                         pass
                         self._track_task(f"notify_asta_union_{session.game_handle.game_id}", notify_union())
@@ -2660,7 +2713,12 @@ class GameEngine:
                             member = guild.get_member(a_id) if guild else None
                             if member:
                                 try:
-                                    bot.message_queue.send(member, f"{get_emoji('warning')} **Your action failed tonight because your target was blinded by a Flashbang!**")
+                                    embed_msg = build_v2_layout(
+                                        title="💥 Flashbang Blindness!",
+                                        description="**Your action failed tonight because your target was blinded by Kishibe's Flashbang!**",
+                                        color=discord.Color.gold()
+                                    )
+                                    bot.message_queue.send(member, view=embed_msg)
                                 except Exception:
                                     pass
                     self._track_task(f"notify_flashbang_{session.game_handle.game_id}_{actor_id}", notify_flashbang())
@@ -2673,6 +2731,22 @@ class GameEngine:
                     t_st = session.players.get(t_id)
                     if t_st and t_st.metadata.get("invisible"):
                         payload["error"] = "Your target was invisible tonight."
+                        async def notify_invisible(s=session, a_id=actor_id, bot=self.bot):
+                            if bot:
+                                guild = bot.get_guild(s.game_handle.guild_id)
+                                member = guild.get_member(a_id) if guild else None
+                                if member:
+                                    try:
+                                        embed_msg = build_v2_layout(
+                                            title="👻 Target Invisible!",
+                                            description="**Your action failed tonight because your target was completely invisible!**",
+                                            color=discord.Color.blue()
+                                        )
+                                        bot.message_queue.send(member, view=embed_msg)
+                                    except Exception:
+                                        pass
+                        self._track_task(f"notify_invisible_{session.game_handle.game_id}_{actor_id}", notify_invisible())
+                        continue
                         payload["log"] = f"{actor_state.character_name} attempted to target <@{t_id}>, but they were invisible."
                         if self.bot:
                             g = self.bot.get_guild(session.game_handle.guild_id)
@@ -3375,9 +3449,6 @@ class GameEngine:
                 bot=self.bot
             )
             try:
-                # If the feedback was already sent as an embed in the resolution phase, skip it here
-                if "result" in payload:
-                    continue
                 feedback = await role_inst.get_night_feedback(context)
                 if feedback:
                     self.bot.message_queue.send(member, feedback)
