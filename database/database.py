@@ -50,13 +50,17 @@ class DatabaseManager:
             )
         db_name = os.getenv("MONGODB_DB_NAME", "anime_mafia")
 
-        # Configure connection pool for production workload
+        # Configure connection pool for production workload & container networking
         self._client = AsyncIOMotorClient(
             uri,
             maxPoolSize=50,
-            minPoolSize=10,
-            serverSelectionTimeoutMS=5000,
-            connectTimeoutMS=10000,
+            minPoolSize=0,
+            maxIdleTimeMS=45000,
+            socketTimeoutMS=30000,
+            connectTimeoutMS=30000,
+            serverSelectionTimeoutMS=30000,
+            retryWrites=True,
+            retryReads=True,
         )
         self._db = self._client[db_name]
         self._global_db = self._client[f"{db_name}_global"]
