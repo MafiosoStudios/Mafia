@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 
 from config import get_emoji
+from roles.base_role import RoleFaction
 
 logger = logging.getLogger(__name__)
 

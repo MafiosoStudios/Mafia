@@ -3259,7 +3259,7 @@ class GameEngine:
                                         eng.bot.message_queue.send(m, f"{get_emoji('warning')} **Judicial Penalty!** You executed a fellow **Vanguard** member. You have permanently lost the ability to execute players.")
                                     except Exception:
                                         pass
-                            self._track_task(f"notify_tosen_penalty_{game_id}", _notify_tosen_penalty())
+                            self._track_task(f"notify_tosen_penalty_{session.game_handle.game_id}", _notify_tosen_penalty())
                         else:
                             execs = tosen_state.metadata.setdefault("executions_left", 3)
                             tosen_state.metadata["executions_left"] = max(0, execs - 1)
@@ -3271,7 +3271,7 @@ class GameEngine:
                                         eng.bot.message_queue.send(m, f"**Execution Complete.** Executions remaining: **{ex}/3**.")
                                     except Exception:
                                         pass
-                            self._track_task(f"notify_tosen_exec_{game_id}", _notify_tosen_exec())
+                            self._track_task(f"notify_tosen_exec_{session.game_handle.game_id}", _notify_tosen_exec())
                         break
 
         # Check Levi's Survivor's Guilt
