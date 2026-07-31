@@ -121,20 +121,21 @@ class LobbyCog(commands.Cog):
             user_id=user.id,
         )
 
-        if ctx.interaction and not ctx.interaction.response.is_done():
-            await ctx.interaction.response.defer()
+        from ui import build_v2_layout
+        leave_layout = build_v2_layout(
+            description=f"{user.display_name} left the party.",
+            color=discord.Color.from_rgb(231, 76, 60),
+        )
 
-        channel = ctx.channel
-        if channel:
-            from ui import build_v2_layout
-            leave_layout = build_v2_layout(
-                description=f"{user.display_name} left the party.",
-                color=discord.Color.from_rgb(231, 76, 60),
-            )
-            try:
-                await channel.send(view=leave_layout)
-            except Exception:
-                pass
+        try:
+            if ctx.interaction and not ctx.interaction.response.is_done():
+                await ctx.interaction.response.send_message(view=leave_layout)
+            elif ctx.interaction:
+                await ctx.interaction.edit_original_response(view=leave_layout)
+            else:
+                await ctx.channel.send(view=leave_layout)
+        except Exception:
+            pass
 
     @commands.hybrid_command(name="start", aliases=["lobby_start"], description="Start the game match")
     @commands.cooldown(1, 1.5, commands.BucketType.user)
