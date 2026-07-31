@@ -1512,7 +1512,7 @@ class GameEngine:
                     try:
                         await self.bot.message_queue.send(
                             mafia_channel,
-                            view=build_v2_layout(description=f"Dawn breaks over the town... The night has come to an end. Everybody get in here.**", footer_text="")
+                            view=build_v2_layout(description=f"**Dawn breaks over the town... The night has come to an end. Everybody get in here!**", footer_text="")
                         )
                     except Exception:
                         pass

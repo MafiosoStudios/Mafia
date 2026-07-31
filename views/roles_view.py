@@ -44,7 +44,7 @@ _FACTION_META = {
     },
     FACTION_ANTAGONIST: {
         "label"       : "Antagonists",
-        "emoji"       : get_emoji("skull"),
+        "emoji"       : get_emoji("Antagonist") or "👹",
         "color"       : COLOR_MAFIA,
         "aliases"     : _MAFIA_ALIASES,
         "dropdown_ph" : "Select an Antagonist…",
