@@ -287,7 +287,7 @@
     "emoji": "✋",
     "description": "A member of the Armed Detective Agency, Dazai possesses the ability to nullify any supernatural power with a single touch. Beneath his eccentric, suicidal exterior lies a mind of unmatched strategic genius.",
     "active_ability": "No Longer Human - Select a player every night, nullify the target's abilities for the night, they cannot use active abilities, their passive is suppressed, and visits are cancelled. The cooldown is 1 night.",
-    g"win_condition": "Help the protagonists win.",
+    "win_condition": "Help the protagonists win.",
     "action_prompt": "Select a player to touch with No Longer Human:",
     "footer": "There is no such thing as an ideal in this world.",
     "image_url": "https://images4.alphacoders.com/131/1314582.png"
