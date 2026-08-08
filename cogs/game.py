@@ -341,7 +341,19 @@ class GameCog(commands.Cog):
         from views.priorities_view import PrioritiesView
         view = PrioritiesView.build_layout()
         await send_hybrid_response(ctx, view=view, ephemeral=False)
-
+    @commands.hybrid_command(name="donate", aliases=["support"], description="Support Mafioso's development")
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def donate(self, ctx: commands.Context) -> None:
+        donate_layout = build_v2_layout(
+            description=(
+                f"{get_emoji('crown')} **Support Mafioso**\n\n"
+                "If you enjoy playing Mafioso, consider buying us a coffee! "
+                "Every bit helps keep the bot running and fuels new updates.\n\n"
+                "☕ **[Buy Me a Coffee](https://buymeacoffee.com/xhazybruh)**"
+            ),
+            color=discord.Color.from_rgb(255, 199, 44),
+        )
+        await send_hybrid_response(ctx, view=donate_layout, ephemeral=False)
 
 
 async def setup(bot: commands.Bot) -> None:

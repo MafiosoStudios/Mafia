@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 import asyncio
 import logging
 from config import get_emoji
-from utils.constants import GamePhase, GameState, RoleFaction
+from utils.constants import GamePhase, RoleFaction
 from ui.base import MafiosoLayoutView
 from ui.theme import heading, small_footer
 from ui import build_v2_layout
@@ -1277,11 +1277,10 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         target_faction = target_player.faction if target_player else None
         
         mafia_channel = interaction.channel
-        declaration_view = build_v2_layout(
-            description=f"{get_emoji('court')} **Hiromi Higuruma has declared Deadly Sentencing on <@{target_id}>!**",
-            color=discord.Color.from_rgb(231, 76, 60),
+        await self.engine.bot.message_queue.send(
+            mafia_channel,
+            f"{get_emoji('court')} **Hiromi Higuruma has declared Deadly Sentencing on <@{target_id}>!**\n"
         )
-        await self.engine.bot.message_queue.send(mafia_channel, view=declaration_view)
 
         await asyncio.sleep(3)
 
@@ -1317,6 +1316,19 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         await self.engine.bot.message_queue.send(mafia_channel, sentencing_gif)
         await asyncio.sleep(8)
 
+        faction_display = "Town (Hero)"
+        if target_faction == RoleFaction.VILLAIN.value:
+            faction_display = "Mafia (Villain)"
+        elif target_faction == "Neutral":
+            faction_display = "Neutral"
+
+        await self.engine.bot.message_queue.send(
+            mafia_channel,
+            f"The defendant <@{target_id}> was aligned with the **{faction_display}** faction!"
+        )
+
+        await asyncio.sleep(3)
+
         target_state = target_player or session.players.get(target_id)
 
         # Get target name for messaging
@@ -1327,29 +1339,18 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
         except Exception:
             target_name = f"User {target_id}"
 
-        # Get target role display name
-        import roles as roles_module
-        role_meta = roles_module.ROLES_METADATA.get(target_state.role_key or "", {}) if target_state else {}
-        role_display_name = role_meta.get("name", target_state.role_key or "Unknown") if target_state else "Unknown"
-        role_emoji = get_emoji(target_state.role_key) if target_state and target_state.role_key else ""
-        role_prefix = f"{role_emoji} " if role_emoji else ""
-
-        # --- Immunity checks (Makima / Eren) ---
         if target_state and target_state.role_key == "makima" and not target_state.metadata.get("pm_contract_activated"):
             target_state.metadata["pm_contract_activated"] = True
-            makima_view = build_v2_layout(
-                description=(
-                    f"<@{target_id}>'s role was {role_prefix}**{role_display_name}**\n\n"
-                    f"{get_emoji('trial')} **Prime Minister's Contract Triggered!** An invisible force prevented Makima's execution!"
-                ),
-                color=discord.Color.from_rgb(231, 76, 60),
+            await self.engine.bot.message_queue.send(
+                mafia_channel,
+                f"{get_emoji('trial')} **Prime Minister's Contract Triggered!** An invisible force prevented Makima's execution!"
             )
-            await self.engine.bot.message_queue.send(mafia_channel, view=makima_view)
             async with self.engine._lock:
                 session.metadata["deadly_sentencing_active"] = False
             await _safe_respond_or_edit(interaction, description="Deadly Sentencing failed — Makima's Prime Minister's Contract protected her.")
             return
 
+        # Eren Jaeger Rumbling immunity — completely immune to all voting/execution
         if target_state and target_state.role_key == "eren_jaeger" and session.metadata.get("rumbling_active"):
             eren_immune_view = build_v2_layout(
                 title="THE RUMBLING — Unstoppable!",
@@ -1367,19 +1368,14 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
             await _safe_respond_or_edit(interaction, description="Deadly Sentencing failed — Eren Jaeger's Rumbling makes him immune.")
             return
 
-        # --- Embed 1: Role reveal ---
-        role_reveal_view = build_v2_layout(
-            description=f"<@{target_id}>'s role was {role_prefix}**{role_display_name}**",
-            color=discord.Color.from_rgb(231, 76, 60),
-        )
-        await self.engine.bot.message_queue.send(mafia_channel, view=role_reveal_view)
-
         await self.engine.eliminate_player(self.game_id, target_id, "deadly_sentencing")
+        await self.engine.bot.message_queue.send(
+            mafia_channel,
+            f"Defendant <@{target_id}> was immediately executed under the Prosecutor's absolute authority!"
+        )
 
-        # Lelouch Zero Requiem check
         if target_state and target_state.role_key == "lelouch":
             target_state.metadata["lelouch_lynched"] = True
-            await asyncio.sleep(3)
             zero_requiem_layout = build_v2_layout(
                 title=f"{get_emoji('crown')} Zero Requiem Activated!",
                 description=(
@@ -1389,28 +1385,20 @@ class HiromiDeadlySentencingSelect(discord.ui.Select):
                 ),
                 color=discord.Color.purple(),
             )
-            await self.engine.bot.message_queue.send(mafia_channel, view=zero_requiem_layout)
+            await self.engine.bot.message_queue.send(
+                mafia_channel,
+                view=zero_requiem_layout
+            )
             session.state = GameState.ENDED
             session.winner_faction = "Lelouch Lamperouge"
 
-        # --- Embed 2: Wrongful Judgment (Town target) ---
         if target_faction == RoleFaction.HERO.value:
             await asyncio.sleep(3)
             await self.engine.eliminate_player(self.game_id, interaction.user.id, "wrongful_judgment")
-            # Get Higuruma's display name
-            try:
-                higuruma_member = guild.get_member(interaction.user.id) if guild else None
-                higuruma_name = higuruma_member.display_name if higuruma_member else f"User {interaction.user.id}"
-            except Exception:
-                higuruma_name = f"User {interaction.user.id}"
-            wrongful_view = build_v2_layout(
-                description=(
-                    f"{get_emoji('warning')} **Wrongful Judgment!** Hiromi Higuruma ({higuruma_name}) "
-                    f"executed a fellow **Town** member and was executed by the Hangman!"
-                ),
-                color=discord.Color.from_rgb(231, 76, 60),
+            await self.engine.bot.message_queue.send(
+                mafia_channel,
+                f"{get_emoji('warning')} **Wrongful Judgment!** Hiromi Higuruma executed a fellow **Town** member and was executed by the Hangman!"
             )
-            await self.engine.bot.message_queue.send(mafia_channel, view=wrongful_view)
 
         async with self.engine._lock:
             session.metadata["deadly_sentencing_active"] = False
