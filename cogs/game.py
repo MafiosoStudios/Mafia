@@ -165,48 +165,49 @@ class GameCog(commands.Cog):
         await send_hybrid_response(ctx, view=updated_card, ephemeral=True)
 
 
-    @commands.command(name="rebellion", aliases=["rebel"])
+    @commands.hybrid_command(name="rebellion", aliases=["rebel"], description="Command the Black Knights to trigger a rebellion during discussion (Lelouch only)")
     @commands.cooldown(1, 1.5, commands.BucketType.user)
     async def rebellion(self, ctx: commands.Context) -> None:
         """Cause a rebellion in the entire lobby, ending the discussion phase immediately. (Lelouch Lamperouge, Once per game)"""
         game_manager = getattr(self.bot, "game_manager", None)
         game_engine = getattr(self.bot, "game_engine", None)
         if not game_manager or not game_engine:
-            await ctx.send("Game manager is not ready.")
+            await send_hybrid_response(ctx, "Game manager is not ready.", ephemeral=True)
             return
 
         active = await game_manager.get_game_by_guild(ctx.guild.id if ctx.guild is not None else 0)
         if not active:
-            await ctx.send("No active game in this server.")
+            await send_hybrid_response(ctx, "No active game in this server.", ephemeral=True)
             return
 
         session = await game_engine.get_session(active.game_id)
         if not session:
-            await ctx.send("No active game session.")
+            await send_hybrid_response(ctx, "No active game session.", ephemeral=True)
             return
 
         player_state = session.players.get(ctx.author.id)
         if not player_state or not player_state.alive:
-            await ctx.send("Only living players in this game can use this command.")
+            await send_hybrid_response(ctx, "Only living players in this game can use this command.", ephemeral=True)
             return
 
         if player_state.role_key != "lelouch":
-            await ctx.send("Only Lelouch Lamperouge can command the Black Knights!")
+            await send_hybrid_response(ctx, "Only Lelouch Lamperouge can command the Black Knights!", ephemeral=True)
             return
 
         if player_state.metadata.get("rebellion_used"):
-            await ctx.send("You have already used your Rebellion once this game.")
+            await send_hybrid_response(ctx, "You have already used your Rebellion once this game.", ephemeral=True)
             return
 
         if session.phase != GamePhase.DISCUSSION:
-            await ctx.send("You can only cause a Rebellion during the Discussion Phase.")
+            await send_hybrid_response(ctx, "You can only cause a Rebellion during the Discussion Phase.", ephemeral=True)
             return
 
         # Mark as used and trigger rebellion
         player_state.metadata["rebellion_used"] = True
         session.metadata["rebellion_triggered"] = True
         
-        await ctx.send(
+        await send_hybrid_response(
+            ctx,
             f"{get_emoji('crown')} **Lelouch Lamperouge has commanded the Black Knights!**\n"
             f"📢 *'I, Lelouch vi Britannia, command you: REBEL!'*\n"
             f"{get_emoji('fire')} **The discussion phase is cut short. Skipped directly to the Nomination Phase!**"

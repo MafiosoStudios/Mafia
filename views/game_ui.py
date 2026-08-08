@@ -542,6 +542,9 @@ class NightAbilityButtonsView(MafiosoLayoutView):
             elif ability.name == "Emergency Surgery":
                 select = TenmaEmergencySurgerySelect(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
+            elif ability.name == "Bungee Gum":
+                select = HisokaBungeeSelect(self.game_id, self.engine, options)
+                view.add_item(select)
             elif ability.num_targets == 2:
                 select = TwoTargetSelectStep1(self.game_id, self.engine, ability, idx, options)
                 view.add_item(select)
@@ -1131,6 +1134,7 @@ class HisokaBungeeLinkSelect(discord.ui.Select):
                 pass
         target2 = int(self.values[0])
         payload = {
+            "action_index": 0,
             "target_id": self.target1,
             "controlled_vote_target": target2
         }
@@ -1149,13 +1153,19 @@ class VoteUISelectView(MafiosoLayoutView):
     @discord.ui.button(label="Cast Vote", style=discord.ButtonStyle.primary, custom_id="mafia_cast_vote_button")
     async def cast_vote(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         async def _reply(target_inter: discord.Interaction, content: str = "", view: Any = None) -> None:
+            kwargs: dict[str, Any] = {"ephemeral": True}
+            if content:
+                kwargs["content"] = content
+            if view is not None:
+                kwargs["view"] = view
+
             if not target_inter.response.is_done():
                 try:
-                    await target_inter.response.send_message(content, view=view, ephemeral=True)
+                    await target_inter.response.send_message(**kwargs)
                 except Exception:
-                    await target_inter.followup.send(content, view=view, ephemeral=True)
+                    await target_inter.followup.send(**kwargs)
             else:
-                await target_inter.followup.send(content, view=view, ephemeral=True)
+                await target_inter.followup.send(**kwargs)
 
         session = await self.engine.get_session(self.game_id)
         if not session:

@@ -118,9 +118,9 @@ class BlackbeardTremorFruit(NightAction):
 
         # Send epic public dialogue warning to match channel!
         mafia_ch_id = session.metadata.get("mafia_channel_id")
-        if mafia_ch_id:
+        if mafia_ch_id and context.bot:
             ch = context.bot.get_channel(mafia_ch_id)
-            if ch:
+            if ch and getattr(context.bot, "message_queue", None):
                 dialogue = (
                     "🌋 **ZEHAHAHAHA! THE EARTHQUAKE IS SHAKING THE LOBBY!**\n"
                     "**\"From now on, this is my era!\"**\n"

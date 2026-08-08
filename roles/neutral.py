@@ -45,7 +45,11 @@ class HisokaBungee(NightAction):
             return
             
         target1 = context.target_id
-        target2 = context.payload.get("controlled_vote_target")
+        target2 = (
+            context.payload.get("controlled_vote_target")
+            or context.payload.get("redirect_target")
+            or (context.payload.get("targets")[1] if context.payload.get("targets") and len(context.payload.get("targets")) > 1 else None)
+        )
         if not target1 or not target2:
             return
 
@@ -134,7 +138,7 @@ class HisokaTextureSurprise(NightAction):
 
         target_player = session.players.get(context.target_id)
         if target_player:
-            if target_player.role_key == "ayanokoji_kiyotaka":
+            if target_player.role_key == "ayanokoji":
                 context.payload["log"] = "Hisoka attempted to disguise Ayanokoji, but Ayanokoji's Unreadable passive resisted it."
                 return
             disg_faction = context.payload.get("disguised_faction", "Hero")
@@ -194,7 +198,11 @@ class Hisoka(BaseRole):
         action_idx = context.payload.get("action_index", 0)
         
         if action_idx == 0:
-            target2 = context.payload.get("controlled_vote_target")
+            target2 = (
+                context.payload.get("controlled_vote_target")
+                or context.payload.get("redirect_target")
+                or (context.payload.get("targets")[1] if context.payload.get("targets") and len(context.payload.get("targets")) > 1 else None)
+            )
             if target_id and target2:
                 return f"{get_emoji('hisoka')} **Bungee Gum:** Linked <@{target_id}> and <@{target2}> successfully!"
         elif action_idx == 1:
@@ -239,6 +247,11 @@ class GilgameshGate(NightAction):
             description="Visit a player to search for your sword.",
             priority=19
         )
+
+    def can_use(self, session: Any, player_state: Any) -> tuple[bool, str | None]:
+        if player_state.metadata.get("transformed"):
+            return False, "Searching is disabled — you have already transformed!"
+        return True, None
 
     def get_eligible_targets(self, session: Any, actor_id: int) -> list[int]:
         return [pid for pid in session.players.keys() if pid != actor_id]
@@ -320,12 +333,10 @@ class ErenWinCondition(WinCondition):
         if not player_state:
             return False
             
-        current_night = session.metadata.get("night_num", 1)
-        if session.metadata.get("rumbling_active") or current_night >= 5:
-            alive_players = [pid for pid, pstate in session.players.items() if pstate.alive]
-            if len(alive_players) == 1 and alive_players[0] == context.user_id:
-                player_state.metadata["rumbling_win"] = True
-                return True
+        alive_players = [pid for pid, pstate in session.players.items() if pstate.alive]
+        if len(alive_players) == 1 and alive_players[0] == context.user_id:
+            player_state.metadata["rumbling_win"] = True
+            return True
         return False
 
 
@@ -530,7 +541,8 @@ class Mahoraga(BaseRole):
     role_key: ClassVar[str] = "mahoraga"
     priority: ClassVar[int] = 99
     tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, "survival")
-    is_unique: ClassVar[bool] = False
+    is_unique: ClassVar[bool] = True
+    is_hostile_neutral: ClassVar[bool] = True
     cooldown_text: ClassVar[str] = "None — Adaptation can be used every night until all 3 factions are adapted"
     limitations_text: ClassVar[str] = "Cannot target a faction already adapted to."
 
@@ -655,7 +667,7 @@ class LelouchGeass(NightAction):
 class LelouchLamperouge(BaseRole):
     role_key: ClassVar[str] = "lelouch"
     priority: ClassVar[int] = 99
-    tags: ClassVar[tuple[str, ...]] = (RoleCategory.UTILITY,)
+    tags: ClassVar[tuple[str, ...]] = (RoleCategory.NEUTRAL, RoleCategory.UTILITY)
     cooldown_text: ClassVar[str] = "Geass: 1 Night, Black Knight: Once per game"
     limitations_text: ClassVar[str] = "None"
 

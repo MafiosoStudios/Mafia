@@ -802,7 +802,7 @@ class GameEngine:
                 p1_id, p2_id = bond
                 p1_state = session.players.get(p1_id)
                 p2_state = session.players.get(p2_id)
-                if p1_state and p2_state:
+                if p1_state and p2_state and p1_state.alive and p2_state.alive:
                     def player_wins_base(p_state):
                         if winner_faction == "Draw":
                             return False
@@ -1111,7 +1111,8 @@ class GameEngine:
                 game_id=session.game_handle.game_id,
                 guild_id=session.game_handle.guild_id,
                 user_id=p.user_id,
-                payload={"session": session}
+                payload={"session": session},
+                bot=self.bot
             )
             # Check if this role satisfied its win condition
             if role_inst.win_condition_met(alive_factions, context):
@@ -1144,7 +1145,7 @@ class GameEngine:
             hostile_neutrals = [
                 p for p in alive_players
                 if p.faction == RoleFaction.NEUTRAL.value
-                and p.role_key in ["eren_jaeger", "gilgamesh"]
+                and p.role_key in ["eren_jaeger", "gilgamesh", "mahoraga"]
                 and not p.metadata.get("has_won")
             ]
             if not hostile_neutrals:
@@ -1154,14 +1155,18 @@ class GameEngine:
         mafia_count = sum(1 for p in alive_players if p.faction == RoleFaction.VILLAIN.value)
         non_mafia_count = len(alive_players) - mafia_count
         if mafia_count > 0 and mafia_count >= non_mafia_count:
-            # Check if Eren with Rumbling active can still stop them
-            eren_threat = any(
-                p.role_key == "eren_jaeger"
-                and session.metadata.get("night_num", 1) >= 9
-                and p.alive
-                for p in alive_players
-            )
-            if not eren_threat:
+            # Check if any active neutral threat can stop them (Eren on N5+/Rumbling, Gilgamesh, Mahoraga)
+            def is_active_neutral_threat(p: GamePlayerState) -> bool:
+                if not p.alive or p.metadata.get("has_won"):
+                    return False
+                if p.role_key == "eren_jaeger":
+                    return bool(session.metadata.get("rumbling_active") or session.metadata.get("night_num", 1) >= 5)
+                if p.role_key in ["gilgamesh", "mahoraga"]:
+                    return True
+                return False
+
+            neutral_threat = any(is_active_neutral_threat(p) for p in alive_players)
+            if not neutral_threat:
                 return RoleFaction.VILLAIN.value
 
         return None
@@ -2046,7 +2051,7 @@ class GameEngine:
                             if guilty_count > inno_count:
                                 # Perform lynch
                                 def_state = session.players[target_id]
-                                if def_state.metadata.get("lynch_immune_day") == session.metadata.get("day_num", 0):
+                                if def_state.role_key == "mahoraga" and (def_state.metadata.get("mahoraga_adapt_complete") or session.metadata.get("mahoraga_vote_immune")):
                                     await self.bot.message_queue.send(mafia_channel, f"{get_emoji('mahoraga')} **Mahoraga is immune to being lynched today!** The trial is dismissed.")
                                 elif def_state.role_key == "eren_jaeger" and session.metadata.get("rumbling_active"):
                                     await self.bot.message_queue.send(
@@ -2472,7 +2477,7 @@ class GameEngine:
         session.metadata["bloodlust_challenges"] = {}
         for pid, pstate in session.players.items():
             if pstate.role_key == "hisoka" and pstate.alive:
-                if not pstate.metadata.get("roleblocked"):
+                if not pstate.metadata.get("roleblocked") and not pstate.metadata.get("nullified") and not pstate.metadata.get("detained"):
                     payload = session.night_actions.get(pid)
                     if payload and payload.get("action_index") == 2:
                         target_id = payload.get("target_id")
@@ -2593,7 +2598,7 @@ class GameEngine:
                 if "target_id" in gt_payload and gt_payload["target_id"] is not None:
                     gt_payload["target_id"] = kpid
                 if "targets" in gt_payload and gt_payload["targets"]:
-                    gt_payload["targets"] = (kpid,) * len(gt_payload["targets"])
+                    gt_payload["targets"] = (kpid,)
                 gt_payload["log"] = f"Kishibe used Goose to redirect <@{goose_target}> to himself."
 
                 goose_payload["result"] = (
@@ -2652,14 +2657,16 @@ class GameEngine:
             is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
             if not actor_state or not actor_state.alive or is_blocked:
                 continue
-            targets = []
+            visited_targets = set()
             t_id = payload.get("target_id")
             if t_id is not None:
-                targets.append(t_id)
+                visited_targets.add(t_id)
             for t in payload.get("targets", ()):
-                targets.append(t)
-            for t in targets:
-                night_visits.setdefault(t, []).append(actor_id)
+                if t is not None:
+                    visited_targets.add(t)
+            for t in visited_targets:
+                if actor_id not in night_visits.setdefault(t, []):
+                    night_visits[t].append(actor_id)
 
         # Check Asta Devil Union activation before action loop starts
         for pid, payload in session.night_actions.items():
@@ -2678,14 +2685,15 @@ class GameEngine:
         # resolves first (and Kishibe only kills them if he survives).
         for pid, pstate in session.players.items():
             if pstate.role_key == "kishibe" and pstate.alive:
-                for visitor_id in night_visits.get(pid, []):
+                for visitor_id in set(night_visits.get(pid, [])):
                     v_state = session.players.get(visitor_id)
                     if not v_state or not v_state.alive:
                         continue
                     # Cancel the visitor's action so it never resolves on Kishibe
                     session.night_actions.pop(visitor_id, None)
                     kills = session.metadata.setdefault("pending_kills", {})
-                    kills[visitor_id] = kills.get(visitor_id, []) + ["kishibe_alert_kill"]
+                    if "kishibe_alert_kill" not in kills.get(visitor_id, []):
+                        kills[visitor_id] = kills.get(visitor_id, []) + ["kishibe_alert_kill"]
 
         # 1. Gather all actions
         action_list = []
@@ -2876,7 +2884,8 @@ class GameEngine:
                 user_id=actor_id,
                 target_id=payload.get("target_id"),
                 targets=payload.get("targets", ()),
-                payload={**payload, "session": session}
+                payload={**payload, "session": session},
+                bot=self.bot
             )
             try:
                 await role_inst.night_action(context)
