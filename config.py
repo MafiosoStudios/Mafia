@@ -227,13 +227,13 @@ EVENT_IMAGES: dict[str, str] = {
     "victory_villain": "https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyODdzc24ydDAzb2lhY3l0MWhuam4ycm83NDRyY3UxZ295dzlldThkMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nhFvzFSWaoDy4VZm2W/giphy.gif",
     "victory_neutral": "https://media1.giphy.com/media/v1.Y2lkPTZjMDliOTUyODdzc24ydDAzb2lhY3l0MWhuam4ycm83NDRyY3UxZ295dzlldThkMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nhFvzFSWaoDy4VZm2W/giphy.gif",
     "draw": "",
-    "blackbeard_tremor": "",       # placeholder — replace with actual GIF URL
-    "light_devils_ink": "",        # placeholder — replace with actual GIF URL
+    "blackbeard_tremor": "https://tenor.com/bJpJK.gif",       # placeholder — replace with actual GIF URL
+    "light_devils_ink": "https://tenor.com/bFJxl.gif",        # placeholder — replace with actual GIF URL
     "makima_contract": "",         # placeholder — replace with actual GIF URL
-    "mahoraga_transform": "",      # placeholder — replace with actual GIF URL
-    "gilgamesh_transform": "",     # placeholder — replace with actual GIF URL
+    "mahoraga_transform": "https://tenor.com/sr1i2vcfpb0.gif",      # placeholder — replace with actual GIF URL
+    "gilgamesh_transform": "https://tenor.com/vW3JHlA0X8z.gif",     # placeholder — replace with actual GIF URL
     "tenma_save": "",              # placeholder — replace with actual GIF URL
-    "ayanokoji_reveal": "",        # placeholder — replace with actual GIF URL
+    "ayanokoji_reveal": "https://tenor.com/bnpV9.gif",        # placeholder — replace with actual GIF URL
 }
 
 
