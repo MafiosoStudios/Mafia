@@ -3,7 +3,9 @@ from __future__ import annotations
 import discord
 from discord.ext import commands
 
+from config import get_emoji, get_role_image
 from database.models import PlayerProfileRecord, StatisticsRecord
+from ui.theme import small_footer
 from utils.embeds import build_profile_embed
 from utils.helpers import send_hybrid_response, utcnow
 
@@ -55,23 +57,56 @@ class ProfileCog(commands.Cog):
         total_games = statistics.games_played
         win_rate = 0.0 if total_games == 0 else (statistics.wins / total_games) * 100
 
+        rank_emoji = get_emoji(rank_info.get("emoji_key", "rank_bronze")) or ""
+        level_emoji = get_emoji("level") or "📈"
+        gold_emoji = get_emoji("gold") or "🪙"
+        xp_emoji = get_emoji("xp") or "✨"
+        wins_emoji = get_emoji("sword") or "⚔️"
+        losses_emoji = get_emoji("skull") or "☠️"
+        draws_emoji = get_emoji("peace") or "🤝"
+        crown_emoji = get_emoji("crown") or "👑"
+
+        # Favorite character visuals
+        fav_role_key = profile_record.favorite_character or ""
+        fav_emoji = get_emoji(fav_role_key) if fav_role_key else ""
+        fav_image = get_role_image(fav_role_key) if fav_role_key else None
+        fav_line = (
+            f"{fav_emoji} **{fav_role_key.replace('_', ' ').title()}**"
+            if fav_role_key else "*None set — use `/setfavourite`*"
+        )
+
+        # Combat record
+        combat_lines = (
+            f"{wins_emoji} Wins: `{statistics.wins}`"
+            f"  |  {losses_emoji} Losses: `{statistics.losses}`\n"
+            f"{draws_emoji} Draws: `{statistics.draws}`"
+            f"  |  🎮 Games: `{total_games}`\n"
+            f"📊 Win Rate: **`{win_rate:.1f}%`**"
+        )
+
+        # Progression card
+        progression_lines = (
+            f"{crown_emoji} Rank: **{rank_emoji} `{profile_record.rank}`**"
+            f"  |  {level_emoji} Level: **`{lvl_info.level}`**\n"
+            f"{xp_emoji} {progress_bar_str}\n"
+            f"{gold_emoji} Gold: **`{profile_record.coins:,}`**"
+        )
+
         desc = (
-            f"• **Rank**: `{profile_record.rank}` ({rank_info.get('badge', 'Tier')})\n"
-            f"• **Level**: `{lvl_info.level}` | {progress_bar_str}\n"
-            f"• **Gold**: `{profile_record.coins}`\n"
-            f"• **Favorite Character**: {profile_record.favorite_character or '*None set*'}\n\n"
-            f"## Global Match Statistics\n"
-            f"• **Wins:** `{statistics.wins}` | **Losses:** `{statistics.losses}` | **Draws:** `{statistics.draws}`\n"
-            f"• **Total Games:** `{total_games}` | **Win Rate:** `{win_rate:.1f}%`"
+            f"{crown_emoji} **{profile_record.username}'s Dossier**\n\n"
+            f"## ⚔️ Combat Record\n{combat_lines}\n\n"
+            f"## 📈 Progression\n{progression_lines}\n\n"
+            f"## 🎭 Favorite Character\n{fav_line}"
         )
 
         from ui import build_v2_layout
         profile_view = build_v2_layout(
-            title=f"{profile_record.username}'s Profile",
+            title=f"{rank_emoji} {profile_record.username}",
             description=desc,
             color=discord.Color.from_str(rank_info.get("color", "#FFD700")),
             thumbnail_url=ctx.author.display_avatar.url,
-            footer_text="",
+            image_url=fav_image,
+            footer_text=small_footer("Mafioso Dossier — every match is a step toward the throne."),
         )
         await send_hybrid_response(ctx, view=profile_view)
 

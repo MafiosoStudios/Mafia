@@ -51,6 +51,28 @@ async def send_hybrid_response(
 
 
 
+def queue_aura(session, title: str, description: str, image_url: str | None = None) -> None:
+    """Appends a channel aura embed to session metadata for display at day transition."""
+    session.metadata.setdefault("aura_queue", []).append({
+        "title": title,
+        "description": description,
+        "image_url": image_url,
+    })
+
+
+async def send_component_dm(bot, member, *, title: str, description: str, color=None, image_url: str | None = None) -> None:
+    """Sends a styled Component V2 DM to a member."""
+    import discord
+    if color is None:
+        color = discord.Color.blue()
+    from ui import build_v2_layout
+    layout = build_v2_layout(title=title, description=description, color=color, image_url=image_url)
+    try:
+        bot.message_queue.send(member, view=layout)
+    except Exception:
+        __import__("logging").getLogger(__name__).exception("Failed to send component DM to %s", getattr(member, "id", member))
+
+
 def get_emoji_url(emoji_str: str) -> str | None:
     if not emoji_str:
         return None

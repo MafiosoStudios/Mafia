@@ -187,6 +187,32 @@ PATCHES: list[dict] = [
             "**Priority Restructure** — Kishibe's entire kit now resolves from a single role priority of #1, letting Goose and Death Trap timing be reordered freely; `/priorities` now lists Kishibe at the top",
         ],
     },
+    {
+        "version": "1.0.9",
+        "date": "August 9, 2026",
+        "title": "Version 1.0.9 — Aura System, DM Overhaul & Message Ordering Fixes",
+        "description": (
+            "A quality-of-life update introducing the **Aura System** (dramatic text/GIF announcements "
+            "for key abilities, all configurable from `config.py`), a full Component V2 overhaul of every "
+            "role DM, and fixes to the order in which death reports, reveals, and player statuses are posted."
+        ),
+        "changes": [
+            "**Blackbeard Tremor Fruit** — Blackbeard now receives a DM confirming his Tremor Fruit usage; an aura announcement (text + GIF from config) is posted in the channel after the death report",
+            "**Maomao Potion of Intelligence** — The target player is now notified when granted **+1 Vote** via the Potion of Intelligence",
+            "**Asta Double DM Fix** — Removed the duplicate Intel DM; every role now receives exactly **one** styled Component V2 feedback embed",
+            "**All Role DMs → Component V2** — Roleblocked, nullified, detained, inaction, Muzan regen, Mahoraga shield, and all other role DMs now use styled V2 LayoutViews",
+            "**Tenma Emergency Surgery** — The save announcement now appears in the aura slot (after the death report, before the alive/dead status list) instead of during night resolution",
+            "**Ayanokoji Public Reveal** — The Mastermind Revelation is now positioned in the aura slot between the death report and the alive/dead status embed",
+            "**Makima Prime Minister's Contract** — Now announced with a styled V2 embed + GIF when the contract saves her from lynching",
+            "**Light Yagami Devil's Pen** — An aura is announced in the channel when the delayed kill activates (3 nights after the name is written)",
+            "**Mahoraga Full Adaptation** — Aura announcement when Mahoraga completes adaptation to all three factions",
+            "**Gilgamesh Apocalypse Transform** — Transform announcement moved into the aura slot (after the death report, before the alive/dead status list)",
+            "**Night Alive/Dead Embed** — An alive/dead status list is now sent before the night action embed every night",
+            "**Ping Fix** — Alive/dead status embeds now use display names (no pings); alive players are pinged only when night ends and the day/death embed is sent. Dead players are never pinged",
+            "**Profile Command Redesign** — Dark luxury anime-card with rank badges, avatar thumbnail, favorite-character art, progress bar, and stat sections",
+            "**Match Rewards DM Redesign** — Styled dark luxury card showing role played, outcome, rewards earned, and progression with victory/defeat visuals",
+        ],
+    },
 ]
 
 

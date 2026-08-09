@@ -116,17 +116,19 @@ class BlackbeardTremorFruit(NightAction):
         context.payload["action_type"] = "tremor"
         context.payload["log"] = f"Blackbeard triggered the Tremor Fruit! An earthquake roleblocked {blocked_count} players."
 
-        # Send epic public dialogue warning to match channel!
-        mafia_ch_id = session.metadata.get("mafia_channel_id")
-        if mafia_ch_id and context.bot:
-            ch = context.bot.get_channel(mafia_ch_id)
-            if ch and getattr(context.bot, "message_queue", None):
-                dialogue = (
-                    "🌋 **ZEHAHAHAHA! THE EARTHQUAKE IS SHAKING THE LOBBY!**\n"
-                    "**\"From now on, this is my era!\"**\n"
-                    "Blackbeard has unleashed the Tremor Fruit power! The ground trembles violently, disrupting everyone's actions tonight..."
-                )
-                await context.bot.message_queue.send(ch, dialogue)
+        # Queue aura embed for day transition (after death report, before alive/dead list)
+        from utils.helpers import queue_aura
+        from config import get_event_image
+        queue_aura(
+            session,
+            title=f"{get_emoji('blackbeard')} ZEHAHAHAHA! THE EARTHQUAKE IS SHAKING THE LOBBY!",
+            description=(
+                f"**\"From now on, this is my era!\"**\n\n"
+                f"Blackbeard has unleashed the Tremor Fruit power! "
+                f"The ground trembles violently, disrupting **{blocked_count}** players' actions tonight..."
+            ),
+            image_url=get_event_image("blackbeard_tremor"),
+        )
 
 
 @role_registry.register
@@ -333,16 +335,20 @@ class MuzanRegen(PassiveEffect):
         player_state = session.players.get(context.user_id)
         if player_state and player_state.metadata.get("muzan_regen", True):
             player_state.metadata["muzan_regen"] = False
-            
-            # Queue the notification DM
+
+            # Queue the notification DM (Component V2 embed)
+            import discord
+            from ui import build_v2_layout
             guild = context.bot.get_guild(session.game_handle.guild_id) if (context.bot and session.game_handle) else None
             if guild:
                 muzan_member = guild.get_member(context.user_id)
                 if muzan_member:
-                    context.bot.message_queue.send(
-                        muzan_member,
-                        f"{get_emoji('shield')} **Instant Regeneration Triggered!** You blocked an attack. Your passive is now disabled."
+                    regen_layout = build_v2_layout(
+                        title=f"{get_emoji('shield')} Instant Regeneration Triggered!",
+                        description="You blocked an attack. Your passive is now **disabled**.",
+                        color=discord.Color.dark_red(),
                     )
+                    context.bot.message_queue.send(muzan_member, view=regen_layout)
             return True
         return False
 

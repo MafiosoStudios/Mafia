@@ -519,6 +519,24 @@ class MahoragaAdaptation(NightAction):
                     f"and **the town can no longer vote you out.** "
                     f"Only an unstoppable one-hit ability can end your reign."
                 )
+
+                # Queue the Mahoraga full-adaptation aura for the day transition.
+                if not session.metadata.get("mahoraga_aura_sent"):
+                    session.metadata["mahoraga_aura_sent"] = True
+                    from utils.helpers import queue_aura
+                    from config import get_event_image
+                    queue_aura(
+                        session,
+                        title=f"{get_emoji('mahoraga')} WITH THIS WHEEL, I ADAPT TO ALL CREATION!",
+                        description=(
+                            f"**\"WITH THIS WHEEL, I ADAPT TO ALL CREATION!\"**\n\n"
+                            f"**Eight-Handled Sword Divergent Sila Divine General Mahoraga** "
+                            f"has fully adapted to **all three factions**!\n\n"
+                            f"• No faction can eliminate Mahoraga through night abilities anymore.\n"
+                            f"• The town can **no longer vote Mahoraga out** — only an unstoppable one-hit ability can end this reign."
+                        ),
+                        image_url=get_event_image("mahoraga_transform"),
+                    )
             else:
                 next_stage_chance = int(_ADAPT_CHANCES[len(adapted)] * 100)
                 context.payload["result"] = (
@@ -614,19 +632,24 @@ class Mahoraga(BaseRole):
         )
 
         if all_immune:
-            # Notify Mahoraga
+            # Notify Mahoraga (Component V2 embed)
+            import discord
+            from ui import build_v2_layout
             if context.bot:
                 guild = context.bot.get_guild(session.game_handle.guild_id)
                 if guild:
                     mahoraga_mem = guild.get_member(context.user_id)
                     if mahoraga_mem:
                         attacker_factions = set(faction_of_source.values())
-                        context.bot.message_queue.send(
-                            mahoraga_mem,
-                            f"🌀 **Mahoraga — Adaptation Shield!**\n"
-                            f"An attack from the **{', '.join(attacker_factions)}** faction was nullified "
-                            f"by your adaptation. They cannot harm you."
+                        shield_layout = build_v2_layout(
+                            title="🌀 Mahoraga — Adaptation Shield!",
+                            description=(
+                                f"An attack from the **{', '.join(attacker_factions)}** faction was nullified "
+                                f"by your adaptation. They cannot harm you."
+                            ),
+                            color=discord.Color.dark_purple(),
                         )
+                        context.bot.message_queue.send(mahoraga_mem, view=shield_layout)
             return True
 
         return False

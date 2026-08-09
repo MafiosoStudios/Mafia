@@ -563,7 +563,12 @@ class GameEngine:
                                             member = guild.get_member(mid)
                                             if member:
                                                 try:
-                                                    eng.bot.message_queue.send(member, msg)
+                                                    transform_layout = build_v2_layout(
+                                                        title=f"{get_emoji('frieza')} Golden Frieza!",
+                                                        description=msg,
+                                                        color=discord.Color.gold(),
+                                                    )
+                                                    eng.bot.message_queue.send(member, view=transform_layout)
                                                 except Exception:
                                                     pass
                                 self._track_task(f"notify_frieza_transform_{game_id}", notify_transformation())
@@ -589,11 +594,12 @@ class GameEngine:
                             member = guild.get_member(k_id)
                             if member:
                                 try:
-                                    eng.bot.message_queue.send(
-                                        member,
-                                        f"**An intruder took their final breath at your door.**"
-                                        f"kill count: **{n}/{q}**."
+                                    intruder_layout = build_v2_layout(
+                                        title=f"{get_emoji('kishibe')} An Intruder Fell at Your Door",
+                                        description=f"Kill count: **{n}/{q}**.",
+                                        color=discord.Color.dark_red(),
                                     )
+                                    eng.bot.message_queue.send(member, view=intruder_layout)
                                 except Exception:
                                     pass
                     self._track_task(f"notify_kishibe_kill_{game_id}_{user_id}", notify_kishibe_kill())
@@ -891,31 +897,60 @@ class GameEngine:
 
                     if user_obj:
                         rank_info = ProgressionManager.get_rank_info(reward_res.new_xp)
-                        outcome_header = "**MATCH VICTORY!**" if is_winner else ("**MATCH DRAW**" if winner_faction == "Draw" else "**MATCH DEFEAT**")
-
                         lvl_info = ProgressionManager.calculate_level_info(reward_res.new_xp)
                         progress_bar_str = ProgressionManager.format_progress_bar(lvl_info.xp_in_level, lvl_info.xp_for_next)
 
+                        # Role played this match
+                        role_key = (history.roles or {}).get(user_id, "")
+                        role_meta = roles.ROLES_METADATA.get(role_key, {})
+                        role_display = role_meta.get("name", role_key or "Unknown")
+                        role_emoji = get_emoji(role_key) if role_key else ""
+                        role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
+                        status_text = "✅ Alive" if getattr(player, "alive", False) else "☠️ Eliminated"
+
+                        # Outcome header + victory gif
+                        if is_winner:
+                            outcome_header = f"{get_emoji('victory')} **MATCH VICTORY!**"
+                            victory_image = get_event_image("victory_hero")
+                        elif winner_faction == "Draw":
+                            outcome_header = f"{get_emoji('peace')} **MATCH DRAW**"
+                            victory_image = get_event_image("draw")
+                        else:
+                            outcome_header = f"{get_emoji('skull')} **MATCH DEFEAT**"
+                            victory_image = get_event_image("victory_neutral")
+
+                        gold_emoji = get_emoji("gold") or "🪙"
+                        xp_emoji = get_emoji("xp") or "✨"
+                        crown_emoji = get_emoji("crown") or "👑"
+                        level_emoji = get_emoji("level") or "📈"
+                        rank_emoji = get_emoji(rank_info.get("emoji_key", "rank_bronze")) or ""
+
                         dm_desc = (
                             f"{outcome_header}\n\n"
-                            f"## Total Earned\n"
-                            f"• **+{reward_res.xp_gained} XP** | **+{reward_res.gold_gained} Gold**\n\n"
-                            f"## Progression Update\n"
-                            f"• **Rank**: `{reward_res.new_rank}`\n"
-                            f"• **Level**: `{reward_res.new_level}` | {progress_bar_str}\n"
-                            f"• **Total Gold**: `{updated_profile.coins}`"
+                            f"## 🎭 Your Role\n"
+                            f"{role_emoji_prefix}**{role_display}**  |  {status_text}\n\n"
+                            f"## 🪙 Rewards Earned\n"
+                            f"{xp_emoji} **+{reward_res.xp_gained} XP**"
+                            f"  |  {gold_emoji} **+{reward_res.gold_gained} Gold**\n\n"
+                            f"## 📈 Progression Update\n"
+                            f"{crown_emoji} Rank: **{rank_emoji} `{reward_res.new_rank}`**\n"
+                            f"{level_emoji} Level: **`{reward_res.new_level}`** | {progress_bar_str}\n"
+                            f"{gold_emoji} Total Gold: **`{updated_profile.coins:,}`**"
                         )
 
                         if reward_res.leveled_up:
-                            dm_desc += f"\n\n**damn you leveled up to lvl `{reward_res.new_level}`!"
+                            dm_desc += f"\n\n{get_emoji('level_up') or '⚡'} **LEVEL UP!** You reached level **`{reward_res.new_level}`**!"
                         if reward_res.ranked_up:
-                            dm_desc += f"\n\n**ggs for promotion to `{reward_res.new_rank}`!"
+                            dm_desc += f"\n\n{get_emoji('rank_up') or '👑'} **PROMOTION!** You've been promoted to **`{reward_res.new_rank}`**!"
 
+                        from ui.theme import small_footer
                         dm_layout = build_v2_layout(
-                            title="Your rewards :3",
+                            title=f"{rank_emoji} Match Complete",
                             description=dm_desc,
                             color=discord.Color.from_str(rank_info.get("color", "#FFD700")),
                             thumbnail_url=user_obj.display_avatar.url if hasattr(user_obj, "display_avatar") else None,
+                            image_url=victory_image,
+                            footer_text=small_footer("Mafioso — your rewards have been deposited."),
                         )
 
                         try:
@@ -1307,7 +1342,12 @@ class GameEngine:
             try:
                 self.bot.message_queue.send(member, view=role_dm_layout)
                 if pstate.faction == RoleFaction.VILLAIN.value and len(mafia_members) > 1:
-                    self.bot.message_queue.send(member, f"{get_emoji('group')} **Your partners in crime:** {mafia_list_str}")
+                    partners_layout = build_v2_layout(
+                        title=f"{get_emoji('group')} Your Partners in Crime",
+                        description=mafia_list_str,
+                        color=discord.Color.dark_red(),
+                    )
+                    self.bot.message_queue.send(member, view=partners_layout)
             except Exception:
                 logger.exception("Failed to send DM to player %s", pid)
 
@@ -1527,6 +1567,18 @@ class GameEngine:
                         view=action_view,
                     )
 
+                    # Send the alive/dead status list BEFORE the night action embed
+                    # (uses display names — no pings).
+                    try:
+                        if not is_resume:
+                            alive_dead_layout = await self._build_alive_dead_embed(
+                                session, guild, title_prefix=f"Night {night_num}"
+                            )
+                            await self.bot.message_queue.send(mafia_channel, view=alive_dead_layout)
+                            await asyncio.sleep(2)
+                    except Exception as err:
+                        logger.error(f"Failed to send pre-night status embed: {err}")
+
                     try:
                         night_msg = await self.bot.message_queue.send(mafia_channel, view=night_view)
                         session.metadata["night_message"] = night_msg
@@ -1572,6 +1624,18 @@ class GameEngine:
                         session.metadata["day_num"] = session.metadata.get("day_num", 0) + 1
                         day_num = session.metadata["day_num"]
 
+                        # Ping ONLY alive players (dead players are never pinged).
+                        alive_mentions = " ".join(
+                            f"<@{pid}>" for pid, ps in session.players.items() if ps.alive
+                        )
+                        try:
+                            await self.bot.message_queue.send(
+                                mafia_channel,
+                                f"{get_emoji('day')} **Day {day_num} begins.** {alive_mentions}",
+                            )
+                        except Exception:
+                            pass
+
                         # Post the death report and the alive/dead roster as two
                         # separate embeds (they used to be one combined embed).
                         await self._send_death_and_status_embeds(
@@ -1593,29 +1657,28 @@ class GameEngine:
                         session.state = GameState.DAY
                         session.phase = GamePhase.DISCUSSION
 
+                        # Ping ONLY alive players when night is over and the day/death
+                        # embed is about to be sent. Dead players are never pinged.
+                        day_num = session.metadata['day_num']
+                        alive_mentions = " ".join(
+                            f"<@{pid}>" for pid, ps in session.players.items() if ps.alive
+                        )
+                        try:
+                            await self.bot.message_queue.send(
+                                mafia_channel,
+                                f"{get_emoji('day')} **Day {day_num} begins.** {alive_mentions}",
+                            )
+                        except Exception:
+                            pass
+
                         # Post the death report and the alive/dead roster as two
                         # separate embeds (they used to be one combined embed).
                         await self._send_death_and_status_embeds(
                             mafia_channel, guild, session,
-                            title=f"Day {session.metadata['day_num']}",
+                            title=f"Day {day_num}",
                         )
 
-                        # Check if Gilgamesh has transformed and is preparing apocalypse
-                        for pid, pstate in list(session.players.items()):
-                            if pstate.role_key == "gilgamesh" and pstate.metadata.get("transformed") and pstate.alive:
-                                gilgamesh_layout = build_v2_layout(
-                                    title=f"AYO",
-                                    description=(
-                                        f"**\"KNEEL, MONGRELS! THE KING OF HEROES ASCENDS!\"**\n"
-                                        f"Gilgamesh has reclaimed every treasure and transformed into the **Horseman of Apocalypse**!\n"
-                                        f"Lynch him before the sun sets, or the **Gate of Babylon** will wipe every last soul from existence!"
-                                    ),
-                                    color=discord.Color.red(),
-                                )
-                                await self.bot.message_queue.send(
-                                    mafia_channel,
-                                    view=gilgamesh_layout
-                                )
+                        # (Gilgamesh transformation aura is queued inside _send_death_and_status_embeds)
 
                         # Unmute alive in #mafia for discussion
                         await self._update_channel_mute(mafia_channel, session, mute=False)
@@ -2072,11 +2135,20 @@ class GameEngine:
                                     break
                                 elif def_state.role_key == "makima" and not def_state.metadata.get("pm_contract_activated"):
                                     def_state.metadata["pm_contract_activated"] = True
+                                    from config import get_event_image
+                                    makima_contract_view = build_v2_layout(
+                                        title=f"{get_emoji('makima')} Prime Minister's Contract Activated!",
+                                        description=(
+                                            f"**\"A dog should obey its master... not the other way around.\"**\n\n"
+                                            f"An invisible force has **prevented the execution** — the defendant survives!\n"
+                                            f"The Day ends with no execution."
+                                        ),
+                                        color=discord.Color.dark_red(),
+                                        image_url=get_event_image("makima_contract"),
+                                    )
                                     await self.bot.message_queue.send(
                                         mafia_channel,
-                                        f"{get_emoji('trial')} **Prime Minister's Contract Triggered!**\n"
-                                        f"An invisible force has prevented the execution! The defendant survives.\n"
-                                        f"The Day ends with no execution."
+                                        view=makima_contract_view
                                     )
                                     session.metadata.pop("defendant_id", None)
                                     session.metadata.pop("verdicts", None)
@@ -2305,6 +2377,40 @@ class GameEngine:
         except Exception as err:
             logger.error(f"Failed to send victory view: {err}")
 
+    async def _build_alive_dead_embed(
+        self,
+        session: GameSession,
+        guild: discord.Guild,
+        *,
+        title_prefix: str = "",
+    ) -> discord.ui.LayoutView:
+        """Builds the alive/dead status embed using display names (no @mentions → no pings)."""
+        alive_lines = []
+        dead_lines = []
+        for pid, pstate in session.players.items():
+            member = guild.get_member(pid)
+            name = member.display_name if member else f"User {pid}"
+            if pstate.alive:
+                alive_lines.append(f"• **{name}**")
+            else:
+                role_meta = roles.ROLES_METADATA.get(pstate.role_key or "", {})
+                role_display = role_meta.get("name", pstate.role_key or "Unknown")
+                role_emoji = get_emoji(pstate.role_key) if pstate.role_key else ""
+                role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
+                dead_lines.append(f"• ~~{name}~~ ({role_emoji_prefix}{role_display})")
+
+        status_desc = (
+            "## Alive Players\n" + ("\n".join(alive_lines) if alive_lines else "None") +
+            "\n\n## Dead Players\n" + ("\n".join(dead_lines) if dead_lines else "None")
+        )
+
+        return build_v2_layout(
+            title=f"{title_prefix} Player Status",
+            description=status_desc,
+            color=discord.Color.blurple(),
+            image_url="https://img.magnific.com/free-vector/anime-cloud-blue-heaven-sky-vector-background-summer-abstract-cloudy-air-design-with-gradient-sun-light-with-reflection-beautiful-calm-morning-game-outdoor-panorama-with-sunshine-painting_107791-23777.jpg",
+        )
+
     async def _send_death_and_status_embeds(
         self,
         channel: discord.TextChannel,
@@ -2390,12 +2496,14 @@ class GameEngine:
                 except Exception as err:
                     logger.error(f"Failed to send Rumbling layout: {err}")
 
-        # 3. Check Ayanokoji Public Reveal (RIGHT AFTER death report & BEFORE alive/dead status embed)
+        # 3. Check Ayanokoji Public Reveal (queued as aura, shown after death report & BEFORE alive/dead status embed)
         ayanokoji_reveal = session.metadata.pop("ayanokoji_public_reveal", None)
         if ayanokoji_reveal:
             target_id, role_display, faction_display, thumbnail_url = ayanokoji_reveal
-            ayanokoji_view = build_v2_layout(
-                title=f"{get_emoji('ayanokoji')} Mastermind Revelation",
+            from utils.helpers import queue_aura
+            queue_aura(
+                session,
+                title=f"{get_emoji('ayanokoji_kiyotaka')} Mastermind Revelation",
                 description=(
                     f"**\"I've never thought of you as an ally... all people are nothing but tools.\"**\n\n"
                     f"looks like ayanokoji found something!\n\n"
@@ -2403,38 +2511,48 @@ class GameEngine:
                     f"**Exposed Role:** **{role_display}**\n"
                     f"**True faction:** **{faction_display}**"
                 ),
-                color=discord.Color.purple(),
-                thumbnail_url=thumbnail_url,
+                image_url=thumbnail_url,
+            )
+
+        # Gilgamesh transformation aura (queued here so it lands in the aura slot,
+        # before the alive/dead status list instead of after it).
+        for pid, pstate in list(session.players.items()):
+            if pstate.role_key == "gilgamesh" and pstate.metadata.get("transformed") and pstate.alive:
+                if not session.metadata.get("gilgamesh_aura_sent"):
+                    session.metadata["gilgamesh_aura_sent"] = True
+                    from utils.helpers import queue_aura
+                    from config import get_event_image
+                    queue_aura(
+                        session,
+                        title=f"{get_emoji('gilgamesh')} KNEEL, MONGRELS! THE KING OF HEROES ASCENDS!",
+                        description=(
+                            f"**\"KNEEL, MONGRELS! THE KING OF HEROES ASCENDS!\"**\n\n"
+                            f"Gilgamesh has reclaimed every treasure and transformed into the **Horseman of Apocalypse**!\n"
+                            f"Lynch him before the sun sets, or the **Gate of Babylon** will wipe every last soul from existence!"
+                        ),
+                        image_url=get_event_image("gilgamesh_transform"),
+                    )
+                break
+
+        # 4. Drain queued aura embeds (BB tremor, Tenma save, Devil's Pen, Ayano reveal,
+        #    Mahoraga / Gilgamesh transforms, etc.) — right after the death report embeds
+        #    and BEFORE the alive/dead status list.
+        aura_queue = session.metadata.pop("aura_queue", [])
+        for aura in aura_queue:
+            aura_layout = build_v2_layout(
+                title=aura.get("title", ""),
+                description=aura.get("description", ""),
+                image_url=aura.get("image_url"),
+                color=discord.Color.from_rgb(255, 255, 255),
             )
             try:
-                await self.bot.message_queue.send(channel, view=ayanokoji_view)
+                await self.bot.message_queue.send(channel, view=aura_layout)
                 await asyncio.sleep(2.5)
             except Exception as err:
-                logger.error(f"Failed to send Ayanokoji reveal layout: {err}")
+                logger.error(f"Failed to send aura embed: {err}")
 
-        alive_list = []
-        dead_list = []
-        for pid, pstate in session.players.items():
-            if pstate.alive:
-                alive_list.append(f"• <@{pid}>")
-            else:
-                role_meta = roles.ROLES_METADATA.get(pstate.role_key or "", {})
-                role_display = role_meta.get("name", pstate.role_key or "Unknown")
-                role_emoji = get_emoji(pstate.role_key) if pstate.role_key else ""
-                role_emoji_prefix = f"{role_emoji} " if role_emoji else ""
-                dead_list.append(f"• <@{pid}> ({role_emoji_prefix}{role_display})")
-
-        status_desc = (
-            "## Alive Players\n" + ("\n".join(alive_list) if alive_list else "None") +
-            "\n\n## Dead Players\n" + ("\n".join(dead_list) if dead_list else "None")
-        )
-
-        status_layout = build_v2_layout(
-            title=f"{title} - Player Status",
-            description=status_desc,
-            color=discord.Color.blurple(),
-            image_url="https://img.magnific.com/free-vector/anime-cloud-blue-heaven-sky-vector-background-summer-abstract-cloudy-air-design-with-gradient-sun-light-with-reflection-beautiful-calm-morning-game-outdoor-panorama-with-sunshine-painting_107791-23777.jpg",
-        )
+        # 5. Alive/Dead status list (uses display names — no pings)
+        status_layout = await self._build_alive_dead_embed(session, guild, title_prefix=title)
         await self.bot.message_queue.send(channel, view=status_layout)
         await asyncio.sleep(2.5)
 
@@ -2619,11 +2737,12 @@ class GameEngine:
                                 kishibe_member = guild.get_member(k_id)
                                 kishibe_name = kishibe_member.display_name if kishibe_member else "Kishibe"
                                 try:
-                                    self.bot.message_queue.send(
-                                        member,
-                                        f"**You got Goosed!**!\n"
-                                        f"Previous target: **{prev_name}**\nNew target: **{kishibe_name}**"
+                                    goose_layout = build_v2_layout(
+                                        title=f"{get_emoji('kishibe')} You Got Goosed!",
+                                        description=f"Previous target: **{prev_name}**\nNew target: **{kishibe_name}**",
+                                        color=discord.Color.teal(),
                                     )
+                                    self.bot.message_queue.send(member, view=goose_layout)
                                 except Exception:
                                     pass
                 self._track_task(f"dm_goosed_{session.game_handle.game_id}_{goose_target}", dm_goosed())
@@ -2640,11 +2759,15 @@ class GameEngine:
                             member = guild.get_member(k_id)
                             if member:
                                 try:
-                                    self.bot.message_queue.send(
-                                        member,
-                                        f"**failed to goose.** You tried to redirect <@{goose_target}>, but they "
-                                        f"weren't visiting anyone tonight. The use has been consumed. sucks to be you."
+                                    failed_goose_layout = build_v2_layout(
+                                        title=f"{get_emoji('kishibe')} Failed to Goose",
+                                        description=(
+                                            f"You tried to redirect <@{goose_target}>, but they weren't visiting "
+                                            f"anyone tonight. The use has been consumed. sucks to be you."
+                                        ),
+                                        color=discord.Color.dark_red(),
                                     )
+                                    self.bot.message_queue.send(member, view=failed_goose_layout)
                                 except Exception:
                                     pass
                 self._track_task(f"dm_goose_failed_{session.game_handle.game_id}_{kpid}", dm_goose_failed())
@@ -2841,16 +2964,6 @@ class GameEngine:
                                         pass
                         self._track_task(f"notify_invisible_{session.game_handle.game_id}_{actor_id}", notify_invisible())
                         continue
-                        payload["log"] = f"{actor_state.character_name} attempted to target <@{t_id}>, but they were invisible."
-                        if self.bot:
-                            g = self.bot.get_guild(session.game_handle.guild_id)
-                            m = g.get_member(actor_id) if g else None
-                            if m:
-                                try:
-                                    self.bot.message_queue.send(m, f"{get_emoji('cross')} **Your action tonight failed because your target was invisible!**")
-                                except Exception:
-                                    pass
-                        continue
                 targets_list = payload.get("targets", ())
                 if targets_list:
                     if any(session.players.get(t) and session.players[t].metadata.get("invisible") for t in targets_list if session.players.get(t)):
@@ -2861,7 +2974,12 @@ class GameEngine:
                             m = g.get_member(actor_id) if g else None
                             if m:
                                 try:
-                                    self.bot.message_queue.send(m, f"{get_emoji('cross')} **Your action tonight failed because one of your targets was invisible!**")
+                                    targets_embed = build_v2_layout(
+                                        title="Bro tried to visit a ghost...",
+                                        description=f"{get_emoji('cross')} **Your action tonight failed because one of your targets was invisible!**",
+                                        color=discord.Color.blue(),
+                                    )
+                                    self.bot.message_queue.send(m, view=targets_embed)
                                 except Exception:
                                     pass
                         continue
@@ -2894,27 +3012,9 @@ class GameEngine:
                 # the stored action payload so later feedback code can read it.
                 session.night_actions[actor_id] = {k: v for k, v in context.payload.items() if k != "session"}
 
-                # Check L / Ayanokoji scan results and deliver to their DMs
-                if "result" in context.payload:
-                    mafia_ch_id = session.metadata.get("mafia_channel_id")
-                    if mafia_ch_id:
-                        ch = self.bot.get_channel(mafia_ch_id)
-                        if ch:
-                            actor_member = ch.guild.get_member(actor_id)
-                            if actor_member:
-                                try:
-                                    role_meta = roles.ROLES_METADATA.get(actor_state.role_key or "", {})
-                                    role_display = role_meta.get("name", "Investigator")
-                                    emoji = get_emoji(actor_state.role_key) or get_emoji("search")
-                                    intel_layout = build_v2_layout(
-                                        title=f"{emoji} {role_display} Intel",
-                                        description=context.payload["result"],
-                                        color=discord.Color.blue(),
-                                    )
-                                    self.bot.message_queue.send(actor_member, view=intel_layout)
-
-                                except Exception:
-                                    logger.exception("Failed to DM scan result to %s", actor_id)
+                # (Feedback DMs are sent once, later, via get_night_feedback wrapped in
+                # a Component V2 embed — see the feedback loop below. The old duplicate
+                # "Intel" DM here was removed to fix double DMs.)
 
                 # Handle Muzan conversion: notify converted player + existing mafia
                 if actor_state.role_key == "muzan_kibutsuji" and context.target_id:
@@ -2943,7 +3043,21 @@ class GameEngine:
                 kills = session.metadata.setdefault("pending_kills", {})
                 kills[pid] = kills.get(pid, []) + ["devils_pen_kill"]
                 death_queue.pop(pid_str, None)
-                
+
+                # Queue the Devil's Pen aura for the day transition (after death report,
+                # before alive/dead list).
+                from utils.helpers import queue_aura
+                from config import get_event_image
+                queue_aura(
+                    session,
+                    title=f"{get_emoji('light_yagami')} The Devil's Pen Has Claimed Another Soul",
+                    description=(
+                        f"<@{pid}>'s name was written in the Death Note **three nights ago**. "
+                        f"Right on schedule, their heart stopped."
+                    ),
+                    image_url=get_event_image("light_devils_ink"),
+                )
+
                 # Notify Light Yagami that the target was hit
                 for ly_id, ly_state in session.players.items():
                     if ly_state.role_key == "light_yagami" and ly_state.alive:
@@ -2953,10 +3067,12 @@ class GameEngine:
                             ly_member = g.get_member(ly_id)
                             if ly_member:
                                 try:
-                                    self.bot.message_queue.send(
-                                        ly_member,
-                                        f"**Devil's Pen:** The 3 nights have passed. Your target <@{pid}> has been written out of existence!"
+                                    devils_pen_layout = build_v2_layout(
+                                        title=f"{get_emoji('light_yagami')} Devil's Pen — Target Eliminated",
+                                        description=f"The 3 nights have passed. Your target <@{pid}> has been written out of existence!",
+                                        color=discord.Color.dark_red(),
                                     )
+                                    self.bot.message_queue.send(ly_member, view=devils_pen_layout)
                                 except Exception:
                                     pass
 
@@ -3076,11 +3192,15 @@ class GameEngine:
                     if tobirama_member:
                         attackers_str = ", ".join([f"<@{atk}>" for atk in attackers]) if attackers else "an unknown force"
                         msg = (
-                            f"**Flying Thunder Counter triggered!**\n"
                             f"You countered the attack on <@{target_id}>.\n"
                             f"{get_emoji('detective')} **Attacker(s) detected:** {attackers_str}"
                         )
-                        self.bot.message_queue.send(tobirama_member, msg)
+                        counter_layout = build_v2_layout(
+                            title=f"{get_emoji('tobirama_senju')} Flying Thunder Counter Triggered!",
+                            description=msg,
+                            color=discord.Color.teal(),
+                        )
+                        self.bot.message_queue.send(tobirama_member, view=counter_layout)
                         
                 # Determine if there's any unstoppable/ignore-protection attack
                 has_unstoppable = False
@@ -3107,10 +3227,12 @@ class GameEngine:
                         target_member = guild.get_member(target_id) if guild else None
                         if target_member:
                             try:
-                                self.bot.message_queue.send(
-                                    target_member,
-                                    f"Tobirama lowk saved your ass, they nullified the attack directed towards you."
+                                tobirama_save_layout = build_v2_layout(
+                                    title=f"{get_emoji('tobirama_senju')} Saved by the Second Hokage!",
+                                    description="Tobirama nullified the attack directed towards you.",
+                                    color=discord.Color.teal(),
                                 )
+                                self.bot.message_queue.send(target_member, view=tobirama_save_layout)
                             except Exception:
                                 pass
                         # Notify attacker(s) anonymously that an unusual force intercepted their attack
@@ -3118,10 +3240,12 @@ class GameEngine:
                             atk_member = guild.get_member(atk_id) if guild else None
                             if atk_member:
                                 try:
-                                    self.bot.message_queue.send(
-                                        atk_member,
-                                        f"Looks like someone countered your attack lmao."
+                                    countered_layout = build_v2_layout(
+                                        title=f"{get_emoji('tobirama_senju')} Attack Countered!",
+                                        description="Looks like someone countered your attack lmao.",
+                                        color=discord.Color.dark_red(),
                                     )
+                                    self.bot.message_queue.send(atk_member, view=countered_layout)
                                 except Exception:
                                     pass
                     # Register the save in heals history and skip further damage processing
@@ -3180,10 +3304,12 @@ class GameEngine:
                             atk_mem = guild.get_member(pid) if guild else None
                             if atk_mem:
                                 try:
-                                    self.bot.message_queue.send(
-                                        atk_mem,
-                                        f"**Attack Nullified!** Your target was hidden and could not be targeted tonight."
+                                    nullified_layout = build_v2_layout(
+                                        title="Attack Nullified!",
+                                        description="Your target was hidden and could not be targeted tonight.",
+                                        color=discord.Color.dark_red(),
                                     )
+                                    self.bot.message_queue.send(atk_mem, view=nullified_layout)
                                 except Exception:
                                     pass
                 continue
@@ -3215,10 +3341,12 @@ class GameEngine:
                             atk_mem = guild.get_member(pid) if guild else None
                             if atk_mem:
                                 try:
-                                    self.bot.message_queue.send(
-                                        atk_mem,
-                                        f"your target was protected by a barrier, sucks to be you."
+                                    barrier_layout = build_v2_layout(
+                                        title="Target Protected!",
+                                        description="Your target was protected by a barrier, sucks to be you.",
+                                        color=discord.Color.dark_red(),
                                     )
+                                    self.bot.message_queue.send(atk_mem, view=barrier_layout)
                                 except Exception:
                                     pass
                 continue
@@ -3241,11 +3369,12 @@ class GameEngine:
                                 doc_member = ch.guild.get_member(doc_id)
                                 if doc_member:
                                     try:
-                                        self.bot.message_queue.send(
-                                            doc_member,
-                                            f"**Compassion Successful,** saved <@{target_id}> from an attack! "
-                                            f"Saves: **{doc_saves}/3**."
+                                        doc_save_layout = build_v2_layout(
+                                            title=f"{get_emoji('doctor_tenma')} Compassion Successful!",
+                                            description=f"Saved <@{target_id}> from an attack! Saves: **{doc_saves}/3**.",
+                                            color=discord.Color.green(),
                                         )
+                                        self.bot.message_queue.send(doc_member, view=doc_save_layout)
                                     except Exception:
                                         pass
                 # Notify attacker(s) anonymously that the attack was protected by healing
@@ -3255,24 +3384,30 @@ class GameEngine:
                             atk_mem = guild.get_member(pid) if guild else None
                             if atk_mem:
                                 try:
-                                    self.bot.message_queue.send(
-                                        atk_mem,
-                                        f"your targetted was saved/healed from your attack lmao."
+                                    healed_layout = build_v2_layout(
+                                        title=f"{get_emoji('doctor_tenma')} Target Healed!",
+                                        description="Your target was saved/healed from your attack lmao.",
+                                        color=discord.Color.dark_red(),
                                     )
+                                    self.bot.message_queue.send(atk_mem, view=healed_layout)
                                 except Exception:
                                     pass
                 continue
 
             # 5. Doctor Tenma Emergency Surgery link save (prevents death via medical link)
             if target_id in tenma_saved:
-                mafia_ch_id = session.metadata.get("mafia_channel_id")
-                if mafia_ch_id:
-                    ch = self.bot.get_channel(mafia_ch_id)
-                    if ch:
-                        self.bot.message_queue.send(
-                            ch,
-                            f"{get_emoji('shield')} **Emergency Surgery Successful,** <@{target_id}> was saved from fatal injuries by Doctor Tenma."
-                        )
+                # Queue the public save announcement into the aura slot so it appears
+                # AFTER the death report and BEFORE the alive/dead status list.
+                from utils.helpers import queue_aura
+                from config import get_event_image
+                queue_aura(
+                    session,
+                    title=f"{get_emoji('shield')} Emergency Surgery Successful",
+                    description=(
+                        f"<@{target_id}> was saved from fatal injuries by Doctor Tenma's **Emergency Surgery**!"
+                    ),
+                    image_url=get_event_image("tenma_save"),
+                )
                 # Notify Tenma
                 tenma_id = session.metadata.get("tenma_doctor_id")
                 if tenma_id:
@@ -3286,11 +3421,15 @@ class GameEngine:
                             tenma_member = guild.get_member(tenma_id)
                             if tenma_member:
                                 try:
-                                    self.bot.message_queue.send(
-                                        tenma_member,
-                                        f"**Compassion Successful!** Your medical link saved <@{target_id}> from death tonight! "
-                                        f"Saves: **{doc_saves}/3**."
+                                    tenma_layout = build_v2_layout(
+                                        title=f"{get_emoji('shield')} Compassion Successful!",
+                                        description=(
+                                            f"Your medical link saved <@{target_id}> from death tonight! "
+                                            f"Saves: **{doc_saves}/3**."
+                                        ),
+                                        color=discord.Color.green(),
                                     )
+                                    self.bot.message_queue.send(tenma_member, view=tenma_layout)
                                 except Exception:
                                     pass
                 # Notify attacker(s) anonymously that emergency surgery saved the target
@@ -3300,10 +3439,12 @@ class GameEngine:
                             atk_mem = guild.get_member(pid) if guild else None
                             if atk_mem:
                                 try:
-                                    self.bot.message_queue.send(
-                                        atk_mem,
-                                        f"your target was saved by someone. sucks to be you."
+                                    saved_by_someone_layout = build_v2_layout(
+                                        title="Target Saved!",
+                                        description="Your target was saved by someone. sucks to be you.",
+                                        color=discord.Color.dark_red(),
                                     )
+                                    self.bot.message_queue.send(atk_mem, view=saved_by_someone_layout)
                                 except Exception:
                                     pass
                 continue
@@ -3333,10 +3474,12 @@ class GameEngine:
                                 atk_mem = guild.get_member(pid) if guild else None
                                 if atk_mem:
                                     try:
-                                        self.bot.message_queue.send(
-                                            atk_mem,
-                                            f"your target survived attack due to an innate defensive power."
+                                        innate_defense_layout = build_v2_layout(
+                                            title="Target Survived!",
+                                            description="Your target survived the attack due to an innate defensive power.",
+                                            color=discord.Color.dark_red(),
                                         )
+                                        self.bot.message_queue.send(atk_mem, view=innate_defense_layout)
                                     except Exception:
                                         pass
                     continue
@@ -3397,7 +3540,12 @@ class GameEngine:
                                 m = g.get_member(t_id) if g else None
                                 if m:
                                     try:
-                                        eng.bot.message_queue.send(m, f"**Judicial Penalty!** You executed a fellow **Vanguard** member. You have permanently lost the ability to execute players.")
+                                        penalty_layout = build_v2_layout(
+                                            title=f"{get_emoji('tosen')} Judicial Penalty",
+                                            description="You executed a fellow **Vanguard** member. You have **permanently lost the ability to execute** players.",
+                                            color=discord.Color.dark_red(),
+                                        )
+                                        eng.bot.message_queue.send(m, view=penalty_layout)
                                     except Exception:
                                         pass
                             self._track_task(f"notify_tosen_penalty_{session.game_handle.game_id}", _notify_tosen_penalty())
@@ -3409,7 +3557,12 @@ class GameEngine:
                                 m = g.get_member(t_id) if g else None
                                 if m:
                                     try:
-                                        eng.bot.message_queue.send(m, f"**Execution Complete.** Executions remaining: **{ex}/3**.")
+                                        exec_layout = build_v2_layout(
+                                            title=f"{get_emoji('tosen')} Execution Complete",
+                                            description=f"Executions remaining: **{ex}/3**.",
+                                            color=discord.Color.dark_red(),
+                                        )
+                                        eng.bot.message_queue.send(m, view=exec_layout)
                                     except Exception:
                                         pass
                             self._track_task(f"notify_tosen_exec_{session.game_handle.game_id}", _notify_tosen_exec())
@@ -3445,7 +3598,12 @@ class GameEngine:
                     msg = f"**Master Sensor:** You did not sense anyone visiting you tonight."
                 member = guild.get_member(pid) if guild else None
                 if member:
-                    self.bot.message_queue.send(member, msg)
+                    sensor_layout = build_v2_layout(
+                        title=f"{get_emoji('tobirama_senju')} Master Sensor",
+                        description=msg,
+                        color=discord.Color.teal(),
+                    )
+                    self.bot.message_queue.send(member, view=sensor_layout)
 
         # Restore Mafia DM Chat access & notify Mafia DMs for released Antagonists
         jailed_mafia = session.metadata.get("jailed_mafia_ids", [])
@@ -3460,11 +3618,15 @@ class GameEngine:
                                 m_mem = guild_obj.get_member(pid)
                                 if m_mem:
                                     try:
-                                        self.bot.message_queue.send(
-                                            m_mem,
-                                            f"**[Mafia DM Chat] ANTAGONIST RELEASED!**\n"
-                                            f"<@{m_id}>'s detention has ended. They can now send and receive Mafia DM Chat messages again."
+                                        released_layout = build_v2_layout(
+                                            title="Antagonist Released!",
+                                            description=(
+                                                f"<@{m_id}>'s detention has ended. They can now send and receive "
+                                                f"Mafia DM Chat messages again."
+                                            ),
+                                            color=discord.Color.dark_red(),
                                         )
+                                        self.bot.message_queue.send(m_mem, view=released_layout)
                                     except Exception:
                                         pass
             session.metadata["jailed_mafia_ids"] = []
@@ -3488,7 +3650,12 @@ class GameEngine:
             is_blocked = actor_state.metadata.get("roleblocked") and not (actor_state.role_key == "frieza" and actor_state.metadata.get("golden_frieza"))
             if is_blocked:
                 try:
-                    self.bot.message_queue.send(member, "**Look a flying hazy! You were distracted tonight!**.")
+                    rb_layout = build_v2_layout(
+                        title="hey look theres a flying elephant!",
+                        description="**You were distracted / roleblocked tonight!**\nYour ability was blocked and could not be performed.",
+                        color=discord.Color.dark_red(),
+                    )
+                    self.bot.message_queue.send(member, view=rb_layout)
                 except Exception:
                     pass
                 continue
@@ -3498,7 +3665,12 @@ class GameEngine:
             # No action submitted at all tonight (no ability, chose not to act, etc.)
             if payload is None:
                 try:
-                    self.bot.message_queue.send(member, f"{get_emoji('night')} {get_inaction_message()}")
+                    inaction_layout = build_v2_layout(
+                        title=f"{get_emoji('night')} A Quiet Night",
+                        description=get_inaction_message(),
+                        color=discord.Color.dark_blue(),
+                    )
+                    self.bot.message_queue.send(member, view=inaction_layout)
                 except Exception:
                     pass
                 continue
@@ -3518,7 +3690,15 @@ class GameEngine:
             try:
                 feedback = await role_inst.get_night_feedback(context)
                 if feedback:
-                    self.bot.message_queue.send(member, feedback)
+                    role_meta = roles.ROLES_METADATA.get(actor_state.role_key or "", {})
+                    role_display = role_meta.get("name", actor_state.role_key or "Unknown")
+                    role_emoji = get_emoji(actor_state.role_key) or get_emoji("search")
+                    feedback_layout = build_v2_layout(
+                        title=f"{role_emoji} {role_display} — Night Feedback",
+                        description=feedback,
+                        color=discord.Color.blue(),
+                    )
+                    self.bot.message_queue.send(member, view=feedback_layout)
             except Exception:
                 logger.exception("Failed to get night feedback for user %s", actor_id)
 
@@ -3584,7 +3764,12 @@ class GameEngine:
                     color=discord.Color.dark_red(),
                 )
                 self.bot.message_queue.send(converted_member, view=convert_layout)
-                self.bot.message_queue.send(converted_member, f"{get_emoji('group')} **Your Fellow Mafia Members:** {mafia_list_str}")
+                converted_mafia_layout = build_v2_layout(
+                    title=f"{get_emoji('group')} Your Fellow Mafia Members",
+                    description=mafia_list_str,
+                    color=discord.Color.dark_red(),
+                )
+                self.bot.message_queue.send(converted_member, view=converted_mafia_layout)
 
             except Exception:
                 logger.exception("Failed to DM converted player %s", converted_id)
@@ -3598,11 +3783,15 @@ class GameEngine:
             member = guild.get_member(pid)
             if member:
                 try:
-                    self.bot.message_queue.send(
-                        member,
-                        f"{get_emoji('muzan_kibutsuji')} **New Mafia Member!** <@{converted_id}> has been transformed into "
-                        f"a **{role_display}** by Muzan Kibutsuji and is now on your side!"
+                    new_mafia_layout = build_v2_layout(
+                        title=f"{get_emoji('muzan_kibutsuji')} New Mafia Member!",
+                        description=(
+                            f"<@{converted_id}> has been transformed into a **{role_display}** "
+                            f"by Muzan Kibutsuji and is now on your side!"
+                        ),
+                        color=discord.Color.dark_red(),
                     )
+                    self.bot.message_queue.send(member, view=new_mafia_layout)
                 except Exception:
                     pass
 

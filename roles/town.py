@@ -157,7 +157,7 @@ class AyanokojiPublicReveal(NightAction):
         import discord
         import roles
         role_meta = roles.ROLES_METADATA.get(role_key, {})
-        role_display = role_meta.get("name", role_key.replace('_', ' ').title())
+        role_display = role_meta.get("name", (role_key or "Unknown").replace('_', ' ').title())
 
         faction_display = "Protagonist" if faction == RoleFaction.HERO.value else ("Antagonist" if faction == RoleFaction.VILLAIN.value else "Neutral")
 
@@ -221,7 +221,7 @@ class LDeduction(NightAction):
             faction = RoleFaction.VILLAIN.value
 
         if scan_count >= 2:
-            role_display = target_player.role_key.replace('_', ' ').title()
+            role_display = (target_player.role_key or "Unknown").replace('_', ' ').title()
             context.payload["result"] = f"{get_emoji('detective')} **Deduction (Scan {scan_count}):** <@{target_id}>'s exact role is **{role_display}**."
         else:
             align_emoji = f"{get_emoji('hero')} Protagonist" if faction == RoleFaction.HERO.value else (f"{get_emoji('villain')} Antagonist" if faction == RoleFaction.VILLAIN.value else f"{get_emoji('neutral')} Neutral")
@@ -667,6 +667,30 @@ class MaomaoBrewPotion(NightAction):
             target_player.vote_weight = 2
             context.payload["result"] = f"🧪 **Potion of Intelligence:** <@{target_id}> gains +1 vote (total weight: 2) for the next day."
 
+            # Notify the target player that they gained +1 vote
+            import asyncio
+            async def notify_intelligence(s=session, t_id=target_id, bot=context.bot):
+                if bot:
+                    from ui import build_v2_layout
+                    import discord
+                    guild = bot.get_guild(s.game_handle.guild_id)
+                    target_member = guild.get_member(t_id) if guild else None
+                    if target_member:
+                        try:
+                            intel_layout = build_v2_layout(
+                                title=f"{get_emoji('maomao')} Potion of Intelligence",
+                                description=(
+                                    "You have been granted **+1 Vote** for the next vote phase! "
+                                    "(Total weight: **2**) — make it count."
+                                ),
+                                color=discord.Color.blue(),
+                            )
+                            bot.message_queue.send(target_member, view=intel_layout)
+                        except Exception:
+                            pass
+            from utils.helpers import safe_create_task
+            safe_create_task(notify_intelligence(), "maomao_intelligence_notify")
+
 
 @role_registry.register
 class Maomao(BaseRole):
@@ -850,14 +874,18 @@ class TosenBankai(NightAction):
             p_member = guild.get_member(p_id)
             if p_member:
                 try:
-                    bot.message_queue.send(
-                        p_member,
-                        "🌑 **Enma Korogi — You Have Been Detained!**\n"
-                        "Kaname Tosen has imprisoned you inside his Bankai tonight.\n"
-                        "• You **cannot** perform your night ability.\n"
-                        "• You **cannot** be targeted by other players.\n"
-                        "• You **may** talk directly with Tosen by replying in this DM."
+                    from ui import build_v2_layout
+                    detain_layout = build_v2_layout(
+                        title="🌑 Enma Korogi — You Have Been Detained!",
+                        description=(
+                            "Kaname Tosen has imprisoned you inside his Bankai tonight.\n\n"
+                            "• You **cannot** perform your night ability.\n"
+                            "• You **cannot** be targeted by other players.\n"
+                            "• You **may** talk directly with Tosen by replying in this DM."
+                        ),
+                        color=discord.Color.dark_purple(),
                     )
+                    bot.message_queue.send(p_member, view=detain_layout)
                 except Exception:
                     pass
 
@@ -872,12 +900,17 @@ class TosenBankai(NightAction):
                         other_mem = guild.get_member(pid)
                         if other_mem:
                             try:
-                                bot.message_queue.send(
-                                    other_mem,
-                                    f"🚨 **[Mafia DM Chat] ANTAGONIST IMPRISONED!**\n"
-                                    f"<@{p_id}> has been detained inside Kaname Tosen's Bankai (*Enma Korogi*) tonight. "
-                                    f"Their access to Mafia DM Chat has been temporarily revoked."
+                                from ui import build_v2_layout
+                                jailed_layout = build_v2_layout(
+                                    title="🚨 Antagonist Imprisoned!",
+                                    description=(
+                                        f"<@{p_id}> has been detained inside Kaname Tosen's Bankai "
+                                        f"(*Enma Korogi*) tonight.\nTheir access to the **Mafia DM Chat** "
+                                        f"has been temporarily revoked."
+                                    ),
+                                    color=discord.Color.dark_red(),
                                 )
+                                bot.message_queue.send(other_mem, view=jailed_layout)
                             except Exception:
                                 pass
 
@@ -1003,15 +1036,22 @@ class DazaiNoLongerHuman(NightAction):
             context.payload["log"] = f"Dazai nullified <@{target_id}>'s abilities."
             context.payload["result"] = f"✋ **No Longer Human!** You have nullified <@{target_id}>'s abilities tonight."
 
-            # Notify target
+            # Notify target (Component V2 embed)
             import asyncio
             async def notify_nullified(s=session, t_id=target_id, bot=context.bot):
                 if bot:
+                    from ui import build_v2_layout
+                    import discord
                     guild = bot.get_guild(s.game_handle.guild_id)
                     member = guild.get_member(t_id) if guild else None
                     if member:
                         try:
-                            bot.message_queue.send(member, f"{get_emoji('cross')} **Your abilities were nullified tonight.**")
+                            null_layout = build_v2_layout(
+                                title="✋ Ability Nullified!",
+                                description="**Your abilities were nullified tonight.**",
+                                color=discord.Color.dark_red(),
+                            )
+                            bot.message_queue.send(member, view=null_layout)
                         except Exception:
                             pass
             from utils.helpers import safe_create_task
